@@ -8,11 +8,13 @@ class WebSocketManager {
   private projectId: string | null = null
   private token: string | null = null
   private reconnectDelay = 3000
+  private intentionalClose = false
 
   connect(projectId: string, token: string) {
     this.disconnect()
     this.projectId = projectId
     this.token = token
+    this.intentionalClose = false
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
@@ -33,6 +35,7 @@ class WebSocketManager {
 
     this.ws.onclose = () => {
       this.cleanup()
+      if (this.intentionalClose) return
       this.reconnectTimer = setTimeout(() => {
         if (this.projectId && this.token) {
           this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000)
@@ -45,9 +48,15 @@ class WebSocketManager {
   }
 
   disconnect() {
+    this.intentionalClose = true
     this.cleanup()
-    this.ws?.close()
-    this.ws = null
+    if (this.ws) {
+      this.ws.onclose = null
+      this.ws.onerror = null
+      this.ws.onmessage = null
+      this.ws.close()
+      this.ws = null
+    }
     this.projectId = null
     this.token = null
   }
