@@ -21,6 +21,7 @@ interface BoardState {
     toStatusId: string,
     position: number,
   ) => void
+  relocateTask: (taskId: string, newTask: Task) => void
   removeTask: (taskId: string) => void
   setFilters: (filters: Partial<FilterState>) => void
   clearFilters: () => void
@@ -89,6 +90,18 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       },
     })
   },
+
+  relocateTask: (taskId, newTask) =>
+    set((state) => {
+      const targetStatusId = newTask.status.id
+      const updated: Record<string, Task[]> = {}
+      for (const [statusId, tasks] of Object.entries(state.tasksByStatus)) {
+        updated[statusId] = tasks.filter((t) => t.id !== taskId)
+      }
+      updated[targetStatusId] = [...(updated[targetStatusId] ?? []), newTask]
+        .sort((a, b) => a.position - b.position)
+      return { tasksByStatus: updated }
+    }),
 
   removeTask: (taskId) =>
     set((state) => {

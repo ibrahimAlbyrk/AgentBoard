@@ -12,8 +12,10 @@ import {
 import { useProjectStore } from '@/stores/projectStore'
 import { useBoardStore } from '@/stores/boardStore'
 import { useMoveTask } from '@/hooks/useTasks'
+import { markLocalMove } from '@/hooks/useWebSocket'
 import { BoardColumn } from './BoardColumn'
 import { TaskCard } from './TaskCard'
+import { TaskAnimationLayer, startFlight } from './TaskAnimationLayer'
 import type { Task } from '@/types'
 
 interface KanbanBoardProps {
@@ -95,7 +97,19 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
         position = (before + after) / 2
       }
 
-      // Optimistic: move in store BEFORE clearing overlay so card is already in new column
+      // Mark as local drag so WS echo won't re-animate
+      markLocalMove(taskId)
+
+      // FLIP animation for cross-column moves: capture overlay position as "from"
+      if (fromStatusId !== targetStatusId) {
+        const translated = active.rect.current.translated
+        if (translated) {
+          const fromRect = new DOMRect(translated.left, translated.top, translated.width, translated.height)
+          startFlight(taskId, activeTask, fromRect, true)
+        }
+      }
+
+      // Optimistic update + clear overlay
       useBoardStore.getState().moveTask(taskId, fromStatusId, targetStatusId, position)
       setActiveTask(null)
 
@@ -127,9 +141,15 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
         ))}
       </div>
 
-      <DragOverlay>
+      <TaskAnimationLayer />
+
+      <DragOverlay dropAnimation={null}>
         {activeTask && (
-          <div className="rotate-3 opacity-90 scale-[1.02]" style={{ filter: 'drop-shadow(0 8px 24px oklch(0 0 0 / 0.3))' }}>
+          <div style={{
+            transform: 'scale(1.03)',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)',
+            borderRadius: 12,
+          }}>
             <TaskCard task={activeTask} onClick={() => {}} isDragOverlay />
           </div>
         )}

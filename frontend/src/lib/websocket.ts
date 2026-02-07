@@ -11,6 +11,7 @@ class WebSocketManager {
   private intentionalClose = false
 
   connect(projectId: string, token: string) {
+    if (this.ws && this.projectId === projectId && this.token === token) return
     this.disconnect()
     this.projectId = projectId
     this.token = token
@@ -18,7 +19,7 @@ class WebSocketManager {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    this.ws = new WebSocket(`${protocol}//${host}/api/v1/ws?token=${token}`)
+    this.ws = new WebSocket(`${protocol}//${host}/api/v1/ws?token=${token}&project_id=${projectId}`)
 
     this.ws.onopen = () => {
       this.reconnectDelay = 3000
@@ -54,11 +55,11 @@ class WebSocketManager {
       this.ws.onclose = null
       this.ws.onerror = null
       this.ws.onmessage = null
-      this.ws.close()
+      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+        this.ws.close()
+      }
       this.ws = null
     }
-    this.projectId = null
-    this.token = null
   }
 
   on(type: string, handler: EventHandler) {

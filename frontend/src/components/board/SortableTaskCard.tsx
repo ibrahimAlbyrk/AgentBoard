@@ -1,6 +1,8 @@
+import { useCallback } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { TaskCard } from './TaskCard'
+import { registerCardRef, useIsFlying } from './TaskAnimationLayer'
 import type { Task } from '@/types'
 
 interface SortableTaskCardProps {
@@ -18,17 +20,26 @@ export function SortableTaskCard({ task, onClick }: SortableTaskCardProps) {
     isDragging,
   } = useSortable({ id: task.id })
 
+  const flying = useIsFlying(task.id)
+
+  const refCallback = useCallback(
+    (el: HTMLDivElement | null) => {
+      setNodeRef(el)
+      registerCardRef(task.id, el)
+    },
+    [setNodeRef, task.id],
+  )
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.4 : flying ? 0 : 1,
   }
 
   return (
     <div
-      ref={setNodeRef}
+      ref={refCallback}
       style={style}
-      className="transition-opacity duration-150"
       {...attributes}
       {...listeners}
     >
