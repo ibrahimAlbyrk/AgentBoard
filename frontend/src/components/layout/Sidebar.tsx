@@ -22,10 +22,12 @@ export function Sidebar({ onClose }: SidebarProps) {
   const user = useAuthStore((s) => s.user)
 
   return (
-    <aside className="w-64 h-full border-r bg-white dark:bg-gray-800 flex flex-col">
-      <div className="h-16 flex items-center gap-2 px-5 border-b">
-        <LayoutDashboard className="size-6 text-blue-600" />
-        <span className="font-bold text-lg">AgentBoard</span>
+    <aside className="w-[240px] h-full border-r border-[var(--sidebar-border)] bg-sidebar flex flex-col">
+      <div className="h-14 flex items-center gap-2 px-5 border-b border-[var(--sidebar-border)]">
+        <LayoutDashboard className="size-5 text-primary" />
+        <span className="font-bold text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          AgentBoard
+        </span>
       </div>
 
       <nav className="flex-1 py-4 px-3 space-y-1">
@@ -37,10 +39,10 @@ export function Sidebar({ onClose }: SidebarProps) {
               to={to}
               onClick={onClose}
               className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                'flex items-center gap-3 px-3 h-8 rounded-lg text-sm font-medium transition-colors duration-150',
                 active
-                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                  ? 'bg-sidebar-accent text-primary font-semibold'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--sidebar-hover)]'
               )}
             >
               <Icon className="size-4" />
@@ -51,7 +53,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
         {projects && projects.length > 0 && (
           <div className="pt-6">
-            <h4 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            <h4 className="px-3 text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
               Projects
             </h4>
             <div className="space-y-1">
@@ -61,10 +63,10 @@ export function Sidebar({ onClose }: SidebarProps) {
                   to={`/projects/${p.id}`}
                   onClick={onClose}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+                    'flex items-center gap-3 px-3 h-8 rounded-lg text-sm transition-colors duration-150',
                     location.pathname === `/projects/${p.id}`
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-600 hover:bg-gray-100'
+                      ? 'bg-sidebar-accent text-primary font-semibold'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--sidebar-hover)]'
                   )}
                 >
                   <span
@@ -80,7 +82,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       </nav>
 
       {user && (
-        <div className="border-t p-4 flex items-center gap-3">
+        <div className="border-t border-[var(--sidebar-border)] p-4 flex items-center gap-3">
           <Avatar className="size-8">
             <AvatarImage src={user.avatar_url || undefined} />
             <AvatarFallback>

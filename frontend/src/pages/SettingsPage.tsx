@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Copy, Plus, Trash2, Key } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -89,8 +88,8 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
+    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+      <h1 className="text-2xl font-semibold">Settings</h1>
 
       <Tabs defaultValue="profile">
         <TabsList>
@@ -100,12 +99,12 @@ export function SettingsPage() {
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile</CardTitle>
-              <CardDescription>Update your personal information</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Profile</h2>
+              <p className="text-sm text-muted-foreground">Update your personal information</p>
+            </div>
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="full_name">Full Name</Label>
                 <Input
@@ -132,60 +131,59 @@ export function SettingsPage() {
                 <Label>Username</Label>
                 <Input value={user?.username ?? ''} disabled />
               </div>
-              <Button onClick={handleProfileSave} disabled={saving}>
+              <Button onClick={handleProfileSave} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="api-keys" className="mt-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+          <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <CardTitle>API Keys</CardTitle>
-                <CardDescription>Manage API keys for programmatic access</CardDescription>
+                <h2 className="text-lg font-semibold text-foreground">API Keys</h2>
+                <p className="text-sm text-muted-foreground">Manage API keys for programmatic access</p>
               </div>
-              <Button onClick={() => setShowCreateKey(true)}>
+              <Button onClick={() => setShowCreateKey(true)} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <Plus className="size-4" />
                 Generate Key
               </Button>
-            </CardHeader>
-            <CardContent>
-              {apiKeys.length === 0 ? (
-                <EmptyState
-                  icon={Key}
-                  title="No API keys"
-                  description="Generate an API key to access the API programmatically"
-                  action={{ label: 'Generate Key', onClick: () => setShowCreateKey(true) }}
-                />
-              ) : (
-                <div className="space-y-3">
-                  {apiKeys.map((key) => (
-                    <div
-                      key={key.id}
-                      className="flex items-center justify-between p-3 rounded-lg border"
-                    >
-                      <div>
-                        <p className="font-medium text-sm">{key.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {key.key_prefix}... | Last used:{' '}
-                          {key.last_used ?? 'Never'}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => handleDeleteKey(key.id)}
-                      >
-                        <Trash2 className="size-3.5 text-destructive" />
-                      </Button>
+            </div>
+
+            {apiKeys.length === 0 ? (
+              <EmptyState
+                icon={Key}
+                title="No API keys"
+                description="Generate an API key to access the API programmatically"
+                action={{ label: 'Generate Key', onClick: () => setShowCreateKey(true) }}
+              />
+            ) : (
+              <div className="space-y-3">
+                {apiKeys.map((key) => (
+                  <div
+                    key={key.id}
+                    className="flex items-center justify-between bg-[var(--surface)] border border-[var(--border-subtle)] rounded-xl p-4"
+                  >
+                    <div>
+                      <p className="font-medium text-sm text-foreground">{key.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {key.key_prefix}... | Last used:{' '}
+                        {key.last_used ?? 'Never'}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => handleDeleteKey(key.id)}
+                    >
+                      <Trash2 className="size-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <Dialog open={showCreateKey} onOpenChange={setShowCreateKey}>
             <DialogContent>
@@ -216,6 +214,7 @@ export function SettingsPage() {
                         setCreatedKey('')
                         setShowCreateKey(false)
                       }}
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       Done
                     </Button>
@@ -241,6 +240,7 @@ export function SettingsPage() {
                     <Button
                       onClick={handleCreateKey}
                       disabled={!newKeyName.trim() || creatingKey}
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       {creatingKey ? 'Generating...' : 'Generate'}
                     </Button>
@@ -252,17 +252,15 @@ export function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="notifications" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notifications</CardTitle>
-              <CardDescription>Configure your notification preferences</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Notification preferences coming soon
-              </p>
-            </CardContent>
-          </Card>
+          <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-foreground">Notifications</h2>
+              <p className="text-sm text-muted-foreground">Configure your notification preferences</p>
+            </div>
+            <p className="text-sm text-muted-foreground text-center py-8">
+              Notification preferences coming soon
+            </p>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

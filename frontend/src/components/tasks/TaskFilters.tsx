@@ -13,12 +13,12 @@ import { useProjectStore } from '@/stores/projectStore'
 import { useBoardStore } from '@/stores/boardStore'
 import type { Priority } from '@/types'
 
-const priorityOptions: { value: Priority; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'urgent', label: 'Urgent' },
+const priorityOptions: { value: Priority; label: string; color: string }[] = [
+  { value: 'none', label: 'None', color: 'var(--priority-none)' },
+  { value: 'low', label: 'Low', color: 'var(--priority-low)' },
+  { value: 'medium', label: 'Medium', color: 'var(--priority-medium)' },
+  { value: 'high', label: 'High', color: 'var(--priority-high)' },
+  { value: 'urgent', label: 'Urgent', color: 'var(--priority-urgent)' },
 ]
 
 export function TaskFilters() {
@@ -47,12 +47,12 @@ export function TaskFilters() {
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <div className="relative w-56">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-[var(--text-tertiary)]" />
         <Input
           placeholder="Filter tasks..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-8 h-8 text-sm"
+          className="pl-8 h-8 text-sm bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors"
         />
       </div>
 
@@ -62,14 +62,20 @@ export function TaskFilters() {
           setFilters({ priorities: v === 'all' ? [] : [v] })
         }
       >
-        <SelectTrigger className="w-32 h-8 text-sm">
+        <SelectTrigger className="w-32 h-8 text-sm bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors">
           <SelectValue placeholder="Priority" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Priorities</SelectItem>
           {priorityOptions.map((p) => (
             <SelectItem key={p.value} value={p.value}>
-              {p.label}
+              <div className="flex items-center gap-2">
+                <span
+                  className="size-2 rounded-full shrink-0"
+                  style={{ backgroundColor: p.color }}
+                />
+                {p.label}
+              </div>
             </SelectItem>
           ))}
         </SelectContent>
@@ -81,7 +87,7 @@ export function TaskFilters() {
           setFilters({ assignee: v === 'all' ? null : v })
         }
       >
-        <SelectTrigger className="w-36 h-8 text-sm">
+        <SelectTrigger className="w-36 h-8 text-sm bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors">
           <SelectValue placeholder="Assignee" />
         </SelectTrigger>
         <SelectContent>
@@ -102,6 +108,7 @@ export function TaskFilters() {
             clearFilters()
             setSearch('')
           }}
+          className="text-[var(--text-secondary)] hover:text-foreground hover:bg-[var(--surface)] transition-colors"
         >
           <X className="size-3" />
           Clear

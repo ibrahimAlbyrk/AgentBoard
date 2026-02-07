@@ -70,18 +70,18 @@ export function BoardPage() {
 
   return (
     <div className="flex flex-col h-full -m-6">
-      <div className="px-6 py-4 border-b bg-white dark:bg-gray-800">
+      <div className="px-6 py-4 border-b border-[var(--border-subtle)] bg-background">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <span className="text-2xl">{project.icon || '📋'}</span>
             <div>
-              <h1 className="text-xl font-bold">{project.name}</h1>
+              <h1 className="text-xl font-semibold text-foreground">{project.name}</h1>
               {project.description && (
                 <p className="text-sm text-muted-foreground">{project.description}</p>
               )}
             </div>
           </div>
-          <Button onClick={() => handleAddTask()}>
+          <Button onClick={() => handleAddTask()} className="bg-primary text-primary-foreground hover:bg-primary/90">
             <Plus className="size-4" />
             New Task
           </Button>

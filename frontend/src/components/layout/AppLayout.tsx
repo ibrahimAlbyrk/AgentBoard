@@ -7,16 +7,16 @@ export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-background">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden transition-opacity duration-150"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <div
-        className={`fixed inset-y-0 left-0 z-50 md:static md:translate-x-0 transition-transform ${
+        className={`fixed inset-y-0 left-0 z-50 md:static md:translate-x-0 transition-transform duration-200 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

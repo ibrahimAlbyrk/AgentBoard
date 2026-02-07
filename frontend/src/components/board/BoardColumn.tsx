@@ -1,7 +1,6 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { SortableTaskCard } from './SortableTaskCard'
 import type { Status, Task } from '@/types'
 
@@ -16,27 +15,32 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask }: BoardColu
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status.id}` })
 
   return (
-    <div className="w-80 flex-shrink-0 flex flex-col max-h-full">
-      <div className="flex items-center justify-between px-3 py-2 mb-2">
+    <div className="w-[300px] flex-shrink-0 flex flex-col max-h-full">
+      <div className="flex items-center justify-between px-2 py-2 mb-2">
         <div className="flex items-center gap-2">
           <span
-            className="size-3 rounded-full"
-            style={{ backgroundColor: status.color || '#6b7280' }}
+            className="size-2 rounded-full flex-shrink-0"
+            style={{ backgroundColor: status.color || 'var(--text-tertiary)' }}
           />
-          <span className="text-sm font-semibold">{status.name}</span>
-          <span className="text-xs text-muted-foreground bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+          <span className="text-sm font-semibold text-foreground">{status.name}</span>
+          <span className="bg-[var(--overlay)] text-[var(--text-tertiary)] text-[11px] px-1.5 py-0.5 rounded-md font-medium">
             {tasks.length}
           </span>
         </div>
-        <Button variant="ghost" size="icon-xs" onClick={onAddTask}>
-          <Plus className="size-4" />
-        </Button>
+        <button
+          onClick={onAddTask}
+          className="size-6 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--overlay)] transition-all duration-150"
+        >
+          <Plus className="size-3.5" />
+        </button>
       </div>
 
       <div
         ref={setNodeRef}
-        className={`flex-1 overflow-y-auto rounded-lg p-2 space-y-2 min-h-[100px] transition-colors ${
-          isOver ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-100 dark:bg-gray-800/50'
+        className={`flex-1 overflow-y-auto rounded-xl p-2 space-y-2 min-h-[120px] transition-all duration-150 ${
+          isOver
+            ? 'border border-primary bg-[var(--accent-muted-bg)]'
+            : 'bg-[var(--surface)]/50 border border-dashed border-[var(--border-subtle)]'
         }`}
       >
         <SortableContext
@@ -53,7 +57,7 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask }: BoardColu
         </SortableContext>
 
         {tasks.length === 0 && (
-          <div className="flex items-center justify-center h-20 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-lg text-sm text-muted-foreground">
+          <div className="flex items-center justify-center h-20 border border-dashed border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-tertiary)]">
             No tasks
           </div>
         )}

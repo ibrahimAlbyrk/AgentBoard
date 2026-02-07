@@ -18,20 +18,20 @@ export function ProjectsPage() {
   const filtered = showArchived ? projects : projects.filter((p) => !p.is_archived)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Projects</h1>
+        <h1 className="text-2xl font-semibold">Projects</h1>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
             <input
               type="checkbox"
               checked={showArchived}
               onChange={(e) => setShowArchived(e.target.checked)}
-              className="rounded"
+              className="rounded border-[var(--border-strong)] accent-[var(--accent-solid)]"
             />
             Show archived
           </label>
-          <Button onClick={() => setShowCreate(true)}>
+          <Button onClick={() => setShowCreate(true)} className="bg-primary text-primary-foreground hover:bg-primary/90">
             <Plus className="size-4" />
             New Project
           </Button>

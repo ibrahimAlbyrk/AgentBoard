@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom'
 import { FolderKanban, CheckSquare, Clock, AlertTriangle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/stores/authStore'
 import { useProjects } from '@/hooks/useProjects'
 import { ProjectCard } from '@/components/projects/ProjectCard'
@@ -16,31 +15,29 @@ export function DashboardPage() {
   if (isLoading) return <LoadingSpinner text="Loading dashboard..." />
 
   const stats = [
-    { label: 'Total Projects', value: projects.length, icon: FolderKanban, color: 'text-blue-600' },
-    { label: 'Total Tasks', value: projects.reduce((sum, p) => sum + p.task_count, 0), icon: CheckSquare, color: 'text-green-600' },
-    { label: 'In Progress', value: '-', icon: Clock, color: 'text-orange-500' },
-    { label: 'Overdue', value: '-', icon: AlertTriangle, color: 'text-red-500' },
+    { label: 'Total Projects', value: projects.length, icon: FolderKanban, color: 'text-primary', bg: 'bg-[var(--accent-muted-bg)]' },
+    { label: 'Total Tasks', value: projects.reduce((sum, p) => sum + p.task_count, 0), icon: CheckSquare, color: 'text-[var(--success)]', bg: 'bg-[var(--success-muted)]' },
+    { label: 'In Progress', value: '-', icon: Clock, color: 'text-[var(--warning)]', bg: 'bg-[var(--warning-muted)]' },
+    { label: 'Overdue', value: '-', icon: AlertTriangle, color: 'text-destructive', bg: 'bg-[var(--destructive)]/10' },
   ]
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">
+    <div className="space-y-6 animate-fade-in">
+      <h1 className="text-2xl font-semibold">
         Welcome back, {user?.full_name || user?.username}
       </h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => (
-          <Card key={s.label}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {s.label}
-              </CardTitle>
-              <s.icon className={`size-4 ${s.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{s.value}</div>
-            </CardContent>
-          </Card>
+          <div key={s.label} className="bg-card border border-[var(--border-subtle)] rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[13px] font-medium text-muted-foreground">{s.label}</p>
+              <div className={`size-7 rounded-lg flex items-center justify-center ${s.bg}`}>
+                <s.icon className={`size-3.5 ${s.color}`} />
+              </div>
+            </div>
+            <p className="text-[22px] font-semibold text-foreground">{s.value}</p>
+          </div>
         ))}
       </div>
 

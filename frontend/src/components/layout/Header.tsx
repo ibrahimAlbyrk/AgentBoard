@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/stores/authStore'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 
 interface HeaderProps {
   onMenuClick?: () => void
@@ -27,26 +28,32 @@ export function Header({ onMenuClick }: HeaderProps) {
   }
 
   return (
-    <header className="h-16 border-b bg-white dark:bg-gray-800 flex items-center justify-between px-6">
+    <header className="h-14 border-b border-[var(--border-subtle)] bg-background/80 backdrop-blur-xl flex items-center justify-between px-6">
       <div className="flex-1 flex items-center gap-2">
         <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenuClick}>
           <Menu className="size-5" />
         </Button>
       </div>
 
-      <div className="hidden sm:block w-96">
+      <div className="hidden sm:block w-full max-w-md">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search tasks... (Cmd+K)"
-            className="pl-9 bg-gray-50 dark:bg-gray-700 border-gray-200"
+            placeholder="Search..."
+            className="pl-9 bg-[var(--surface)] border border-input rounded-lg"
           />
+          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:inline-flex h-5 items-center gap-1 rounded border border-[var(--border-subtle)] bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+            Cmd+K
+          </kbd>
         </div>
       </div>
 
       <div className="flex-1 flex items-center justify-end gap-2">
-        <Button variant="ghost" size="icon">
+        <ThemeToggle />
+
+        <Button variant="ghost" size="icon" className="relative size-8 text-[var(--text-secondary)] hover:text-foreground transition-colors duration-150">
           <Bell className="size-4" />
+          <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary" />
         </Button>
 
         <DropdownMenu>

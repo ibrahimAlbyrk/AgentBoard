@@ -1,15 +1,15 @@
 import { Calendar, MessageCircle } from 'lucide-react'
 import { formatDistanceToNow, isPast, parseISO } from 'date-fns'
 import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { Task } from '@/types'
 
-const priorityColors: Record<string, string> = {
-  urgent: 'bg-red-500',
-  high: 'bg-orange-500',
-  medium: 'bg-yellow-500',
-  low: 'bg-blue-500',
+const priorityBorderColors: Record<string, string> = {
+  urgent: 'var(--priority-urgent)',
+  high: 'var(--priority-high)',
+  medium: 'var(--priority-medium)',
+  low: 'var(--priority-low)',
+  none: 'transparent',
 }
 
 interface TaskCardProps {
@@ -27,25 +27,22 @@ export function TaskCard({ task, onClick, isDragging, isDragOverlay }: TaskCardP
   return (
     <div
       onClick={isDragging ? undefined : onClick}
+      style={{
+        borderLeftColor: priorityBorderColors[task.priority] || 'transparent',
+      }}
       className={cn(
-        'bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-100 dark:border-gray-700',
-        isDragging && 'cursor-grabbing',
-        isDragOverlay && 'shadow-lg',
+        'bg-card border border-[var(--border-subtle)] border-l-[3px] rounded-xl p-3 cursor-pointer',
+        'hover:-translate-y-0.5 hover:border-[var(--border)] transition-all duration-150',
+        isDragging && 'opacity-50 cursor-grabbing',
+        isDragOverlay && 'shadow-[0_8px_24px_oklch(0_0_0/0.3)] border-primary',
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-medium leading-snug line-clamp-2">
-          {task.title}
-        </span>
-        {task.priority !== 'none' && (
-          <span
-            className={cn('size-2 rounded-full flex-shrink-0 mt-1.5', priorityColors[task.priority])}
-          />
-        )}
-      </div>
+      <span className="text-[13px] font-medium text-foreground leading-snug line-clamp-2 block">
+        {task.title}
+      </span>
 
       {task.description && (
-        <p className="text-xs text-muted-foreground line-clamp-2 mt-1.5">
+        <p className="text-xs text-[var(--text-tertiary)] line-clamp-2 mt-1">
           {task.description}
         </p>
       )}
@@ -53,23 +50,22 @@ export function TaskCard({ task, onClick, isDragging, isDragOverlay }: TaskCardP
       {visibleLabels.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
           {visibleLabels.map((label) => (
-            <Badge
+            <span
               key={label.id}
-              variant="secondary"
-              className="text-[10px] px-1.5 py-0"
+              className="text-[11px] font-medium px-1.5 py-0 rounded-md border inline-flex items-center"
               style={{
                 backgroundColor: `${label.color}20`,
                 color: label.color,
-                borderColor: `${label.color}40`,
+                borderColor: `${label.color}33`,
               }}
             >
               {label.name}
-            </Badge>
+            </span>
           ))}
           {extraCount > 0 && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+            <span className="text-[11px] font-medium px-1.5 py-0 rounded-md bg-[var(--overlay)] text-[var(--text-tertiary)] inline-flex items-center">
               +{extraCount}
-            </Badge>
+            </span>
           )}
         </div>
       )}
@@ -80,7 +76,7 @@ export function TaskCard({ task, onClick, isDragging, isDragOverlay }: TaskCardP
             <span
               className={cn(
                 'flex items-center gap-1 text-xs',
-                isOverdue ? 'text-red-500' : 'text-muted-foreground'
+                isOverdue ? 'text-[var(--priority-urgent)]' : 'text-[var(--text-tertiary)]'
               )}
             >
               <Calendar className="size-3" />
@@ -88,7 +84,7 @@ export function TaskCard({ task, onClick, isDragging, isDragOverlay }: TaskCardP
             </span>
           )}
           {task.comments_count > 0 && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1 text-xs text-[var(--text-tertiary)]">
               <MessageCircle className="size-3" />
               {task.comments_count}
             </span>
@@ -96,9 +92,9 @@ export function TaskCard({ task, onClick, isDragging, isDragOverlay }: TaskCardP
         </div>
 
         {task.assignee && (
-          <Avatar size="sm">
+          <Avatar className="size-5">
             <AvatarImage src={task.assignee.avatar_url || undefined} />
-            <AvatarFallback className="text-[10px]">
+            <AvatarFallback className="text-[9px]">
               {(task.assignee.full_name || task.assignee.username).charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>

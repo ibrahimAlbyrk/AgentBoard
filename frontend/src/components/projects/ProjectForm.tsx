@@ -106,7 +106,7 @@ export function ProjectForm({ open, onClose }: ProjectFormProps) {
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createProject.isPending}>
+            <Button type="submit" disabled={createProject.isPending} className="bg-primary text-primary-foreground hover:bg-primary/90">
               {createProject.isPending ? 'Creating...' : 'Create Project'}
             </Button>
           </DialogFooter>
