@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.env
+!.env.example
+*.db
+*.sqlite3
+.venv/
+alembic/versions/*.pyc

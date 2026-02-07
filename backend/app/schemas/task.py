@@ -1,0 +1,74 @@
+from datetime import datetime
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from .label import LabelResponse
+from .status import StatusResponse
+from .user import UserBrief
+
+
+class TaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+    description: str | None = None
+    status_id: UUID | None = None
+    priority: Literal["none", "low", "medium", "high", "urgent"] = "none"
+    assignee_id: UUID | None = None
+    label_ids: list[UUID] = []
+    due_date: datetime | None = None
+    parent_id: UUID | None = None
+
+
+class TaskUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    status_id: UUID | None = None
+    priority: Literal["none", "low", "medium", "high", "urgent"] | None = None
+    assignee_id: UUID | None = None
+    label_ids: list[UUID] | None = None
+    due_date: datetime | None = None
+
+
+class TaskResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    project_id: UUID
+    title: str
+    description: str | None = None
+    status: StatusResponse
+    priority: str
+    assignee: UserBrief | None = None
+    creator: UserBrief
+    labels: list[LabelResponse]
+    due_date: datetime | None = None
+    position: float
+    parent_id: UUID | None = None
+    comments_count: int = 0
+    created_at: datetime
+    updated_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class TaskMove(BaseModel):
+    status_id: UUID
+    position: float | None = None
+
+
+class TaskReorder(BaseModel):
+    position: float
+
+
+class BulkTaskUpdate(BaseModel):
+    task_ids: list[UUID]
+    updates: dict
+
+
+class BulkTaskMove(BaseModel):
+    task_ids: list[UUID]
+    status_id: UUID
+
+
+class BulkTaskDelete(BaseModel):
+    task_ids: list[UUID]
