@@ -44,9 +44,11 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      setActiveTask(null)
       const { active, over } = event
-      if (!over || !activeTask) return
+      if (!over || !activeTask) {
+        setActiveTask(null)
+        return
+      }
 
       const taskId = String(active.id)
       const overId = String(over.id)
@@ -67,11 +69,15 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
             break
           }
         }
-        if (!targetStatusId!) return
+        if (!targetStatusId!) {
+          setActiveTask(null)
+          return
+        }
       }
 
       const fromStatusId = activeTask.status.id
       if (fromStatusId === targetStatusId && tasksByStatus[fromStatusId]?.findIndex(t => t.id === taskId) === targetIndex) {
+        setActiveTask(null)
         return
       }
 
@@ -88,6 +94,10 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
         const after = targetTasks[targetIndex]?.position ?? before + 2048
         position = (before + after) / 2
       }
+
+      // Optimistic: move in store BEFORE clearing overlay so card is already in new column
+      useBoardStore.getState().moveTask(taskId, fromStatusId, targetStatusId, position)
+      setActiveTask(null)
 
       moveTask.mutate({
         taskId,
@@ -119,7 +129,7 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
 
       <DragOverlay>
         {activeTask && (
-          <div className="rotate-3 opacity-90">
+          <div className="rotate-3 opacity-90 scale-[1.02]" style={{ filter: 'drop-shadow(0 8px 24px oklch(0 0 0 / 0.3))' }}>
             <TaskCard task={activeTask} onClick={() => {}} isDragOverlay />
           </div>
         )}

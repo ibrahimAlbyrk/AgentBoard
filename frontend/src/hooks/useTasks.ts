@@ -41,7 +41,6 @@ export function useDeleteTask(projectId: string) {
 
 export function useMoveTask(projectId: string) {
   const qc = useQueryClient()
-  const { moveTask: boardMoveTask } = useBoardStore.getState()
 
   return useMutation({
     mutationFn: ({
@@ -53,13 +52,10 @@ export function useMoveTask(projectId: string) {
       data: TaskMove
     }) => api.moveTask(projectId, taskId, data),
 
-    onMutate: async ({ taskId, fromStatusId, data }) => {
+    onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['tasks', projectId] })
-
+      // Store already updated optimistically in KanbanBoard.handleDragEnd
       const prevBoard = { ...useBoardStore.getState().tasksByStatus }
-
-      boardMoveTask(taskId, fromStatusId, data.status_id, data.position ?? 0)
-
       return { prevBoard }
     },
 
