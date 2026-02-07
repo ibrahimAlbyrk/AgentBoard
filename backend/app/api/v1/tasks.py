@@ -19,6 +19,7 @@ from app.schemas.task import (
     TaskUpdate,
 )
 from app.services.task_service import TaskService
+from app.services.websocket_manager import manager
 
 router = APIRouter(
     prefix="/projects/{project_id}/tasks", tags=["Tasks"]
@@ -67,7 +68,14 @@ async def create_task(
     current_user: User = Depends(get_current_user),
 ):
     task = await TaskService.create_task(db, project.id, current_user.id, task_in)
-    return ResponseBase(data=TaskResponse.model_validate(task))
+    response = TaskResponse.model_validate(task)
+    await manager.broadcast_to_project(str(project.id), {
+        "type": "task.created",
+        "project_id": str(project.id),
+        "data": response.model_dump(mode="json"),
+        "user": {"id": str(current_user.id), "username": current_user.username},
+    })
+    return ResponseBase(data=response)
 
 
 @router.get("/{task_id}", response_model=ResponseBase[TaskResponse])
@@ -98,7 +106,14 @@ async def update_task(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
     updated = await TaskService.update_task(db, task, current_user.id, task_in)
-    return ResponseBase(data=TaskResponse.model_validate(updated))
+    response = TaskResponse.model_validate(updated)
+    await manager.broadcast_to_project(str(project.id), {
+        "type": "task.updated",
+        "project_id": str(project.id),
+        "data": response.model_dump(mode="json"),
+        "user": {"id": str(current_user.id), "username": current_user.username},
+    })
+    return ResponseBase(data=response)
 
 
 @router.delete("/{task_id}", status_code=204)
@@ -113,6 +128,11 @@ async def delete_task(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
     await crud_task.remove(db, id=task_id)
+    await manager.broadcast_to_project(str(project.id), {
+        "type": "task.deleted",
+        "project_id": str(project.id),
+        "data": {"task_id": str(task_id)},
+    })
 
 
 @router.post("/{task_id}/move", response_model=ResponseBase[TaskResponse])
@@ -131,7 +151,14 @@ async def move_task(
     moved = await TaskService.move_task(
         db, task, current_user.id, body.status_id, body.position
     )
-    return ResponseBase(data=TaskResponse.model_validate(moved))
+    response = TaskResponse.model_validate(moved)
+    await manager.broadcast_to_project(str(project.id), {
+        "type": "task.moved",
+        "project_id": str(project.id),
+        "data": response.model_dump(mode="json"),
+        "user": {"id": str(current_user.id), "username": current_user.username},
+    })
+    return ResponseBase(data=response)
 
 
 @router.post("/bulk-update", response_model=ResponseBase[list[TaskResponse]])
@@ -144,7 +171,15 @@ async def bulk_update_tasks(
     tasks = await TaskService.bulk_update(
         db, project.id, current_user.id, body.task_ids, body.updates
     )
-    return ResponseBase(data=[TaskResponse.model_validate(t) for t in tasks])
+    responses = [TaskResponse.model_validate(t) for t in tasks]
+    for r in responses:
+        await manager.broadcast_to_project(str(project.id), {
+            "type": "task.updated",
+            "project_id": str(project.id),
+            "data": r.model_dump(mode="json"),
+            "user": {"id": str(current_user.id), "username": current_user.username},
+        })
+    return ResponseBase(data=responses)
 
 
 @router.post("/bulk-move", response_model=ResponseBase[list[TaskResponse]])
@@ -157,7 +192,15 @@ async def bulk_move_tasks(
     tasks = await TaskService.bulk_move(
         db, project.id, current_user.id, body.task_ids, body.status_id
     )
-    return ResponseBase(data=[TaskResponse.model_validate(t) for t in tasks])
+    responses = [TaskResponse.model_validate(t) for t in tasks]
+    for r in responses:
+        await manager.broadcast_to_project(str(project.id), {
+            "type": "task.moved",
+            "project_id": str(project.id),
+            "data": r.model_dump(mode="json"),
+            "user": {"id": str(current_user.id), "username": current_user.username},
+        })
+    return ResponseBase(data=responses)
 
 
 @router.post("/bulk-delete", status_code=204)
@@ -170,3 +213,8 @@ async def bulk_delete_tasks(
         task = await crud_task.get(db, task_id)
         if task and task.project_id == project.id:
             await crud_task.remove(db, id=task_id)
+            await manager.broadcast_to_project(str(project.id), {
+                "type": "task.deleted",
+                "project_id": str(project.id),
+                "data": {"task_id": str(task_id)},
+            })

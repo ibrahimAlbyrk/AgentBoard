@@ -100,7 +100,10 @@ class TaskService:
                 changes=changes,
             )
 
-        return await crud_task.get_with_relations(db, task.id)
+        task_id = task.id
+        await db.flush()
+        db.expunge(task)
+        return await crud_task.get_with_relations(db, task_id)
 
     @staticmethod
     async def move_task(
@@ -140,8 +143,10 @@ class TaskService:
             },
         )
 
+        task_id = task.id
         await db.commit()
-        return await crud_task.get_with_relations(db, task.id)
+        db.expunge(task)
+        return await crud_task.get_with_relations(db, task_id)
 
     @staticmethod
     async def bulk_update(

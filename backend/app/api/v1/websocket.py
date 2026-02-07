@@ -1,4 +1,4 @@
-from uuid import UUID
+import json
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
@@ -15,7 +15,7 @@ async def websocket_endpoint(
     project_id: str = Query(...),
 ):
     try:
-        payload = decode_token(token)
+        decode_token(token)
     except Exception:
         await websocket.close(code=4001)
         return
@@ -25,8 +25,14 @@ async def websocket_endpoint(
 
     try:
         while True:
-            data = await websocket.receive_text()
-            if data == "ping":
-                await websocket.send_text("pong")
+            raw = await websocket.receive_text()
+            try:
+                data = json.loads(raw)
+                msg_type = data.get("type")
+            except json.JSONDecodeError:
+                msg_type = raw
+
+            if msg_type == "ping":
+                await websocket.send_text(json.dumps({"type": "pong"}))
     except WebSocketDisconnect:
         manager.disconnect(project_id, websocket)
