@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Search, Bell, LogOut, User, Menu } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { Bell, LogOut, User, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -28,32 +27,19 @@ export function Header({ onMenuClick }: HeaderProps) {
   }
 
   return (
-    <header className="h-14 border-b border-[var(--border-subtle)] bg-background/80 backdrop-blur-xl flex items-center justify-between px-6">
-      <div className="flex-1 flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenuClick}>
-          <Menu className="size-5" />
+    <header className="h-12 border-b border-[var(--border-subtle)] bg-background/80 backdrop-blur-xl flex items-center justify-between px-4">
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" className="md:hidden size-8" onClick={onMenuClick}>
+          <Menu className="size-4" />
         </Button>
       </div>
 
-      <div className="hidden sm:block w-full max-w-md">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search..."
-            className="pl-9 bg-[var(--surface)] border border-input rounded-lg"
-          />
-          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:inline-flex h-5 items-center gap-1 rounded border border-[var(--border-subtle)] bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-            Cmd+K
-          </kbd>
-        </div>
-      </div>
-
-      <div className="flex-1 flex items-center justify-end gap-2">
+      <div className="flex items-center gap-1.5">
         <ThemeToggle />
 
-        <Button variant="ghost" size="icon" className="relative size-8 text-[var(--text-secondary)] hover:text-foreground transition-colors duration-150">
+        <Button variant="ghost" size="icon" className="relative size-8 text-[var(--text-secondary)] hover:text-foreground transition-colors">
           <Bell className="size-4" />
-          <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary" />
+          <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-[var(--accent-solid)]" />
         </Button>
 
         <DropdownMenu>
@@ -61,7 +47,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             <Button variant="ghost" className="relative size-8 rounded-full p-0">
               <Avatar size="sm">
                 <AvatarImage src={user?.avatar_url || undefined} />
-                <AvatarFallback>
+                <AvatarFallback className="text-xs bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
                   {(user?.full_name || user?.username || 'U').charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>

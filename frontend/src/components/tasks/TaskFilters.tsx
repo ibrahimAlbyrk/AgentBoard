@@ -45,14 +45,14 @@ export function TaskFilters() {
     filters.assignee
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
-      <div className="relative w-56">
+    <div className="flex items-center gap-2.5 flex-wrap">
+      <div className="relative w-52">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-[var(--text-tertiary)]" />
         <Input
           placeholder="Filter tasks..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-8 h-8 text-sm bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors"
+          className="pl-8 h-8 text-[13px] bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors"
         />
       </div>
 
@@ -62,7 +62,7 @@ export function TaskFilters() {
           setFilters({ priorities: v === 'all' ? [] : [v] })
         }
       >
-        <SelectTrigger className="w-32 h-8 text-sm bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors">
+        <SelectTrigger className="w-32 h-8 text-[13px] bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors">
           <SelectValue placeholder="Priority" />
         </SelectTrigger>
         <SelectContent>
@@ -87,7 +87,7 @@ export function TaskFilters() {
           setFilters({ assignee: v === 'all' ? null : v })
         }
       >
-        <SelectTrigger className="w-36 h-8 text-sm bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors">
+        <SelectTrigger className="w-36 h-8 text-[13px] bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors">
           <SelectValue placeholder="Assignee" />
         </SelectTrigger>
         <SelectContent>
@@ -108,7 +108,7 @@ export function TaskFilters() {
             clearFilters()
             setSearch('')
           }}
-          className="text-[var(--text-secondary)] hover:text-foreground hover:bg-[var(--surface)] transition-colors"
+          className="text-[var(--text-secondary)] hover:text-foreground hover:bg-[var(--surface)] transition-colors text-[13px]"
         >
           <X className="size-3" />
           Clear

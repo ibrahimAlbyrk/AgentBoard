@@ -11,20 +11,22 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
   return (
     <div
-      className="stagger-item bg-card border border-[var(--border-subtle)] rounded-xl cursor-pointer hover:-translate-y-0.5 transition-all duration-150"
+      className="stagger-item bg-card border border-[var(--border-subtle)] rounded-xl cursor-pointer card-hover overflow-hidden"
       onClick={() => navigate(`/projects/${project.id}`)}
     >
+      {/* Color accent bar */}
       <div
-        className="h-1 rounded-t-xl"
-        style={{ backgroundColor: project.color || '#6366f1' }}
+        className="h-1"
+        style={{ backgroundColor: project.color || '#6C5CE7' }}
       />
+
       <div className="p-4">
         <div className="flex items-start gap-3">
-          <span className="text-2xl">{project.icon || '📋'}</span>
+          <span className="text-xl">{project.icon || '📋'}</span>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground truncate">{project.name}</h3>
+            <h3 className="font-semibold text-[14px] text-foreground truncate">{project.name}</h3>
             {project.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+              <p className="text-[13px] text-[var(--text-secondary)] line-clamp-2 mt-0.5 leading-relaxed">
                 {project.description}
               </p>
             )}
@@ -32,20 +34,20 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </div>
 
         <div className="flex items-center gap-2 mt-4">
-          <span className="inline-flex items-center gap-1 bg-[var(--surface)] border border-[var(--border-subtle)] text-muted-foreground text-xs px-2 py-0.5 rounded-md">
+          <span className="inline-flex items-center gap-1.5 bg-[var(--surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-[11px] font-medium px-2.5 py-1 rounded-full">
             <Users className="size-3" />
             {project.member_count}
           </span>
-          <span className="inline-flex items-center bg-[var(--surface)] border border-[var(--border-subtle)] text-muted-foreground text-xs px-2 py-0.5 rounded-md">
+          <span className="inline-flex items-center bg-[var(--surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-[11px] font-medium px-2.5 py-1 rounded-full">
             {project.task_count} tasks
           </span>
         </div>
 
         {project.task_count > 0 && (
           <div className="mt-3">
-            <div className="h-1.5 bg-[var(--surface)] rounded-full overflow-hidden">
+            <div className="h-1 bg-[var(--overlay)] rounded-full overflow-hidden">
               <div
-                className="h-full bg-primary rounded-full transition-all"
+                className="h-full rounded-full transition-all bg-gradient-to-r from-[var(--accent-solid)] to-[var(--accent-solid)]/60"
                 style={{ width: '0%' }}
               />
             </div>

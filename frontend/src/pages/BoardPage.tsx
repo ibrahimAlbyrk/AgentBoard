@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,8 @@ export function BoardPage() {
 
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const selectedTaskRef = useRef(selectedTask)
+  selectedTaskRef.current = selectedTask
   const [defaultStatusId, setDefaultStatusId] = useState<string>()
 
   useEffect(() => {
@@ -51,6 +53,12 @@ export function BoardPage() {
           tasks.filter((t) => t.status.id === status.id)
         )
       }
+      // Sync selected task with fresh data
+      if (selectedTaskRef.current) {
+        const updated = tasks.find((t) => t.id === selectedTaskRef.current!.id)
+        if (updated) setSelectedTask(updated)
+        else setSelectedTask(null)
+      }
     }
   }, [tasksRes, statuses, setTasksForStatus])
 
@@ -60,7 +68,7 @@ export function BoardPage() {
 
   const project = projectRes?.data
   if (!project) {
-    return <div className="text-center py-16 text-muted-foreground">Project not found</div>
+    return <div className="text-center py-16 text-[var(--text-secondary)]">Project not found</div>
   }
 
   const handleAddTask = (statusId?: string) => {
@@ -70,18 +78,21 @@ export function BoardPage() {
 
   return (
     <div className="flex flex-col h-full -m-6">
-      <div className="px-6 py-4 border-b border-[var(--border-subtle)] bg-background">
+      <div className="px-6 py-4 border-b border-[var(--border-subtle)] bg-background/60 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">{project.icon || '📋'}</span>
+            <span className="text-xl">{project.icon || '📋'}</span>
             <div>
-              <h1 className="text-xl font-semibold text-foreground">{project.name}</h1>
+              <h1 className="text-lg font-bold text-foreground tracking-tight">{project.name}</h1>
               {project.description && (
-                <p className="text-sm text-muted-foreground">{project.description}</p>
+                <p className="text-[13px] text-[var(--text-secondary)]">{project.description}</p>
               )}
             </div>
           </div>
-          <Button onClick={() => handleAddTask()} className="bg-primary text-primary-foreground hover:bg-primary/90">
+          <Button
+            onClick={() => handleAddTask()}
+            className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)] shadow-[0_0_16px_-4px_var(--glow)] transition-all"
+          >
             <Plus className="size-4" />
             New Task
           </Button>

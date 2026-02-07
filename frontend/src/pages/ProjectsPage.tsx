@@ -20,9 +20,14 @@ export function ProjectsPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Projects</h1>
+        <div>
+          <h1 className="text-[26px] font-bold tracking-tight">Projects</h1>
+          <p className="text-[var(--text-secondary)] text-sm mt-0.5">
+            {filtered.length} project{filtered.length !== 1 ? 's' : ''}
+          </p>
+        </div>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+          <label className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] cursor-pointer select-none">
             <input
               type="checkbox"
               checked={showArchived}
@@ -31,7 +36,10 @@ export function ProjectsPage() {
             />
             Show archived
           </label>
-          <Button onClick={() => setShowCreate(true)} className="bg-primary text-primary-foreground hover:bg-primary/90">
+          <Button
+            onClick={() => setShowCreate(true)}
+            className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)] shadow-[0_0_16px_-4px_var(--glow)] transition-all"
+          >
             <Plus className="size-4" />
             New Project
           </Button>

@@ -16,20 +16,20 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask }: BoardColu
 
   return (
     <div className="w-[300px] flex-shrink-0 flex flex-col max-h-full">
-      <div className="flex items-center justify-between px-2 py-2 mb-2">
+      <div className="flex items-center justify-between px-1 py-2 mb-2">
         <div className="flex items-center gap-2">
           <span
-            className="size-2 rounded-full flex-shrink-0"
+            className="size-2.5 rounded-full flex-shrink-0 ring-2 ring-background"
             style={{ backgroundColor: status.color || 'var(--text-tertiary)' }}
           />
-          <span className="text-sm font-semibold text-foreground">{status.name}</span>
-          <span className="bg-[var(--overlay)] text-[var(--text-tertiary)] text-[11px] px-1.5 py-0.5 rounded-md font-medium">
+          <span className="text-[13px] font-semibold text-foreground">{status.name}</span>
+          <span className="bg-[var(--overlay)] text-[var(--text-tertiary)] text-[11px] px-1.5 py-0.5 rounded-md font-medium tabular-nums">
             {tasks.length}
           </span>
         </div>
         <button
           onClick={onAddTask}
-          className="size-6 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--overlay)] transition-all duration-150"
+          className="size-6 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] hover:bg-[var(--accent-muted-bg)] transition-all duration-150"
         >
           <Plus className="size-3.5" />
         </button>
@@ -37,10 +37,10 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask }: BoardColu
 
       <div
         ref={setNodeRef}
-        className={`flex-1 overflow-y-auto rounded-xl p-2 space-y-2 min-h-[120px] transition-all duration-150 ${
+        className={`flex-1 overflow-y-auto rounded-xl p-2 space-y-2 min-h-[120px] transition-all duration-200 ${
           isOver
-            ? 'border border-primary bg-[var(--accent-muted-bg)]'
-            : 'bg-[var(--surface)]/50 border border-dashed border-[var(--border-subtle)]'
+            ? 'border border-[var(--accent-solid)]/40 bg-[var(--accent-muted-bg)] shadow-[inset_0_0_20px_-8px_var(--glow)]'
+            : 'bg-[var(--surface)]/40 border border-dashed border-[var(--border-subtle)]'
         }`}
       >
         <SortableContext
@@ -57,7 +57,7 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask }: BoardColu
         </SortableContext>
 
         {tasks.length === 0 && (
-          <div className="flex items-center justify-center h-20 border border-dashed border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-tertiary)]">
+          <div className="flex items-center justify-center h-20 border border-dashed border-[var(--border-subtle)] rounded-lg text-[13px] text-[var(--text-tertiary)]">
             No tasks
           </div>
         )}
