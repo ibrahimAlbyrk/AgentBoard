@@ -16,6 +16,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        ws: true,
         configure: (proxy) => {
           proxy.on('proxyRes', (proxyRes) => {
             const location = proxyRes.headers['location']
@@ -27,10 +28,6 @@ export default defineConfig({
             }
           })
         },
-      },
-      '/ws': {
-        target: 'ws://localhost:8000',
-        ws: true,
       },
     },
   },
