@@ -103,43 +103,57 @@ export function Header({ onMenuClick }: HeaderProps) {
                   <p className="text-sm">No notifications yet</p>
                 </div>
               ) : (
-                items.map((n) => (
-                  <div
-                    key={n.id}
-                    className={cn(
-                      'flex gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 transition-colors',
-                      !n.is_read && 'bg-[var(--accent-muted-bg)]/30'
-                    )}
-                  >
-                    <div className="mt-0.5 flex-shrink-0">
-                      {!n.is_read ? (
-                        <span className="block size-2 rounded-full bg-[var(--accent-solid)]" />
-                      ) : (
-                        <span className="block size-2 rounded-full bg-transparent" />
+                items.map((n) => {
+                  const taskId = n.data?.task_id as string | undefined
+                  const boardId = n.data?.board_id as string | undefined
+                  const isClickable = !!(taskId && boardId && n.project_id)
+
+                  const handleNotifClick = () => {
+                    if (!isClickable) return
+                    if (!n.is_read) markRead.mutate({ ids: [n.id] })
+                    navigate(`/projects/${n.project_id}/boards/${boardId}?task=${taskId}`)
+                  }
+
+                  return (
+                    <div
+                      key={n.id}
+                      onClick={handleNotifClick}
+                      className={cn(
+                        'flex gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 transition-colors',
+                        !n.is_read && 'bg-[var(--accent-muted-bg)]/30',
+                        isClickable && 'cursor-pointer hover:bg-[var(--overlay)]',
+                      )}
+                    >
+                      <div className="mt-0.5 flex-shrink-0">
+                        {!n.is_read ? (
+                          <span className="block size-2 rounded-full bg-[var(--accent-solid)]" />
+                        ) : (
+                          <span className="block size-2 rounded-full bg-transparent" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn('text-sm truncate', !n.is_read ? 'font-medium text-foreground' : 'text-[var(--text-secondary)]')}>
+                          {n.title}
+                        </p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-0.5 line-clamp-2">
+                          {n.message}
+                        </p>
+                        <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+                          {timeAgo(n.created_at)}
+                        </p>
+                      </div>
+                      {!n.is_read && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); markRead.mutate({ ids: [n.id] }) }}
+                          className="mt-0.5 flex-shrink-0 text-[var(--text-tertiary)] hover:text-foreground transition-colors"
+                          title="Mark as read"
+                        >
+                          <Check className="size-3.5" />
+                        </button>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={cn('text-sm truncate', !n.is_read ? 'font-medium text-foreground' : 'text-[var(--text-secondary)]')}>
-                        {n.title}
-                      </p>
-                      <p className="text-xs text-[var(--text-tertiary)] mt-0.5 line-clamp-2">
-                        {n.message}
-                      </p>
-                      <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
-                        {timeAgo(n.created_at)}
-                      </p>
-                    </div>
-                    {!n.is_read && (
-                      <button
-                        onClick={() => markRead.mutate({ ids: [n.id] })}
-                        className="mt-0.5 flex-shrink-0 text-[var(--text-tertiary)] hover:text-foreground transition-colors"
-                        title="Mark as read"
-                      >
-                        <Check className="size-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </PopoverContent>
