@@ -97,3 +97,6 @@ class Task(Base):
     attachments = relationship(
         "Attachment", back_populates="task", cascade="all, delete-orphan"
     )
+    watchers = relationship(
+        "TaskWatcher", back_populates="task", cascade="all, delete-orphan"
+    )

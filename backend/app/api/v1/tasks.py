@@ -79,10 +79,15 @@ async def create_task(
         "data": response.model_dump(mode="json"),
         "user": {"id": str(current_user.id), "username": current_user.username},
     })
+    notified: set[str] = set()
     if response.assignee:
-        await manager.broadcast_to_user(str(response.assignee.id), {
-            "type": "notification.new",
-        })
+        uid = str(response.assignee.id)
+        notified.add(uid)
+        await manager.broadcast_to_user(uid, {"type": "notification.new"})
+    for w in response.watchers:
+        if w.user and str(w.user.id) not in notified:
+            notified.add(str(w.user.id))
+            await manager.broadcast_to_user(str(w.user.id), {"type": "notification.new"})
     return ResponseBase(data=response)
 
 
@@ -122,10 +127,15 @@ async def update_task(
         "data": response.model_dump(mode="json"),
         "user": {"id": str(current_user.id), "username": current_user.username},
     })
+    notified: set[str] = set()
     if response.assignee:
-        await manager.broadcast_to_user(str(response.assignee.id), {
-            "type": "notification.new",
-        })
+        uid = str(response.assignee.id)
+        notified.add(uid)
+        await manager.broadcast_to_user(uid, {"type": "notification.new"})
+    for w in response.watchers:
+        if w.user and str(w.user.id) not in notified:
+            notified.add(str(w.user.id))
+            await manager.broadcast_to_user(str(w.user.id), {"type": "notification.new"})
     return ResponseBase(data=response)
 
 
@@ -136,13 +146,14 @@ async def delete_task(
     board: Board = Depends(check_board_access),
     current_user: User = Depends(get_current_user),
 ):
-    task = await crud_task.get(db, task_id)
+    task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
     task_title = task.title
     assignee_id = task.assignee_id
+    watcher_user_ids = [w.user_id for w in task.watchers if w.user_id]
     await crud_task.remove(db, id=task_id)
     await manager.broadcast_to_board(str(board.project_id), str(board.id), {
         "type": "task.deleted",
@@ -150,8 +161,9 @@ async def delete_task(
         "board_id": str(board.id),
         "data": {"task_id": str(task_id)},
     })
+    deleter_name = current_user.full_name or current_user.username
+    notified: set[str] = set()
     if assignee_id:
-        deleter_name = current_user.full_name or current_user.username
         notif = await NotificationService.create_notification(
             db,
             user_id=assignee_id,
@@ -163,9 +175,24 @@ async def delete_task(
             data={"task_id": str(task_id)},
         )
         if notif:
-            await manager.broadcast_to_user(str(assignee_id), {
-                "type": "notification.new",
-            })
+            notified.add(str(assignee_id))
+            await manager.broadcast_to_user(str(assignee_id), {"type": "notification.new"})
+    for wuid in watcher_user_ids:
+        if str(wuid) in notified or wuid == assignee_id:
+            continue
+        notif = await NotificationService.create_notification(
+            db,
+            user_id=wuid,
+            actor_id=current_user.id,
+            project_id=board.project_id,
+            type="task_deleted",
+            title="Watching: Task Deleted",
+            message=f'{deleter_name} deleted "{task_title}"',
+            data={"task_id": str(task_id)},
+        )
+        if notif:
+            notified.add(str(wuid))
+            await manager.broadcast_to_user(str(wuid), {"type": "notification.new"})
 
 
 @router.post("/{task_id}/move", response_model=ResponseBase[TaskResponse])
@@ -192,10 +219,15 @@ async def move_task(
         "data": response.model_dump(mode="json"),
         "user": {"id": str(current_user.id), "username": current_user.username},
     })
+    notified: set[str] = set()
     if response.assignee:
-        await manager.broadcast_to_user(str(response.assignee.id), {
-            "type": "notification.new",
-        })
+        uid = str(response.assignee.id)
+        notified.add(uid)
+        await manager.broadcast_to_user(uid, {"type": "notification.new"})
+    for w in response.watchers:
+        if w.user and str(w.user.id) not in notified:
+            notified.add(str(w.user.id))
+            await manager.broadcast_to_user(str(w.user.id), {"type": "notification.new"})
     return ResponseBase(data=response)
 
 

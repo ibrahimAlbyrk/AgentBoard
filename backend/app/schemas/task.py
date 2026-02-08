@@ -20,6 +20,8 @@ class TaskCreate(BaseModel):
     agent_assignee_id: UUID | None = None
     agent_creator_id: UUID | None = None
     label_ids: list[UUID] = []
+    watcher_user_ids: list[UUID] = []
+    watcher_agent_ids: list[UUID] = []
     due_date: datetime | None = None
     parent_id: UUID | None = None
 
@@ -38,6 +40,8 @@ class TaskUpdate(BaseModel):
     assignee_id: UUID | None = None
     agent_assignee_id: UUID | None = None
     label_ids: list[UUID] | None = None
+    watcher_user_ids: list[UUID] | None = None
+    watcher_agent_ids: list[UUID] | None = None
     due_date: datetime | None = None
 
     @model_validator(mode="after")
@@ -45,6 +49,14 @@ class TaskUpdate(BaseModel):
         if self.assignee_id and self.agent_assignee_id:
             raise ValueError("Cannot assign to both user and agent")
         return self
+
+
+class WatcherBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user: UserBrief | None = None
+    agent: AgentBrief | None = None
 
 
 class TaskResponse(BaseModel):
@@ -63,6 +75,7 @@ class TaskResponse(BaseModel):
     agent_creator: AgentBrief | None = None
     labels: list[LabelResponse]
     attachments: list[AttachmentResponse] = []
+    watchers: list[WatcherBrief] = []
     due_date: datetime | None = None
     position: float
     parent_id: UUID | None = None

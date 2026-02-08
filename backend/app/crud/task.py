@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from app.models.attachment import Attachment
 from app.models.task import Task
 from app.models.task_label import TaskLabel
+from app.models.task_watcher import TaskWatcher
 from app.schemas.task import TaskCreate, TaskUpdate
 
 from .base import CRUDBase
@@ -20,6 +21,10 @@ _task_load_options = (
     joinedload(Task.agent_creator),
     selectinload(Task.labels).joinedload(TaskLabel.label),
     selectinload(Task.attachments).joinedload(Attachment.user),
+    selectinload(Task.watchers).options(
+        joinedload(TaskWatcher.user),
+        joinedload(TaskWatcher.agent),
+    ),
 )
 
 

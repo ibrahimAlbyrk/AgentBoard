@@ -14,6 +14,12 @@ export interface Attachment {
   created_at: string
 }
 
+export interface WatcherBrief {
+  id: string
+  user: UserBrief | null
+  agent: AgentBrief | null
+}
+
 export interface Task {
   id: string
   project_id: string
@@ -28,6 +34,7 @@ export interface Task {
   agent_creator: AgentBrief | null
   labels: Label[]
   attachments: Attachment[]
+  watchers: WatcherBrief[]
   due_date: string | null
   position: number
   parent_id: string | null
@@ -46,6 +53,8 @@ export interface TaskCreate {
   agent_assignee_id?: string
   agent_creator_id?: string
   label_ids?: string[]
+  watcher_user_ids?: string[]
+  watcher_agent_ids?: string[]
   due_date?: string
   parent_id?: string
 }
@@ -58,6 +67,8 @@ export interface TaskUpdate {
   assignee_id?: string | null
   agent_assignee_id?: string | null
   label_ids?: string[]
+  watcher_user_ids?: string[]
+  watcher_agent_ids?: string[]
   due_date?: string
 }
 
