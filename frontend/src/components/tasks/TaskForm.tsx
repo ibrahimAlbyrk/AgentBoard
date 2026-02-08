@@ -35,6 +35,7 @@ type FormData = z.infer<typeof schema>
 
 interface TaskFormProps {
   projectId: string
+  boardId: string
   open: boolean
   onClose: () => void
   defaultStatusId?: string
@@ -48,9 +49,9 @@ const priorityOptions: { value: Priority; label: string; color: string }[] = [
   { value: 'urgent', label: 'Urgent', color: 'var(--priority-urgent)' },
 ]
 
-export function TaskForm({ projectId, open, onClose, defaultStatusId }: TaskFormProps) {
+export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }: TaskFormProps) {
   const { statuses, members } = useProjectStore()
-  const createTask = useCreateTask(projectId)
+  const createTask = useCreateTask(projectId, boardId)
 
   const firstStatusId = defaultStatusId || statuses[0]?.id || ''
 

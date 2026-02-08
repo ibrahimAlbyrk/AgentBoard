@@ -2,7 +2,9 @@ import { useState, useCallback, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  pointerWithin,
+  closestCenter,
+  type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
@@ -20,20 +22,85 @@ import { TaskCard } from './TaskCard'
 import { TaskAnimationLayer, startFlight } from './TaskAnimationLayer'
 import type { Task } from '@/types'
 
+/**
+ * Custom collision detection for Kanban cross-column drags.
+ * pointerWithin finds the column, then closestCenter finds the nearest task inside it.
+ */
+const kanbanCollision: CollisionDetection = (args) => {
+  const withinCollisions = pointerWithin(args)
+
+  // Pointer directly over a task card
+  const directTask = withinCollisions.find(
+    (c) => !String(c.id).startsWith('column-'),
+  )
+  if (directTask) return [directTask]
+
+  // Pointer inside a column but between/below task cards
+  const column = withinCollisions.find((c) =>
+    String(c.id).startsWith('column-'),
+  )
+  if (column) {
+    const columnRect = args.droppableRects.get(column.id)
+    if (columnRect) {
+      const inColumn = (id: string | number, r: { left: number; width: number }) => {
+        if (String(id).startsWith('column-')) return false
+        const cx = r.left + r.width / 2
+        return cx >= columnRect.left && cx <= columnRect.right
+      }
+
+      const allClosest = closestCenter(args)
+      const nearestInColumn = allClosest.find((c) => {
+        const r = args.droppableRects.get(c.id)
+        return r ? inColumn(c.id, r) : false
+      })
+
+      if (nearestInColumn) {
+        const nearestRect = args.droppableRects.get(nearestInColumn.id)
+        const pointerY = args.pointerCoordinates?.y ?? 0
+
+        // Pointer below nearest task: check if it's the bottom-most in column
+        if (nearestRect && pointerY > nearestRect.top + nearestRect.height) {
+          const hasLowerTask = allClosest.some((c) => {
+            if (c.id === nearestInColumn.id) return false
+            const r = args.droppableRects.get(c.id)
+            return r ? inColumn(c.id, r) && r.top > nearestRect.top : false
+          })
+
+          if (!hasLowerTask) {
+            // Same-column: keep returning task for SortableContext swap animations
+            const activeRect = args.droppableRects.get(args.active.id)
+            if (activeRect && inColumn(args.active.id, activeRect)) {
+              return [nearestInColumn]
+            }
+            // Cross-column: return column → dragOverItemId=null → placeholder at bottom
+            return [column]
+          }
+        }
+
+        return [nearestInColumn]
+      }
+    }
+    return [column]
+  }
+
+  return closestCenter(args)
+}
+
 interface KanbanBoardProps {
   onTaskClick: (task: Task) => void
   onAddTask: (statusId: string) => void
 }
 
 export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
-  const { statuses, currentProject } = useProjectStore()
+  const { statuses, currentProject, currentBoard } = useProjectStore()
   const { tasksByStatus, getFilteredTasks } = useBoardStore()
-  const moveTask = useMoveTask(currentProject?.id ?? '')
+  const moveTask = useMoveTask(currentProject?.id ?? '', currentBoard?.id ?? '')
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
   const [tilt, setTilt] = useState({ x: 0, y: 0 })
   const prevDelta = useRef({ x: 0, y: 0 })
+  const insertAfterRef = useRef(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -49,6 +116,7 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
         setActiveTask(task)
         setDragOverColumnId(task.status.id)
         setDragOverItemId(null)
+        insertAfterRef.current = false
         break
       }
     }
@@ -69,7 +137,7 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
   }, [])
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { over } = event
+    const { over, active } = event
     if (!over || !activeTask) return
 
     const overId = String(over.id)
@@ -91,6 +159,18 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
     if (targetColumnId) {
       setDragOverColumnId(targetColumnId)
       setDragOverItemId(overItemId)
+
+      // Cross-column: determine above/below for placeholder positioning
+      if (overItemId && targetColumnId !== activeTask.status.id) {
+        const translated = active.rect.current.translated
+        if (translated) {
+          const activeCenterY = translated.top + translated.height / 2
+          const overCenterY = over.rect.top + over.rect.height / 2
+          insertAfterRef.current = activeCenterY > overCenterY
+        }
+      } else {
+        insertAfterRef.current = false
+      }
     }
   }, [activeTask, tasksByStatus])
 
@@ -99,6 +179,7 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
     setDragOverColumnId(null)
     setDragOverItemId(null)
     setTilt({ x: 0, y: 0 })
+    insertAfterRef.current = false
   }, [])
 
   const handleDragEnd = useCallback(
@@ -156,7 +237,7 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
           // Moving down → insert after over task; moving up → insert before
           insertIdx = origActive < origOver ? overIdx + 1 : overIdx
         } else {
-          insertIdx = overIdx
+          insertIdx = insertAfterRef.current ? overIdx + 1 : overIdx
         }
       }
 
@@ -211,13 +292,14 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
     if (!dragOverItemId) return tasks.length
 
     const idx = tasks.findIndex(t => t.id === dragOverItemId)
-    return idx === -1 ? tasks.length : idx
+    if (idx === -1) return tasks.length
+    return insertAfterRef.current ? idx + 1 : idx
   }
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={kanbanCollision}
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragOver={handleDragOver}

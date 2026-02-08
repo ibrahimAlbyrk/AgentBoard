@@ -1,0 +1,293 @@
+import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Plus, LayoutGrid, ListTodo, Users, Trash2, Pencil, MoreHorizontal, ArrowRight } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useProject } from '@/hooks/useProjects'
+import { useCreateBoard, useUpdateBoard, useDeleteBoard } from '@/hooks/useBoards'
+import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
+import { EmptyState } from '@/components/shared/EmptyState'
+import type { Board } from '@/types'
+
+export function BoardListPage() {
+  const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
+  const { data: projectRes, isLoading } = useProject(projectId!)
+  const createBoard = useCreateBoard(projectId!)
+  const updateBoard = useUpdateBoard(projectId!)
+  const deleteBoard = useDeleteBoard(projectId!)
+
+  const [showCreate, setShowCreate] = useState(false)
+  const [boardName, setBoardName] = useState('')
+  const [boardColor, setBoardColor] = useState('#3B82F6')
+  const [editingBoard, setEditingBoard] = useState<Board | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editColor, setEditColor] = useState('#3B82F6')
+
+  if (isLoading) return <LoadingSpinner text="Loading project..." />
+
+  const project = projectRes?.data
+  if (!project) {
+    return <div className="text-center py-16 text-[var(--text-secondary)]">Project not found</div>
+  }
+
+  const boards = project.boards ?? []
+
+  const handleCreate = async () => {
+    if (!boardName.trim()) return
+    try {
+      await createBoard.mutateAsync({ name: boardName, color: boardColor })
+      toast.success('Board created')
+      setBoardName('')
+      setShowCreate(false)
+    } catch {
+      toast.error('Failed to create board')
+    }
+  }
+
+  const openEdit = (board: Board) => {
+    setEditingBoard(board)
+    setEditName(board.name)
+    setEditColor(board.color || '#3B82F6')
+  }
+
+  const handleEdit = async () => {
+    if (!editingBoard || !editName.trim()) return
+    try {
+      await updateBoard.mutateAsync({ boardId: editingBoard.id, data: { name: editName, color: editColor } })
+      toast.success('Board updated')
+      setEditingBoard(null)
+    } catch {
+      toast.error('Failed to update board')
+    }
+  }
+
+  const handleDelete = async (board: Board) => {
+    if (!confirm(`Delete "${board.name}"? All tasks in this board will be lost.`)) return
+    try {
+      await deleteBoard.mutateAsync(board.id)
+      toast.success('Board deleted')
+    } catch {
+      toast.error('Failed to delete board')
+    }
+  }
+
+  const colors = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#22C55E', '#EF4444', '#06B6D4', '#6366F1']
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">{project.icon || '📋'}</span>
+          <div>
+            <h1 className="text-xl font-bold text-foreground tracking-tight">{project.name}</h1>
+            {project.description && (
+              <p className="text-sm text-[var(--text-secondary)]">{project.description}</p>
+            )}
+          </div>
+        </div>
+        <Button
+          onClick={() => setShowCreate(true)}
+          className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)]"
+        >
+          <Plus className="size-4" />
+          New Board
+        </Button>
+      </div>
+
+      {boards.length === 0 ? (
+        <EmptyState
+          icon={LayoutGrid}
+          title="No boards yet"
+          description="Create your first board to start organizing tasks"
+          action={{ label: 'Create Board', onClick: () => setShowCreate(true) }}
+        />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {boards.map((board) => {
+            const color = board.color || '#3B82F6'
+            const rgb = hexToRgb(color)
+            return (
+              <div
+                key={board.id}
+                className="group relative bg-card rounded-2xl cursor-pointer overflow-hidden transition-all duration-300 border border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
+                onClick={() => navigate(`/projects/${projectId}/boards/${board.id}`)}
+              >
+                <div className="h-1.5 w-full" style={{ background: `linear-gradient(135deg, ${color}, ${color}88, ${color}44)` }} />
+
+                <div
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+                  style={{ boxShadow: `inset 0 0 60px -20px rgb(${rgb} / 0.06), 0 8px 32px -8px rgb(${rgb} / 0.12)` }}
+                />
+
+                <div className="p-5 relative">
+                  <div className="flex items-start gap-3.5">
+                    <div
+                      className="size-11 rounded-xl flex items-center justify-center shrink-0 text-2xl transition-transform duration-300 group-hover:scale-110"
+                      style={{ backgroundColor: `rgb(${rgb} / 0.1)` }}
+                    >
+                      {board.icon || <LayoutGrid className="size-5" style={{ color }} />}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-[16px] text-foreground truncate leading-tight">{board.name}</h3>
+                      {board.description && (
+                        <p className="text-[13px] text-[var(--text-secondary)] line-clamp-2 mt-1">{board.description}</p>
+                      )}
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className="size-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--overlay)] shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="size-4 text-[var(--text-secondary)]" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuItem onSelect={() => openEdit(board)}>
+                          <Pencil className="size-4" /> Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem variant="destructive" onSelect={() => handleDelete(board)}>
+                          <Trash2 className="size-4" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-4">
+                    <span className="inline-flex items-center gap-1.5 bg-[var(--overlay)] text-[var(--text-secondary)] text-[11px] font-medium px-2.5 py-1 rounded-full">
+                      <ListTodo className="size-3" />
+                      {board.task_count}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 bg-[var(--overlay)] text-[var(--text-secondary)] text-[11px] font-medium px-2.5 py-1 rounded-full">
+                      <Users className="size-3" />
+                      {board.member_count}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-end mt-4 pt-3.5 border-t border-[var(--border-subtle)]">
+                    <div className="size-7 rounded-lg flex items-center justify-center bg-[var(--overlay)] opacity-0 group-hover:opacity-100 transition-all duration-300">
+                      <ArrowRight className="size-3.5 text-[var(--text-secondary)]" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <Dialog open={!!editingBoard} onOpenChange={(v) => !v && setEditingBoard(null)}>
+        <DialogContent className="bg-[var(--elevated)] border-[var(--border-subtle)] sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Edit Board</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <span className="text-xs text-[var(--text-tertiary)] font-medium">Name</span>
+              <Input
+                placeholder="Board name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="bg-[var(--surface)] border-[var(--border-subtle)]"
+                onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <span className="text-xs text-[var(--text-tertiary)] font-medium">Color</span>
+              <div className="flex gap-2">
+                {colors.map((c) => (
+                  <button
+                    key={c}
+                    className="size-7 rounded-full transition-transform hover:scale-110"
+                    style={{
+                      backgroundColor: c,
+                      outline: editColor === c ? '2px solid var(--foreground)' : 'none',
+                      outlineOffset: '2px',
+                    }}
+                    onClick={() => setEditColor(c)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingBoard(null)}>Cancel</Button>
+            <Button onClick={handleEdit} disabled={updateBoard.isPending || !editName.trim()}>
+              {updateBoard.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="bg-[var(--elevated)] border-[var(--border-subtle)] sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>New Board</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <span className="text-xs text-[var(--text-tertiary)] font-medium">Name</span>
+              <Input
+                placeholder="e.g. Development, Design, Marketing..."
+                value={boardName}
+                onChange={(e) => setBoardName(e.target.value)}
+                className="bg-[var(--surface)] border-[var(--border-subtle)]"
+                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <span className="text-xs text-[var(--text-tertiary)] font-medium">Color</span>
+              <div className="flex gap-2">
+                {colors.map((c) => (
+                  <button
+                    key={c}
+                    className="size-7 rounded-full transition-transform hover:scale-110"
+                    style={{
+                      backgroundColor: c,
+                      outline: boardColor === c ? '2px solid var(--foreground)' : 'none',
+                      outlineOffset: '2px',
+                    }}
+                    onClick={() => setBoardColor(c)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button onClick={handleCreate} disabled={createBoard.isPending || !boardName.trim()}>
+              {createBoard.isPending ? 'Creating...' : 'Create Board'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function hexToRgb(hex: string): string {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.substring(0, 2), 16)
+  const g = parseInt(h.substring(2, 4), 16)
+  const b = parseInt(h.substring(4, 6), 16)
+  return `${r} ${g} ${b}`
+}

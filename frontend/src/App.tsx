@@ -5,6 +5,7 @@ import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
+import { BoardListPage } from '@/pages/BoardListPage'
 import { BoardPage } from '@/pages/BoardPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 
@@ -29,7 +30,8 @@ function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
-        <Route path="/projects/:projectId" element={<BoardPage />} />
+        <Route path="/projects/:projectId" element={<BoardListPage />} />
+        <Route path="/projects/:projectId/boards/:boardId" element={<BoardPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>

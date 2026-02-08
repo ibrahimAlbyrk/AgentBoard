@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useProject } from '@/hooks/useProjects'
+import { useBoard } from '@/hooks/useBoards'
 import { useTasks } from '@/hooks/useTasks'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useProjectStore } from '@/stores/projectStore'
@@ -15,12 +16,13 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import type { Task } from '@/types'
 
 export function BoardPage() {
-  const { projectId } = useParams<{ projectId: string }>()
+  const { projectId, boardId } = useParams<{ projectId: string; boardId: string }>()
   const { data: projectRes, isLoading: projectLoading } = useProject(projectId!)
-  const { data: tasksRes, isLoading: tasksLoading } = useTasks(projectId!)
-  useWebSocket(projectId!)
+  const { data: boardRes, isLoading: boardLoading } = useBoard(projectId!, boardId!)
+  const { data: tasksRes, isLoading: tasksLoading } = useTasks(projectId!, boardId!)
+  useWebSocket(projectId!, boardId!)
 
-  const { setCurrentProject, setStatuses, setLabels, setMembers, clearProject, statuses } =
+  const { setCurrentProject, setCurrentBoard, setStatuses, setLabels, setMembers, clearProject, statuses } =
     useProjectStore()
   const { setTasksForStatus, clearBoard } = useBoardStore()
 
@@ -34,7 +36,6 @@ export function BoardPage() {
     if (projectRes?.data) {
       const project = projectRes.data
       setCurrentProject(project)
-      setStatuses(project.statuses)
       setLabels(project.labels)
       setMembers(project.members)
     }
@@ -42,7 +43,15 @@ export function BoardPage() {
       clearProject()
       clearBoard()
     }
-  }, [projectRes, setCurrentProject, setStatuses, setLabels, setMembers, clearProject, clearBoard])
+  }, [projectRes, setCurrentProject, setLabels, setMembers, clearProject, clearBoard])
+
+  useEffect(() => {
+    if (boardRes?.data) {
+      const board = boardRes.data
+      setCurrentBoard(board)
+      setStatuses(board.statuses)
+    }
+  }, [boardRes, setCurrentBoard, setStatuses])
 
   useEffect(() => {
     if (tasksRes?.data && statuses.length > 0) {
@@ -53,7 +62,6 @@ export function BoardPage() {
           tasks.filter((t) => t.status.id === status.id)
         )
       }
-      // Sync selected task with fresh data
       if (selectedTaskRef.current) {
         const updated = tasks.find((t) => t.id === selectedTaskRef.current!.id)
         if (updated) setSelectedTask(updated)
@@ -62,13 +70,14 @@ export function BoardPage() {
     }
   }, [tasksRes, statuses, setTasksForStatus])
 
-  if (projectLoading || tasksLoading) {
-    return <LoadingSpinner text="Loading project..." />
+  if (projectLoading || boardLoading || tasksLoading) {
+    return <LoadingSpinner text="Loading board..." />
   }
 
   const project = projectRes?.data
-  if (!project) {
-    return <div className="text-center py-16 text-[var(--text-secondary)]">Project not found</div>
+  const board = boardRes?.data
+  if (!project || !board) {
+    return <div className="text-center py-16 text-[var(--text-secondary)]">Board not found</div>
   }
 
   const handleAddTask = (statusId?: string) => {
@@ -83,9 +92,11 @@ export function BoardPage() {
           <div className="flex items-center gap-3">
             <span className="text-xl">{project.icon || '📋'}</span>
             <div>
-              <h1 className="text-lg font-bold text-foreground tracking-tight">{project.name}</h1>
-              {project.description && (
-                <p className="text-[13px] text-[var(--text-secondary)]">{project.description}</p>
+              <h1 className="text-lg font-bold text-foreground tracking-tight">
+                {project.name} <span className="text-[var(--text-secondary)] font-normal">/ {board.name}</span>
+              </h1>
+              {board.description && (
+                <p className="text-[13px] text-[var(--text-secondary)]">{board.description}</p>
               )}
             </div>
           </div>
@@ -109,6 +120,7 @@ export function BoardPage() {
 
       <TaskForm
         projectId={projectId!}
+        boardId={boardId!}
         open={showTaskForm}
         onClose={() => setShowTaskForm(false)}
         defaultStatusId={defaultStatusId}
@@ -117,6 +129,7 @@ export function BoardPage() {
       <TaskDetailPanel
         task={selectedTask}
         projectId={projectId!}
+        boardId={boardId!}
         open={!!selectedTask}
         onClose={() => setSelectedTask(null)}
       />

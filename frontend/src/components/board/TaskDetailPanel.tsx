@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useProjectStore } from '@/stores/projectStore'
 import { useUpdateTask } from '@/hooks/useTasks'
 import { TaskComments } from '@/components/tasks/TaskComments'
+import { TaskActivity } from '@/components/tasks/TaskActivity'
 import type { Task, Priority } from '@/types'
 
 const priorities: { value: Priority; label: string; color: string; icon: typeof Flag }[] = [
@@ -50,6 +51,7 @@ const priorityBg: Record<Priority, string> = {
 interface TaskDetailPanelProps {
   task: Task | null
   projectId: string
+  boardId: string
   open: boolean
   onClose: () => void
 }
@@ -85,9 +87,9 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] as const } },
 }
 
-export function TaskDetailPanel({ task, projectId, open, onClose }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: TaskDetailPanelProps) {
   const { statuses, members, labels } = useProjectStore()
-  const updateTask = useUpdateTask(projectId)
+  const updateTask = useUpdateTask(projectId, boardId)
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState('')
   const [editingDesc, setEditingDesc] = useState(false)
@@ -452,13 +454,10 @@ export function TaskDetailPanel({ task, projectId, open, onClose }: TaskDetailPa
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="comments">
-                      <TaskComments projectId={projectId} taskId={displayTask.id} />
+                      <TaskComments projectId={projectId} boardId={boardId} taskId={displayTask.id} />
                     </TabsContent>
                     <TabsContent value="activity">
-                      <div className="flex flex-col items-center justify-center py-10 text-[var(--text-tertiary)]">
-                        <Activity className="size-8 mb-2 opacity-30" />
-                        <p className="text-sm">Activity log coming soon</p>
-                      </div>
+                      <TaskActivity projectId={projectId} taskId={displayTask.id} />
                     </TabsContent>
                   </Tabs>
                 </motion.div>

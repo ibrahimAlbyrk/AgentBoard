@@ -8,12 +8,13 @@ import { useComments, useCreateComment } from '@/hooks/useComments'
 
 interface TaskCommentsProps {
   projectId: string
+  boardId: string
   taskId: string
 }
 
-export function TaskComments({ projectId, taskId }: TaskCommentsProps) {
-  const { data: commentsRes, isLoading } = useComments(projectId, taskId)
-  const createComment = useCreateComment(projectId, taskId)
+export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) {
+  const { data: commentsRes, isLoading } = useComments(projectId, boardId, taskId)
+  const createComment = useCreateComment(projectId, boardId, taskId)
   const [content, setContent] = useState('')
 
   const comments = commentsRes?.data ?? []
