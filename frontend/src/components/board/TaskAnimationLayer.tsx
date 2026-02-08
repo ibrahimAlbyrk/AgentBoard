@@ -65,7 +65,7 @@ export function TaskAnimationLayer() {
   if (flying.size === 0) return null
 
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999 }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 40 }}>
       {Array.from(flying.entries()).map(([taskId, info]) => (
         <FlyingCard key={taskId} taskId={taskId} info={info} />
       ))}

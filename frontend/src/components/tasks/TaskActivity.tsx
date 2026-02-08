@@ -24,7 +24,9 @@ function formatChanges(log: ActivityLog): string {
   if (log.action === 'moved') {
     const statusChange = log.changes.status_id
     if (statusChange && typeof statusChange === 'object') {
-      return `moved task`
+      const from = statusChange.old || '—'
+      const to = statusChange.new || '—'
+      return `moved task: ${from} → ${to}`
     }
     return 'moved task'
   }
@@ -33,7 +35,15 @@ function formatChanges(log: ActivityLog): string {
     const fields = Object.keys(log.changes)
     const parts = fields.map((field) => {
       const change = log.changes[field]
-      const label = field.replace(/_/g, ' ')
+      if (field === 'assignee_id') {
+        if (typeof change === 'object' && change !== null) {
+          if (!change.old && change.new) return `assigned to ${change.new}`
+          if (change.old && !change.new) return `unassigned ${change.old}`
+          if (change.old && change.new) return `reassigned from ${change.old} to ${change.new}`
+        }
+        return 'changed assignee'
+      }
+      const label = field.replace(/_id$/, '').replace(/_/g, ' ')
       if (typeof change === 'object' && change !== null) {
         const oldVal = change.old || '—'
         const newVal = change.new || '—'
@@ -41,7 +51,7 @@ function formatChanges(log: ActivityLog): string {
       }
       return label
     })
-    return `updated ${parts.join(', ')}`
+    return `${parts.join(', ')}`
   }
 
   return log.action
