@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Plus, Tag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useProject } from '@/hooks/useProjects'
@@ -18,6 +18,7 @@ import type { Task } from '@/types'
 
 export function BoardPage() {
   const { projectId, boardId } = useParams<{ projectId: string; boardId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { data: projectRes, isLoading: projectLoading } = useProject(projectId!)
   const { data: boardRes, isLoading: boardLoading } = useBoard(projectId!, boardId!)
   const { data: tasksRes, isLoading: tasksLoading } = useTasks(projectId!, boardId!)
@@ -71,6 +72,19 @@ export function BoardPage() {
       }
     }
   }, [tasksRes, statuses, setTasksForStatus])
+
+  // Auto-open task from ?task= query param
+  const pendingTaskId = searchParams.get('task')
+  useEffect(() => {
+    if (pendingTaskId && tasksRes?.data) {
+      const found = tasksRes.data.find((t) => t.id === pendingTaskId)
+      if (found) {
+        setSelectedTask(found)
+        searchParams.delete('task')
+        setSearchParams(searchParams, { replace: true })
+      }
+    }
+  }, [pendingTaskId, tasksRes])
 
   if (projectLoading || boardLoading || tasksLoading) {
     return <LoadingSpinner text="Loading board..." />
