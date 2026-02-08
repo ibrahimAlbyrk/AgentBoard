@@ -1,12 +1,20 @@
-import { useState } from 'react'
-import { formatDistanceToNow, parseISO } from 'date-fns'
+import { useState, useEffect, useRef } from 'react'
+import { formatDistanceToNow, parseISO, isPast, isToday } from 'date-fns'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet'
+  X,
+  Calendar,
+  User,
+  Flag,
+  CircleDot,
+  Tag,
+  MessageSquare,
+  Activity,
+  Clock,
+  ChevronRight,
+  Sparkles,
+  AlertTriangle,
+} from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -14,23 +22,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useProjectStore } from '@/stores/projectStore'
 import { useUpdateTask } from '@/hooks/useTasks'
 import { TaskComments } from '@/components/tasks/TaskComments'
 import type { Task, Priority } from '@/types'
 
-const priorities: { value: Priority; label: string; color: string }[] = [
-  { value: 'none', label: 'None', color: 'var(--priority-none)' },
-  { value: 'low', label: 'Low', color: 'var(--priority-low)' },
-  { value: 'medium', label: 'Medium', color: 'var(--priority-medium)' },
-  { value: 'high', label: 'High', color: 'var(--priority-high)' },
-  { value: 'urgent', label: 'Urgent', color: 'var(--priority-urgent)' },
+const priorities: { value: Priority; label: string; color: string; icon: typeof Flag }[] = [
+  { value: 'none', label: 'None', color: 'var(--priority-none)', icon: Flag },
+  { value: 'low', label: 'Low', color: 'var(--priority-low)', icon: Flag },
+  { value: 'medium', label: 'Medium', color: 'var(--priority-medium)', icon: Flag },
+  { value: 'high', label: 'High', color: 'var(--priority-high)', icon: AlertTriangle },
+  { value: 'urgent', label: 'Urgent', color: 'var(--priority-urgent)', icon: AlertTriangle },
 ]
+
+const priorityBg: Record<Priority, string> = {
+  none: 'var(--priority-none)',
+  low: 'var(--priority-low)',
+  medium: 'var(--priority-medium)',
+  high: 'var(--priority-high)',
+  urgent: 'var(--priority-urgent)',
+}
 
 interface TaskDetailPanelProps {
   task: Task | null
@@ -39,230 +54,444 @@ interface TaskDetailPanelProps {
   onClose: () => void
 }
 
+const overlay = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 },
+  exit: { opacity: 0 },
+}
+
+const panel = {
+  hidden: { x: '100%', opacity: 0.5 },
+  visible: {
+    x: 0,
+    opacity: 1,
+    transition: { type: 'spring' as const, damping: 30, stiffness: 300, mass: 0.8 },
+  },
+  exit: {
+    x: '100%',
+    opacity: 0,
+    transition: { duration: 0.25, ease: [0.4, 0, 1, 1] as const },
+  },
+}
+
+const stagger = {
+  visible: { transition: { staggerChildren: 0.04, delayChildren: 0.12 } },
+}
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as const } },
+}
+
 export function TaskDetailPanel({ task, projectId, open, onClose }: TaskDetailPanelProps) {
   const { statuses, members, labels } = useProjectStore()
   const updateTask = useUpdateTask(projectId)
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState('')
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [desc, setDesc] = useState('')
+  const panelRef = useRef<HTMLDivElement>(null)
 
-  if (!task) return null
+  // Keep last task in memory so exit animation can render with stale data
+  const lastTaskRef = useRef<Task | null>(null)
+  if (task) lastTaskRef.current = task
+  const displayTask = task ?? lastTaskRef.current
+
+  useEffect(() => {
+    if (!open) {
+      setEditingTitle(false)
+      setEditingDesc(false)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, onClose])
+
+  if (!displayTask) return null
 
   const handleTitleSave = () => {
-    if (title.trim() && title !== task.title) {
-      updateTask.mutate({ taskId: task.id, data: { title: title.trim() } })
+    if (!displayTask) return
+    if (title.trim() && title !== displayTask.title) {
+      updateTask.mutate({ taskId: displayTask.id, data: { title: title.trim() } })
     }
     setEditingTitle(false)
   }
 
-  const handleFieldUpdate = (data: Record<string, unknown>) => {
-    updateTask.mutate({ taskId: task.id, data })
+  const handleDescSave = () => {
+    if (!displayTask) return
+    const trimmed = desc.trim()
+    if (trimmed !== (displayTask.description ?? '')) {
+      updateTask.mutate({ taskId: displayTask.id, data: { description: trimmed || undefined } })
+    }
+    setEditingDesc(false)
   }
 
+  const handleFieldUpdate = (data: Record<string, unknown>) => {
+    if (!displayTask) return
+    updateTask.mutate({ taskId: displayTask.id, data })
+  }
+
+  const currentPriority = priorities.find((p) => p.value === displayTask.priority) ?? priorities[0]
+  const isOverdue = displayTask.due_date && isPast(parseISO(displayTask.due_date)) && !isToday(parseISO(displayTask.due_date))
+
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full sm:max-w-[650px] overflow-y-auto bg-[var(--elevated)] border-l border-[var(--border-subtle)]">
-        <SheetHeader className="pb-6 px-6 pt-6">
-          {editingTitle ? (
-            <Input
-              autoFocus
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={handleTitleSave}
-              onKeyDown={(e) => e.key === 'Enter' && handleTitleSave()}
-              className="text-xl font-semibold bg-[var(--surface)] border-[var(--border-subtle)] rounded-lg px-3 py-2"
-              style={{ fontFamily: "'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif" }}
+    <AnimatePresence mode="wait">
+      {open && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Overlay */}
+          <motion.div
+            className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+            variants={overlay}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+          />
+
+          {/* Panel */}
+          <motion.div
+            ref={panelRef}
+            className="relative z-10 h-full w-full max-w-[620px] flex flex-col bg-[var(--elevated)] shadow-2xl"
+            variants={panel}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            {/* Priority accent bar */}
+            <div
+              className="h-[3px] w-full shrink-0 transition-colors duration-300"
+              style={{ backgroundColor: priorityBg[displayTask.priority] }}
             />
-          ) : (
-            <SheetTitle
-              className="cursor-pointer hover:bg-[var(--surface)] rounded-lg px-2 py-1 -mx-2 transition-colors text-xl tracking-tight"
-              style={{ fontFamily: "'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif" }}
-              onClick={() => {
-                setTitle(task.title)
-                setEditingTitle(true)
-              }}
-            >
-              {task.title}
-            </SheetTitle>
-          )}
-          <SheetDescription className="sr-only">Task details for {task.title}</SheetDescription>
-        </SheetHeader>
 
-        <div className="space-y-6 px-6 pb-6">
-          {/* Property grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <span className="text-xs text-[var(--text-tertiary)] font-medium">Status</span>
-              <Select
-                value={task.status.id}
-                onValueChange={(v) => handleFieldUpdate({ status_id: v })}
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--border-subtle)]">
+              <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                <span className="font-mono bg-[var(--surface)] px-2 py-0.5 rounded-md border border-[var(--border-subtle)]">
+                  {displayTask.id.slice(0, 8).toUpperCase()}
+                </span>
+                <ChevronRight className="size-3" />
+                <span>{displayTask.status.name}</span>
+              </div>
+              <button
+                onClick={onClose}
+                className="size-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--surface)] transition-all duration-150"
               >
-                <SelectTrigger className="w-full bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="size-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: s.color || 'var(--priority-none)' }}
-                        />
-                        {s.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <X className="size-4" />
+              </button>
             </div>
 
-            <div className="space-y-1.5">
-              <span className="text-xs text-[var(--text-tertiary)] font-medium">Priority</span>
-              <Select
-                value={task.priority}
-                onValueChange={(v) => handleFieldUpdate({ priority: v })}
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto">
+              <motion.div
+                variants={stagger}
+                initial="hidden"
+                animate="visible"
+                className="px-6 py-5"
               >
-                <SelectTrigger className="w-full bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {priorities.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="size-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: p.color }}
-                        />
-                        {p.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <span className="text-xs text-[var(--text-tertiary)] font-medium">Assignee</span>
-              <Select
-                value={task.assignee?.id ?? 'unassigned'}
-                onValueChange={(v) =>
-                  handleFieldUpdate({ assignee_id: v === 'unassigned' ? null : v })
-                }
-              >
-                <SelectTrigger className="w-full bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors">
-                  <SelectValue placeholder="Unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {members.map((m) => (
-                    <SelectItem key={m.id} value={m.user.id}>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="size-6">
-                          <AvatarImage src={m.user.avatar_url || undefined} />
-                          <AvatarFallback className="text-[10px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
-                            {(m.user.full_name || m.user.username).charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        {m.user.full_name || m.user.username}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <span className="text-xs text-[var(--text-tertiary)] font-medium">Due Date</span>
-              <Input
-                type="date"
-                value={task.due_date?.split('T')[0] ?? ''}
-                onChange={(e) =>
-                  handleFieldUpdate({ due_date: e.target.value || undefined })
-                }
-                className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="space-y-1.5">
-            <span className="text-xs text-[var(--text-tertiary)] font-medium">Description</span>
-            <Textarea
-              defaultValue={task.description ?? ''}
-              placeholder="Add a description..."
-              onBlur={(e) => {
-                if (e.target.value !== (task.description ?? '')) {
-                  handleFieldUpdate({ description: e.target.value || undefined })
-                }
-              }}
-              className="min-h-[100px] bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--ring)] transition-colors rounded-lg resize-y"
-            />
-          </div>
-
-          {/* Labels */}
-          {labels.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-xs text-[var(--text-tertiary)] font-medium">Labels</span>
-              <div className="flex flex-wrap gap-1.5">
-                {labels.map((label) => {
-                  const active = task.labels.some((l) => l.id === label.id)
-                  return (
-                    <Badge
-                      key={label.id}
-                      variant={active ? 'default' : 'outline'}
-                      className="cursor-pointer transition-all duration-150 hover:scale-105"
-                      style={
-                        active
-                          ? { backgroundColor: label.color, borderColor: label.color }
-                          : { borderColor: label.color, color: label.color, opacity: 0.7 }
-                      }
+                {/* Title */}
+                <motion.div variants={fadeUp} className="mb-6">
+                  {editingTitle ? (
+                    <Input
+                      autoFocus
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      onBlur={handleTitleSave}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleTitleSave()
+                        if (e.key === 'Escape') setEditingTitle(false)
+                      }}
+                      className="text-[22px] font-bold bg-transparent border-0 border-b-2 border-[var(--accent-solid)] rounded-none px-0 py-1 focus-visible:ring-0 focus-visible:shadow-none tracking-tight"
+                    />
+                  ) : (
+                    <h2
+                      className="text-[22px] font-bold tracking-tight cursor-pointer hover:text-[var(--accent-solid)] transition-colors duration-200 leading-snug"
                       onClick={() => {
-                        const newIds = active
-                          ? task.labels.filter((l) => l.id !== label.id).map((l) => l.id)
-                          : [...task.labels.map((l) => l.id), label.id]
-                        handleFieldUpdate({ label_ids: newIds })
+                        setTitle(displayTask.title)
+                        setEditingTitle(true)
                       }}
                     >
-                      {label.name}
-                    </Badge>
-                  )
-                })}
+                      {displayTask.title}
+                    </h2>
+                  )}
+                </motion.div>
+
+                {/* Property rows */}
+                <motion.div
+                  variants={fadeUp}
+                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] divide-y divide-[var(--border-subtle)] mb-6"
+                >
+                  {/* Status */}
+                  <PropertyRow icon={CircleDot} label="Status">
+                    <Select
+                      value={displayTask.status.id}
+                      onValueChange={(v) => handleFieldUpdate({ status_id: v })}
+                    >
+                      <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statuses.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="size-2.5 rounded-full"
+                                style={{ backgroundColor: s.color || 'var(--priority-none)', boxShadow: `0 0 0 2px var(--popover), 0 0 0 3.5px ${s.color || 'var(--priority-none)'}` }}
+                              />
+                              {s.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </PropertyRow>
+
+                  {/* Priority */}
+                  <PropertyRow icon={Flag} label="Priority" iconColor={currentPriority.color}>
+                    <Select
+                      value={displayTask.priority}
+                      onValueChange={(v) => handleFieldUpdate({ priority: v })}
+                    >
+                      <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {priorities.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="size-2.5 rounded-full"
+                                style={{ backgroundColor: p.color }}
+                              />
+                              {p.label}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </PropertyRow>
+
+                  {/* Assignee */}
+                  <PropertyRow icon={User} label="Assignee">
+                    <Select
+                      value={displayTask.assignee?.id ?? 'unassigned'}
+                      onValueChange={(v) =>
+                        handleFieldUpdate({ assignee_id: v === 'unassigned' ? null : v })
+                      }
+                    >
+                      <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0">
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">
+                          <span className="text-[var(--text-tertiary)]">Unassigned</span>
+                        </SelectItem>
+                        {members.map((m) => (
+                          <SelectItem key={m.id} value={m.user.id}>
+                            <div className="flex items-center gap-2">
+                              <Avatar className="size-5">
+                                <AvatarImage src={m.user.avatar_url || undefined} />
+                                <AvatarFallback className="text-[9px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                                  {(m.user.full_name || m.user.username).charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              {m.user.full_name || m.user.username}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </PropertyRow>
+
+                  {/* Due date */}
+                  <PropertyRow
+                    icon={Calendar}
+                    label="Due date"
+                    iconColor={isOverdue ? 'var(--priority-urgent)' : undefined}
+                  >
+                    <div className="flex items-center gap-2 flex-1">
+                      <Input
+                        type="date"
+                        value={displayTask.due_date?.split('T')[0] ?? ''}
+                        onChange={(e) =>
+                          handleFieldUpdate({ due_date: e.target.value || undefined })
+                        }
+                        className="border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus-visible:ring-0 focus-visible:shadow-none"
+                      />
+                      {isOverdue && (
+                        <span className="text-[10px] font-semibold text-[var(--priority-urgent)] bg-[var(--priority-urgent)]/10 px-1.5 py-0.5 rounded-md">
+                          OVERDUE
+                        </span>
+                      )}
+                    </div>
+                  </PropertyRow>
+                </motion.div>
+
+                {/* Labels */}
+                {labels.length > 0 && (
+                  <motion.div variants={fadeUp} className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Tag className="size-3.5 text-[var(--text-tertiary)]" />
+                      <span className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+                        Labels
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {labels.map((label) => {
+                        const active = displayTask.labels.some((l) => l.id === label.id)
+                        return (
+                          <button
+                            key={label.id}
+                            onClick={() => {
+                              const newIds = active
+                                ? displayTask.labels.filter((l) => l.id !== label.id).map((l) => l.id)
+                                : [...displayTask.labels.map((l) => l.id), label.id]
+                              handleFieldUpdate({ label_ids: newIds })
+                            }}
+                            className="group relative px-2.5 py-1 rounded-lg text-xs font-medium border transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
+                            style={
+                              active
+                                ? {
+                                    backgroundColor: label.color,
+                                    borderColor: label.color,
+                                    color: '#fff',
+                                    boxShadow: `0 2px 8px -2px ${label.color}60`,
+                                  }
+                                : {
+                                    borderColor: `${label.color}40`,
+                                    color: label.color,
+                                    backgroundColor: `${label.color}08`,
+                                  }
+                            }
+                          >
+                            {label.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Description */}
+                <motion.div variants={fadeUp} className="mb-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="size-3.5 text-[var(--text-tertiary)]" />
+                    <span className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+                      Description
+                    </span>
+                  </div>
+                  {editingDesc ? (
+                    <Textarea
+                      autoFocus
+                      value={desc}
+                      onChange={(e) => setDesc(e.target.value)}
+                      onBlur={handleDescSave}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setEditingDesc(false)
+                        }
+                      }}
+                      placeholder="Describe this task..."
+                      className="min-h-[120px] bg-[var(--surface)] border-[var(--border-subtle)] focus:border-[var(--accent-solid)] focus:ring-2 focus:ring-[var(--ring)] rounded-xl resize-y text-sm leading-relaxed transition-all"
+                    />
+                  ) : (
+                    <div
+                      onClick={() => {
+                        setDesc(displayTask.description ?? '')
+                        setEditingDesc(true)
+                      }}
+                      className="min-h-[60px] px-4 py-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] cursor-pointer hover:border-[var(--border-strong)] transition-colors text-sm leading-relaxed group"
+                    >
+                      {displayTask.description ? (
+                        <p className="text-foreground whitespace-pre-wrap">{displayTask.description}</p>
+                      ) : (
+                        <p className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors">
+                          Click to add a description...
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+
+                {/* Tabs: Comments / Activity */}
+                <motion.div variants={fadeUp}>
+                  <Tabs defaultValue="comments">
+                    <TabsList variant="line" className="mb-4">
+                      <TabsTrigger value="comments" className="gap-1.5 text-sm">
+                        <MessageSquare className="size-3.5" />
+                        Comments
+                        {displayTask.comments_count > 0 && (
+                          <span className="ml-1 text-[10px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)] px-1.5 py-0.5 rounded-full font-semibold">
+                            {displayTask.comments_count}
+                          </span>
+                        )}
+                      </TabsTrigger>
+                      <TabsTrigger value="activity" className="gap-1.5 text-sm">
+                        <Activity className="size-3.5" />
+                        Activity
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="comments">
+                      <TaskComments projectId={projectId} taskId={displayTask.id} />
+                    </TabsContent>
+                    <TabsContent value="activity">
+                      <div className="flex flex-col items-center justify-center py-10 text-[var(--text-tertiary)]">
+                        <Activity className="size-8 mb-2 opacity-30" />
+                        <p className="text-sm">Activity log coming soon</p>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </motion.div>
+              </motion.div>
+            </div>
+
+            {/* Footer timestamps */}
+            <div className="px-6 py-3 border-t border-[var(--border-subtle)] flex items-center gap-4 text-[11px] text-[var(--text-tertiary)] shrink-0 bg-[var(--surface)]">
+              <div className="flex items-center gap-1.5">
+                <Clock className="size-3" />
+                Created {formatDistanceToNow(parseISO(displayTask.created_at), { addSuffix: true })}
+              </div>
+              <span className="text-[var(--border-strong)]">&middot;</span>
+              <div className="flex items-center gap-1.5">
+                Updated {formatDistanceToNow(parseISO(displayTask.updated_at), { addSuffix: true })}
               </div>
             </div>
-          )}
-
-          {/* Tabs */}
-          <Tabs defaultValue="comments">
-            <TabsList className="bg-[var(--surface)] border border-[var(--border-subtle)] p-0.5 rounded-lg">
-              <TabsTrigger
-                value="comments"
-                className="data-[state=active]:bg-[var(--elevated)] data-[state=active]:shadow-sm rounded-md text-sm"
-              >
-                Comments
-              </TabsTrigger>
-              <TabsTrigger
-                value="activity"
-                className="data-[state=active]:bg-[var(--elevated)] data-[state=active]:shadow-sm rounded-md text-sm"
-              >
-                Activity
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="comments" className="mt-4">
-              <TaskComments projectId={projectId} taskId={task.id} />
-            </TabsContent>
-            <TabsContent value="activity" className="mt-4">
-              <p className="text-sm text-[var(--text-tertiary)] text-center py-8">
-                Activity log coming soon
-              </p>
-            </TabsContent>
-          </Tabs>
-
-          {/* Timestamps */}
-          <div className="pt-4 border-t border-[var(--border-subtle)] text-xs text-[var(--text-tertiary)] space-y-1">
-            <p>Created {formatDistanceToNow(parseISO(task.created_at), { addSuffix: true })}</p>
-            <p>Updated {formatDistanceToNow(parseISO(task.updated_at), { addSuffix: true })}</p>
-          </div>
+          </motion.div>
         </div>
-      </SheetContent>
-    </Sheet>
+      )}
+    </AnimatePresence>
+  )
+}
+
+/* ── Property Row ── */
+
+function PropertyRow({
+  icon: Icon,
+  label,
+  iconColor,
+  children,
+}: {
+  icon: typeof Flag
+  label: string
+  iconColor?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--elevated)] transition-colors duration-150 group">
+      <div className="flex items-center gap-2.5 w-[110px] shrink-0">
+        <Icon
+          className="size-3.5 transition-colors duration-200"
+          style={{ color: iconColor || 'var(--text-tertiary)' }}
+        />
+        <span className="text-xs text-[var(--text-tertiary)] font-medium">{label}</span>
+      </div>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
   )
 }
