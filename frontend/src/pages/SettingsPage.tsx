@@ -7,13 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -317,16 +310,6 @@ function NotificationSettings() {
     [current, updatePrefs],
   )
 
-  const setDigest = useCallback(
-    (value: string) => {
-      const updated = { ...current, email_digest: value as NotificationPreferences['email_digest'] }
-      updatePrefs.mutate(updated, {
-        onSuccess: () => toast.success('Preferences saved'),
-        onError: () => toast.error('Failed to save'),
-      })
-    },
-    [current, updatePrefs],
-  )
 
   const toggleMuteProject = useCallback(
     (projectId: string) => {
@@ -498,28 +481,16 @@ function NotificationSettings() {
         <div className="space-y-4">
           <ToggleRow
             label="Enable email notifications"
-            description="Requires SMTP configuration on the server"
+            description="Receive an email for each notification instantly"
             checked={current.email_enabled}
-            onToggle={() => toggle('email_enabled')}
+            onToggle={() => {
+              const updated = { ...current, email_enabled: !current.email_enabled, email_digest: !current.email_enabled ? 'instant' : 'off' }
+              updatePrefs.mutate(updated, {
+                onSuccess: () => toast.success('Preferences saved'),
+                onError: () => toast.error('Failed to save'),
+              })
+            }}
           />
-          {current.email_enabled && (
-            <div className="flex items-center justify-between py-3 px-4 bg-[var(--surface)] rounded-lg border border-[var(--border-subtle)]">
-              <div>
-                <p className="text-[13px] font-medium text-foreground">Email Digest Frequency</p>
-                <p className="text-[12px] text-[var(--text-tertiary)] mt-0.5">How often to receive email digests</p>
-              </div>
-              <Select value={current.email_digest} onValueChange={setDigest}>
-                <SelectTrigger className="w-32 h-8 text-[13px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="instant">Instant</SelectItem>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </div>
       </div>
     </div>
