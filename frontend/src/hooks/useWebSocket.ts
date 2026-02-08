@@ -15,7 +15,7 @@ export function markLocalMove(taskId: string) {
 
 export function useWebSocket(projectId: string) {
   const accessToken = useAuthStore((s) => s.accessToken)
-  const { addTask, relocateTask, removeTask } = useBoardStore()
+  const { addTask, updateTask, relocateTask, removeTask } = useBoardStore()
 
   useEffect(() => {
     if (!projectId || !accessToken) return
@@ -36,7 +36,17 @@ export function useWebSocket(projectId: string) {
     }
 
     const handleUpdated = (e: Record<string, unknown>) => {
-      animatedRelocate(e.data as Task)
+      const data = e.data as Task
+      // Only animate if task moved to a different column
+      const current = useBoardStore.getState().tasksByStatus
+      const currentStatusId = Object.entries(current).find(
+        ([, tasks]) => tasks.some((t) => t.id === data.id),
+      )?.[0]
+      if (currentStatusId && currentStatusId !== data.status.id) {
+        animatedRelocate(data)
+      } else {
+        updateTask(data.id, data)
+      }
     }
     const handleDeleted = (e: Record<string, unknown>) => {
       const data = e.data as { task_id: string }
@@ -65,5 +75,5 @@ export function useWebSocket(projectId: string) {
       wsManager.off('task.deleted', handleDeleted)
       wsManager.off('task.moved', handleMoved)
     }
-  }, [projectId, accessToken, addTask, relocateTask, removeTask])
+  }, [projectId, accessToken, addTask, updateTask, relocateTask, removeTask])
 }
