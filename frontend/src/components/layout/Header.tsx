@@ -63,12 +63,12 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative size-8 text-[var(--text-secondary)] hover:text-foreground transition-colors">
+            <button className="relative size-8 inline-flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:text-foreground hover:bg-foreground/[0.08] active:bg-foreground/[0.12] active:scale-95 transition-all duration-150 cursor-pointer">
               <Bell className="size-4" />
               {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 size-2 rounded-full bg-[var(--accent-solid)] ring-2 ring-background" />
               )}
-            </Button>
+            </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-80 p-0">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
@@ -135,14 +135,14 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative size-8 rounded-full p-0">
+            <button className="relative size-8 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-foreground/[0.12] active:ring-foreground/[0.2] active:scale-95 transition-all duration-150 cursor-pointer">
               <Avatar size="sm">
                 <AvatarImage src={user?.avatar_url || undefined} />
                 <AvatarFallback className="text-xs bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
                   {(user?.full_name || user?.username || 'U').charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-            </Button>
+            </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={() => navigate('/settings')}>
