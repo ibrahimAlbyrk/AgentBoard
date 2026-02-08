@@ -23,9 +23,24 @@ class CRUDAPIKey(CRUDBase[APIKey, APIKeyCreate, APIKeyResponse]):
         self, db: AsyncSession, user_id: UUID
     ) -> list[APIKey]:
         result = await db.execute(
-            select(APIKey).where(APIKey.user_id == user_id)
+            select(APIKey).where(
+                APIKey.user_id == user_id,
+                APIKey.is_active == True,  # noqa: E712
+            )
         )
         return list(result.scalars().all())
+
+    async def get_by_name_and_user(
+        self, db: AsyncSession, name: str, user_id: UUID
+    ) -> APIKey | None:
+        result = await db.execute(
+            select(APIKey).where(
+                APIKey.user_id == user_id,
+                APIKey.name == name,
+                APIKey.is_active == True,  # noqa: E712
+            )
+        )
+        return result.scalar_one_or_none()
 
     async def update_last_used(
         self, db: AsyncSession, api_key: APIKey

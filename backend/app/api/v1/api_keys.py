@@ -29,6 +29,14 @@ async def create_api_key(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    existing = await crud_api_key.get_by_name_and_user(
+        db, key_in.name, current_user.id
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An API key with this name already exists",
+        )
     result = await AuthService.create_api_key(db, current_user.id, key_in)
     api_key = result["api_key"]
     return ResponseBase(
