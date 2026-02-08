@@ -32,6 +32,7 @@ from app.api.v1 import (
     comments,
     labels,
     members,
+    notifications,
     projects,
     search,
     stats,
@@ -52,6 +53,7 @@ for router_module in [
     tasks,
     comments,
     activity,
+    notifications,
     search,
     stats,
 ]:

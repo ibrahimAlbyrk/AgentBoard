@@ -362,6 +362,37 @@ class APIClient {
     return this.request<void>(`/api-keys/${keyId}`, { method: 'DELETE' })
   }
 
+  // Notifications
+  async listNotifications(params?: { page?: number; per_page?: number }) {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.per_page) query.set('per_page', String(params.per_page))
+    const qs = query.toString()
+    return this.request<PaginatedResponse<{
+      id: string
+      type: string
+      title: string
+      message: string
+      is_read: boolean
+      data: Record<string, unknown> | null
+      created_at: string
+    }>>(`/notifications${qs ? `?${qs}` : ''}`)
+  }
+
+  async getUnreadCount() {
+    return this.request<{ count: number }>('/notifications/unread-count')
+  }
+
+  async markNotificationsRead(notificationIds?: string[], markAll?: boolean) {
+    return this.request<{ success: boolean }>('/notifications/read', {
+      method: 'PUT',
+      body: JSON.stringify({
+        notification_ids: notificationIds ?? null,
+        mark_all: markAll ?? false,
+      }),
+    })
+  }
+
   // Users
   async getMe() {
     return this.request<APIResponse<User>>('/users/me')
