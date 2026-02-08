@@ -83,3 +83,19 @@ class BulkTaskMove(BaseModel):
 
 class BulkTaskDelete(BaseModel):
     task_ids: list[UUID]
+
+
+class DashboardTaskResponse(TaskResponse):
+    project_name: str = ""
+
+
+class MyTasksSummary(BaseModel):
+    overdue_count: int = 0
+    due_today_count: int = 0
+    due_this_week_count: int = 0
+    total_assigned: int = 0
+
+
+class MyTasksResponse(BaseModel):
+    summary: MyTasksSummary
+    tasks: list[DashboardTaskResponse]

@@ -114,6 +114,51 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
         )
         return dict(result.all())
 
+    async def get_assigned_to_user(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        project_ids: list[UUID],
+        *,
+        limit: int = 30,
+    ) -> list[Task]:
+        from app.models.comment import Comment
+        from app.models.status import Status
+
+        comments_count = (
+            select(func.count(Comment.id))
+            .where(Comment.task_id == Task.id)
+            .correlate(Task)
+            .scalar_subquery()
+            .label("comments_count")
+        )
+
+        query = (
+            select(Task)
+            .join(Status, Task.status_id == Status.id)
+            .where(
+                Task.assignee_id == user_id,
+                Task.project_id.in_(project_ids),
+                Task.completed_at.is_(None),
+                Status.is_terminal == False,  # noqa: E712
+            )
+            .options(*_task_load_options)
+            .add_columns(comments_count)
+            .order_by(
+                Task.due_date.asc().nullslast(),
+                Task.created_at.desc(),
+            )
+            .limit(limit)
+        )
+        result = await db.execute(query)
+        rows = result.unique().all()
+        tasks = []
+        for row in rows:
+            task = row[0]
+            task.comments_count = row[1]
+            tasks.append(task)
+        return tasks
+
     async def count_by_priority(
         self, db: AsyncSession, project_id: UUID
     ) -> dict[str, int]:
