@@ -105,9 +105,11 @@ class TaskService:
             await db.flush()
             for label_id in label_ids:
                 db.add(TaskLabel(task_id=task.id, label_id=label_id))
+            await db.flush()
 
-        db.add(task)
-        await db.flush()
+        if update_data:
+            db.add(task)
+            await db.flush()
 
         if changes:
             await crud_activity_log.log(
@@ -121,7 +123,7 @@ class TaskService:
             )
 
         task_id = task.id
-        await db.flush()
+        await db.commit()
         db.expunge(task)
         return await crud_task.get_with_relations(db, task_id)
 
