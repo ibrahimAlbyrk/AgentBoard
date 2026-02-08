@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -6,6 +6,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
+  type DragMoveEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -31,6 +32,8 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
+  const [tilt, setTilt] = useState({ x: 0, y: 0 })
+  const prevDelta = useRef({ x: 0, y: 0 })
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -38,6 +41,8 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const taskId = String(event.active.id)
+    prevDelta.current = { x: 0, y: 0 }
+    setTilt({ x: 0, y: 0 })
     for (const tasks of Object.values(tasksByStatus)) {
       const task = tasks.find((t) => t.id === taskId)
       if (task) {
@@ -48,6 +53,20 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
       }
     }
   }, [tasksByStatus])
+
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    const { delta } = event
+    const velocityX = delta.x - prevDelta.current.x
+    const velocityY = delta.y - prevDelta.current.y
+    prevDelta.current = { x: delta.x, y: delta.y }
+
+    // Clamp tilt: max ±12 degrees, velocity drives the angle
+    const maxTilt = 12
+    const sensitivity = 0.6
+    const tiltY = Math.max(-maxTilt, Math.min(maxTilt, velocityX * sensitivity))
+    const tiltX = Math.max(-maxTilt, Math.min(maxTilt, -velocityY * sensitivity))
+    setTilt({ x: tiltX, y: tiltY })
+  }, [])
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     const { over } = event
@@ -79,6 +98,7 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
     setActiveTask(null)
     setDragOverColumnId(null)
     setDragOverItemId(null)
+    setTilt({ x: 0, y: 0 })
   }, [])
 
   const handleDragEnd = useCallback(
@@ -199,6 +219,7 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
       sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
@@ -221,11 +242,17 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
       <DragOverlay dropAnimation={null}>
         {activeTask && (
           <div style={{
-            transform: 'scale(1.03)',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)',
-            borderRadius: 12,
+            perspective: 600,
           }}>
-            <TaskCard task={activeTask} onClick={() => {}} isDragOverlay />
+            <div style={{
+              transform: `scale(1.03) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+              transition: 'transform 150ms ease-out',
+              transformStyle: 'preserve-3d',
+              boxShadow: `${-tilt.y * 0.5}px ${tilt.x * 0.5 + 12}px 40px -8px rgba(0,0,0,0.35)`,
+              borderRadius: 12,
+            }}>
+              <TaskCard task={activeTask} onClick={() => {}} isDragOverlay />
+            </div>
           </div>
         )}
       </DragOverlay>
