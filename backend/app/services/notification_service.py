@@ -68,11 +68,33 @@ class NotificationService:
         )
         db.add(notif)
         await db.flush()
+
+        # trigger email if user opted in
+        prefs = await NotificationService.get_user_prefs(db, user_id)
+        if prefs.email_enabled and prefs.email_digest == "instant":
+            user = await crud_user.get(db, user_id)
+            if user and user.email:
+                NotificationService._dispatch_email(
+                    to=user.email, title=title,
+                    message=message, notification_type=type,
+                )
+
         return notif
 
     @staticmethod
-    async def send_email(to: str, subject: str, body: str) -> None:
-        logger.info("Email send skipped (SMTP not configured): to=%s subject=%s", to, subject)
+    def _dispatch_email(*, to: str, title: str, message: str, notification_type: str) -> None:
+        from app.services.email_service import (
+            email_configured,
+            fire_and_forget_email,
+            render_notification_email,
+        )
+
+        if not email_configured():
+            logger.debug("Email skipped (Resend not configured): to=%s", to)
+            return
+
+        html = render_notification_email(title, message, notification_type)
+        fire_and_forget_email(to, f"AgentBoard: {title}", html)
 
     @staticmethod
     async def send_webhook(url: str, secret: str | None, event: dict) -> None:

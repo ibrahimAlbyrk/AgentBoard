@@ -8,7 +8,7 @@ export interface NotificationPreferences {
   desktop_enabled: boolean
   muted_projects: string[]
   email_enabled: boolean
-  email_digest: 'off' | 'instant' | 'daily' | 'weekly'
+  email_digest: 'off' | 'instant'
 }
 
 export interface User {

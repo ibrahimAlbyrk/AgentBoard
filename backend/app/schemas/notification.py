@@ -32,4 +32,4 @@ class NotificationPreferences(BaseModel):
     desktop_enabled: bool = False
     muted_projects: list[str] = []
     email_enabled: bool = False
-    email_digest: str = "off"  # off, instant, daily, weekly
+    email_digest: str = "off"  # off, instant

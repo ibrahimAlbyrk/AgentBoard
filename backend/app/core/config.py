@@ -16,11 +16,8 @@ class Settings(BaseSettings):
         "http://localhost:5173",
     ]
 
-    SMTP_HOST: str | None = None
-    SMTP_PORT: int = 587
-    SMTP_USER: str | None = None
-    SMTP_PASSWORD: str | None = None
-    SMTP_FROM: str | None = None
+    RESEND_API_KEY: str | None = None
+    EMAIL_FROM: str = "AgentBoard <onboarding@resend.dev>"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
