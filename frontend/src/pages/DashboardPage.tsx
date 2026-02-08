@@ -8,6 +8,7 @@ import { useProjects, useDeleteProject } from '@/hooks/useProjects'
 import { api } from '@/lib/api-client'
 import { ProjectCard } from '@/components/projects/ProjectCard'
 import { ProjectForm } from '@/components/projects/ProjectForm'
+import { MyTasksSection } from '@/components/dashboard/MyTasksSection'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { Project } from '@/types'
@@ -119,6 +120,9 @@ export function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* My Tasks */}
+      <MyTasksSection />
 
       {/* Projects */}
       <div>

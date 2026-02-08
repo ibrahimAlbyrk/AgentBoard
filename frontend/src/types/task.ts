@@ -76,3 +76,19 @@ export interface ActivityLog {
   task_id: string | null
   created_at: string
 }
+
+export interface DashboardTask extends Task {
+  project_name: string
+}
+
+export interface MyTasksSummary {
+  overdue_count: number
+  due_today_count: number
+  due_this_week_count: number
+  total_assigned: number
+}
+
+export interface MyTasksResponse {
+  summary: MyTasksSummary
+  tasks: DashboardTask[]
+}

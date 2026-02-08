@@ -21,6 +21,7 @@ import type {
   User,
   LoginCredentials,
   RegisterData,
+  MyTasksResponse,
 } from '@/types'
 
 const BASE_URL = '/api/v1'
@@ -388,6 +389,10 @@ class APIClient {
 
   async getDashboardStats() {
     return this.request<APIResponse<{ in_progress: number; overdue: number }>>('/dashboard/stats')
+  }
+
+  async getMyTasks() {
+    return this.request<APIResponse<MyTasksResponse>>('/dashboard/my-tasks')
   }
 
   // API Keys
