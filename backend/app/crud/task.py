@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.models.task import Task
+from app.models.task_label import TaskLabel
 from app.schemas.task import TaskCreate, TaskUpdate
 
 from .base import CRUDBase
@@ -14,7 +15,7 @@ _task_load_options = (
     joinedload(Task.status),
     joinedload(Task.assignee),
     joinedload(Task.creator),
-    selectinload(Task.labels),
+    selectinload(Task.labels).joinedload(TaskLabel.label),
 )
 
 

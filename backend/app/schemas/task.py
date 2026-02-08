@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .label import LabelResponse
 from .status import StatusResponse
@@ -50,6 +50,16 @@ class TaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     completed_at: datetime | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_labels(cls, data):
+        """Convert TaskLabel join objects to Label objects for serialization."""
+        if hasattr(data, "labels"):
+            raw = data.labels
+            if raw and hasattr(raw[0], "label"):
+                data.__dict__["labels"] = [tl.label for tl in raw if tl.label]
+        return data
 
 
 class TaskMove(BaseModel):

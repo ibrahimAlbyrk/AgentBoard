@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud import crud_activity_log, crud_status, crud_task
+from app.crud import crud_activity_log, crud_status, crud_task, crud_user
 from app.models.task import Task
 from app.models.task_label import TaskLabel
 from app.schemas.task import TaskCreate, TaskUpdate
@@ -78,7 +78,25 @@ class TaskService:
         for field, value in update_data.items():
             old_value = getattr(task, field, None)
             if old_value != value:
-                changes[field] = {"old": str(old_value), "new": str(value)}
+                if field == "assignee_id":
+                    old_name = None
+                    new_name = None
+                    if old_value:
+                        old_user = await crud_user.get(db, old_value)
+                        old_name = old_user.full_name or old_user.username if old_user else None
+                    if value:
+                        new_user = await crud_user.get(db, value)
+                        new_name = new_user.full_name or new_user.username if new_user else None
+                    changes[field] = {"old": old_name, "new": new_name}
+                elif field == "status_id":
+                    old_s = await crud_status.get(db, old_value) if old_value else None
+                    new_s = await crud_status.get(db, value) if value else None
+                    changes[field] = {
+                        "old": old_s.name if old_s else None,
+                        "new": new_s.name if new_s else None,
+                    }
+                else:
+                    changes[field] = {"old": str(old_value), "new": str(value)}
                 setattr(task, field, value)
 
         if label_ids is not None:
@@ -133,6 +151,7 @@ class TaskService:
         db.add(task)
         await db.flush()
 
+        old_status = await crud_status.get(db, old_status_id)
         await crud_activity_log.log(
             db,
             project_id=task.project_id,
@@ -141,7 +160,10 @@ class TaskService:
             entity_type="task",
             task_id=task.id,
             changes={
-                "status_id": {"old": str(old_status_id), "new": str(new_status_id)},
+                "status_id": {
+                    "old": old_status.name if old_status else str(old_status_id),
+                    "new": new_status.name if new_status else str(new_status_id),
+                },
             },
         )
 
