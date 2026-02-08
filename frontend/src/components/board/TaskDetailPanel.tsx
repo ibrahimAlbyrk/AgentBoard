@@ -487,11 +487,21 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
             {/* Footer timestamps */}
             <div className="px-6 py-3 border-t border-[var(--border-subtle)] flex items-center gap-4 text-[11px] text-[var(--text-tertiary)] shrink-0 bg-[var(--surface)] rounded-b-[20px]">
               <div className="flex items-center gap-1.5">
-                <Clock className="size-3" />
-                Created {formatDistanceToNow(parseISO(displayTask.created_at), { addSuffix: true })}
+                <Avatar className="size-4">
+                  <AvatarImage src={displayTask.creator.avatar_url || undefined} />
+                  <AvatarFallback className="text-[7px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                    {(displayTask.creator.full_name || displayTask.creator.username).charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span>
+                  Created by {displayTask.creator.full_name || displayTask.creator.username}
+                </span>
+                <span className="text-[var(--border-strong)]">&middot;</span>
+                <span>{formatDistanceToNow(parseISO(displayTask.created_at), { addSuffix: true })}</span>
               </div>
               <span className="text-[var(--border-strong)]">&middot;</span>
               <div className="flex items-center gap-1.5">
+                <Clock className="size-3" />
                 Updated {formatDistanceToNow(parseISO(displayTask.updated_at), { addSuffix: true })}
               </div>
             </div>
