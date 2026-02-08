@@ -1,5 +1,6 @@
+import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FolderKanban, Settings, Search, Plus } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, Settings, Search, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useProjects } from '@/hooks/useProjects'
 import { useAuthStore } from '@/stores/authStore'
@@ -20,12 +21,29 @@ export function Sidebar({ onClose }: SidebarProps) {
   const { data: projectsRes } = useProjects()
   const projects = projectsRes?.data ?? []
   const user = useAuthStore((s) => s.user)
+  const [search, setSearch] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  const filteredProjects = projects.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
 
   return (
     <aside className="w-[248px] h-full border-r border-[var(--sidebar-border)] bg-sidebar flex flex-col">
       {/* Brand */}
       <div className="h-14 flex items-center gap-2.5 px-5 border-b border-[var(--sidebar-border)]">
-        <div className="size-7 rounded-lg bg-gradient-to-br from-[var(--accent-solid)] to-[#7C6AEF] flex items-center justify-center shadow-sm">
+        <div className="size-7 rounded-lg bg-gradient-to-br from-[var(--accent-solid)] to-[#3B82F6] flex items-center justify-center shadow-sm">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="7" height="7" rx="1" />
             <rect x="14" y="3" width="7" height="7" rx="1" />
@@ -38,12 +56,28 @@ export function Sidebar({ onClose }: SidebarProps) {
 
       {/* Search */}
       <div className="px-3 pt-3 pb-1">
-        <div className="flex items-center gap-2 px-3 h-8 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-[var(--text-tertiary)] text-sm cursor-pointer hover:border-[var(--border-strong)] transition-colors">
-          <Search className="size-3.5" />
-          <span>Search...</span>
-          <kbd className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded bg-[var(--overlay)] border border-[var(--border-subtle)]">
-            /
-          </kbd>
+        <div className="flex items-center gap-2 px-3 h-8 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-sm focus-within:border-[var(--accent-solid)] hover:border-[var(--border-strong)] transition-colors">
+          <Search className="size-3.5 text-[var(--text-tertiary)] flex-shrink-0" />
+          <input
+            ref={searchRef}
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search..."
+            className="flex-1 bg-transparent text-foreground placeholder:text-[var(--text-tertiary)] outline-none text-sm min-w-0"
+          />
+          {search ? (
+            <button
+              onClick={() => { setSearch(''); searchRef.current?.focus() }}
+              className="text-[var(--text-tertiary)] hover:text-foreground transition-colors flex-shrink-0"
+            >
+              <X className="size-3" />
+            </button>
+          ) : (
+            <kbd className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded bg-[var(--overlay)] border border-[var(--border-subtle)] text-[var(--text-tertiary)] flex-shrink-0">
+              /
+            </kbd>
+          )}
         </div>
       </div>
 
@@ -88,7 +122,7 @@ export function Sidebar({ onClose }: SidebarProps) {
                 <Plus className="size-3" />
               </Link>
             </div>
-            {projects.slice(0, 8).map((p) => (
+            {filteredProjects.slice(0, 8).map((p) => (
               <Link
                 key={p.id}
                 to={`/projects/${p.id}`}
@@ -102,7 +136,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               >
                 <span
                   className="size-2.5 rounded flex-shrink-0"
-                  style={{ backgroundColor: p.color || '#6C5CE7' }}
+                  style={{ backgroundColor: p.color || '#3B82F6' }}
                 />
                 <span className="truncate">{p.name}</span>
               </Link>
