@@ -484,7 +484,7 @@ function NotificationSettings() {
             description="Receive an email for each notification instantly"
             checked={current.email_enabled}
             onToggle={() => {
-              const updated = { ...current, email_enabled: !current.email_enabled, email_digest: !current.email_enabled ? 'instant' : 'off' }
+              const updated = { ...current, email_enabled: !current.email_enabled, email_digest: !current.email_enabled ? 'instant' as const : 'off' as const }
               updatePrefs.mutate(updated, {
                 onSuccess: () => toast.success('Preferences saved'),
                 onError: () => toast.error('Failed to save'),
