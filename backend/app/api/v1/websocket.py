@@ -16,14 +16,19 @@ async def websocket_endpoint(
     board_id: str = Query(...),
 ):
     try:
-        decode_token(token)
+        payload = decode_token(token)
     except Exception:
         await websocket.close(code=4001)
         return
 
-    key = f"{project_id}:{board_id}"
+    user_id = payload.get("sub")
+    board_key = f"{project_id}:{board_id}"
+    user_key = f"user:{user_id}" if user_id else None
+
     await websocket.accept()
-    await manager.connect(key, websocket)
+    await manager.connect(board_key, websocket)
+    if user_key:
+        await manager.connect(user_key, websocket)
 
     try:
         while True:
@@ -37,4 +42,6 @@ async def websocket_endpoint(
             if msg_type == "ping":
                 await websocket.send_text(json.dumps({"type": "pong"}))
     except WebSocketDisconnect:
-        manager.disconnect(key, websocket)
+        manager.disconnect(board_key, websocket)
+        if user_key:
+            manager.disconnect(user_key, websocket)

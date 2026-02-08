@@ -42,5 +42,10 @@ class ConnectionManager:
     ) -> None:
         await self._broadcast(project_id, message)
 
+    async def broadcast_to_user(
+        self, user_id: str, message: dict
+    ) -> None:
+        await self._broadcast(f"user:{user_id}", message)
+
 
 manager = ConnectionManager()
