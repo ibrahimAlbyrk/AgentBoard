@@ -17,7 +17,7 @@ export interface Project {
 
 export interface ProjectDetail extends Project {
   members: ProjectMember[]
-  statuses: Status[]
+  boards: import('./board').Board[]
   labels: Label[]
 }
 
@@ -34,11 +34,12 @@ export interface ProjectCreate {
   slug?: string
   icon?: string
   color?: string
-  create_default_statuses?: boolean
+  create_default_board?: boolean
 }
 
 export interface Status {
   id: string
+  board_id: string
   name: string
   slug: string
   color: string | null

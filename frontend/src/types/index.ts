@@ -1,4 +1,5 @@
 export type * from './api'
+export type * from './board'
 export type * from './project'
 export type * from './task'
 export type * from './user'

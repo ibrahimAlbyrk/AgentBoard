@@ -6,6 +6,7 @@ export type Priority = 'none' | 'low' | 'medium' | 'high' | 'urgent'
 export interface Task {
   id: string
   project_id: string
+  board_id: string
   title: string
   description: string | null
   status: Status
@@ -64,4 +65,14 @@ export interface TaskFilters {
   search?: string
   page?: number
   per_page?: number
+}
+
+export interface ActivityLog {
+  id: string
+  action: string
+  entity_type: string
+  changes: Record<string, { old?: string; new?: string } | string>
+  user: UserBrief
+  task_id: string | null
+  created_at: string
 }

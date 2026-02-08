@@ -3,43 +3,47 @@ import { api } from '@/lib/api-client'
 import { useBoardStore } from '@/stores/boardStore'
 import type { TaskCreate, TaskUpdate, TaskMove, TaskFilters } from '@/types'
 
-export function useTasks(projectId: string, filters?: TaskFilters) {
+export function useTasks(projectId: string, boardId: string, filters?: TaskFilters) {
   return useQuery({
-    queryKey: ['tasks', projectId, filters],
-    queryFn: () => api.listTasks(projectId, filters),
-    enabled: !!projectId,
+    queryKey: ['tasks', projectId, boardId, filters],
+    queryFn: () => api.listTasks(projectId, boardId, filters),
+    enabled: !!projectId && !!boardId,
   })
 }
 
-export function useCreateTask(projectId: string) {
+export function useCreateTask(projectId: string, boardId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: TaskCreate) => api.createTask(projectId, data),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['tasks', projectId] }),
+    mutationFn: (data: TaskCreate) => api.createTask(projectId, boardId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId] })
+    },
   })
 }
 
-export function useUpdateTask(projectId: string) {
+export function useUpdateTask(projectId: string, boardId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ taskId, data }: { taskId: string; data: TaskUpdate }) =>
-      api.updateTask(projectId, taskId, data),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['tasks', projectId] }),
+      api.updateTask(projectId, boardId, taskId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId] })
+    },
   })
 }
 
-export function useDeleteTask(projectId: string) {
+export function useDeleteTask(projectId: string, boardId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (taskId: string) => api.deleteTask(projectId, taskId),
+    mutationFn: (taskId: string) => api.deleteTask(projectId, boardId, taskId),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['tasks', projectId] }),
+      qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] }),
   })
 }
 
-export function useMoveTask(projectId: string) {
+export function useMoveTask(projectId: string, boardId: string) {
   const qc = useQueryClient()
 
   return useMutation({
@@ -50,11 +54,10 @@ export function useMoveTask(projectId: string) {
       taskId: string
       fromStatusId: string
       data: TaskMove
-    }) => api.moveTask(projectId, taskId, data),
+    }) => api.moveTask(projectId, boardId, taskId, data),
 
     onMutate: async () => {
-      await qc.cancelQueries({ queryKey: ['tasks', projectId] })
-      // Store already updated optimistically in KanbanBoard.handleDragEnd
+      await qc.cancelQueries({ queryKey: ['tasks', projectId, boardId] })
       const prevBoard = { ...useBoardStore.getState().tasksByStatus }
       return { prevBoard }
     },
@@ -68,7 +71,9 @@ export function useMoveTask(projectId: string) {
       }
     },
 
-    onSettled: () =>
-      qc.invalidateQueries({ queryKey: ['tasks', projectId] }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId] })
+    },
   })
 }

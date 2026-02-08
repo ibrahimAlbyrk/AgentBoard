@@ -5,6 +5,10 @@ import type {
   Project,
   ProjectDetail,
   ProjectCreate,
+  Board,
+  BoardDetail,
+  BoardCreate,
+  BoardUpdate,
   Status,
   Label,
   Task,
@@ -13,6 +17,7 @@ import type {
   TaskMove,
   TaskFilters,
   Comment,
+  ActivityLog,
   User,
   LoginCredentials,
   RegisterData,
@@ -189,39 +194,66 @@ class APIClient {
     })
   }
 
-  // Statuses
-  async listStatuses(projectId: string) {
-    return this.request<APIResponse<Status[]>>(`/projects/${projectId}/statuses`)
+  // Boards
+  async listBoards(projectId: string) {
+    return this.request<APIResponse<Board[]>>(`/projects/${projectId}/boards`)
   }
 
-  async createStatus(projectId: string, data: { name: string; color?: string }) {
-    return this.request<APIResponse<Status>>(`/projects/${projectId}/statuses`, {
+  async getBoard(projectId: string, boardId: string) {
+    return this.request<APIResponse<BoardDetail>>(`/projects/${projectId}/boards/${boardId}`)
+  }
+
+  async createBoard(projectId: string, data: BoardCreate) {
+    return this.request<APIResponse<Board>>(`/projects/${projectId}/boards`, {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async updateStatus(projectId: string, statusId: string, data: { name?: string; color?: string }) {
-    return this.request<APIResponse<Status>>(`/projects/${projectId}/statuses/${statusId}`, {
+  async updateBoard(projectId: string, boardId: string, data: BoardUpdate) {
+    return this.request<APIResponse<Board>>(`/projects/${projectId}/boards/${boardId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     })
   }
 
-  async deleteStatus(projectId: string, statusId: string) {
-    return this.request<void>(`/projects/${projectId}/statuses/${statusId}`, {
+  async deleteBoard(projectId: string, boardId: string) {
+    return this.request<void>(`/projects/${projectId}/boards/${boardId}`, { method: 'DELETE' })
+  }
+
+  // Statuses (board-scoped)
+  async listStatuses(projectId: string, boardId: string) {
+    return this.request<APIResponse<Status[]>>(`/projects/${projectId}/boards/${boardId}/statuses`)
+  }
+
+  async createStatus(projectId: string, boardId: string, data: { name: string; color?: string }) {
+    return this.request<APIResponse<Status>>(`/projects/${projectId}/boards/${boardId}/statuses`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateStatus(projectId: string, boardId: string, statusId: string, data: { name?: string; color?: string }) {
+    return this.request<APIResponse<Status>>(`/projects/${projectId}/boards/${boardId}/statuses/${statusId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteStatus(projectId: string, boardId: string, statusId: string) {
+    return this.request<void>(`/projects/${projectId}/boards/${boardId}/statuses/${statusId}`, {
       method: 'DELETE',
     })
   }
 
-  async reorderStatuses(projectId: string, statusIds: string[]) {
-    return this.request<APIResponse<Status[]>>(`/projects/${projectId}/statuses/reorder`, {
+  async reorderStatuses(projectId: string, boardId: string, statusIds: string[]) {
+    return this.request<APIResponse<Status[]>>(`/projects/${projectId}/boards/${boardId}/statuses/reorder`, {
       method: 'POST',
       body: JSON.stringify({ status_ids: statusIds }),
     })
   }
 
-  // Labels
+  // Labels (project-scoped)
   async listLabels(projectId: string) {
     return this.request<APIResponse<Label[]>>(`/projects/${projectId}/labels`)
   }
@@ -246,8 +278,8 @@ class APIClient {
     })
   }
 
-  // Tasks
-  async listTasks(projectId: string, filters?: TaskFilters) {
+  // Tasks (board-scoped)
+  async listTasks(projectId: string, boardId: string, filters?: TaskFilters) {
     const query = new URLSearchParams()
     if (filters?.status_id) query.set('status_id', filters.status_id)
     if (filters?.priority) query.set('priority', filters.priority)
@@ -256,84 +288,89 @@ class APIClient {
     if (filters?.page) query.set('page', String(filters.page))
     if (filters?.per_page) query.set('per_page', String(filters.per_page))
     const qs = query.toString()
-    return this.request<PaginatedResponse<Task>>(`/projects/${projectId}/tasks${qs ? `?${qs}` : ''}`)
+    return this.request<PaginatedResponse<Task>>(`/projects/${projectId}/boards/${boardId}/tasks${qs ? `?${qs}` : ''}`)
   }
 
-  async getTask(projectId: string, taskId: string) {
-    return this.request<APIResponse<Task>>(`/projects/${projectId}/tasks/${taskId}`)
+  async getTask(projectId: string, boardId: string, taskId: string) {
+    return this.request<APIResponse<Task>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}`)
   }
 
-  async createTask(projectId: string, data: TaskCreate) {
-    return this.request<APIResponse<Task>>(`/projects/${projectId}/tasks`, {
+  async createTask(projectId: string, boardId: string, data: TaskCreate) {
+    return this.request<APIResponse<Task>>(`/projects/${projectId}/boards/${boardId}/tasks`, {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async updateTask(projectId: string, taskId: string, data: TaskUpdate) {
-    return this.request<APIResponse<Task>>(`/projects/${projectId}/tasks/${taskId}`, {
+  async updateTask(projectId: string, boardId: string, taskId: string, data: TaskUpdate) {
+    return this.request<APIResponse<Task>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     })
   }
 
-  async deleteTask(projectId: string, taskId: string) {
-    return this.request<void>(`/projects/${projectId}/tasks/${taskId}`, {
+  async deleteTask(projectId: string, boardId: string, taskId: string) {
+    return this.request<void>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}`, {
       method: 'DELETE',
     })
   }
 
-  async moveTask(projectId: string, taskId: string, data: TaskMove) {
-    return this.request<APIResponse<Task>>(`/projects/${projectId}/tasks/${taskId}/move`, {
+  async moveTask(projectId: string, boardId: string, taskId: string, data: TaskMove) {
+    return this.request<APIResponse<Task>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/move`, {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async bulkUpdateTasks(projectId: string, taskIds: string[], data: TaskUpdate) {
-    return this.request<APIResponse<Task[]>>(`/projects/${projectId}/tasks/bulk/update`, {
+  async bulkUpdateTasks(projectId: string, boardId: string, taskIds: string[], data: TaskUpdate) {
+    return this.request<APIResponse<Task[]>>(`/projects/${projectId}/boards/${boardId}/tasks/bulk-update`, {
+      method: 'POST',
+      body: JSON.stringify({ task_ids: taskIds, updates: data }),
+    })
+  }
+
+  async bulkMoveTasks(projectId: string, boardId: string, taskIds: string[], data: TaskMove) {
+    return this.request<APIResponse<Task[]>>(`/projects/${projectId}/boards/${boardId}/tasks/bulk-move`, {
       method: 'POST',
       body: JSON.stringify({ task_ids: taskIds, ...data }),
     })
   }
 
-  async bulkMoveTasks(projectId: string, taskIds: string[], data: TaskMove) {
-    return this.request<APIResponse<Task[]>>(`/projects/${projectId}/tasks/bulk/move`, {
-      method: 'POST',
-      body: JSON.stringify({ task_ids: taskIds, ...data }),
-    })
-  }
-
-  async bulkDeleteTasks(projectId: string, taskIds: string[]) {
-    return this.request<void>(`/projects/${projectId}/tasks/bulk/delete`, {
+  async bulkDeleteTasks(projectId: string, boardId: string, taskIds: string[]) {
+    return this.request<void>(`/projects/${projectId}/boards/${boardId}/tasks/bulk-delete`, {
       method: 'POST',
       body: JSON.stringify({ task_ids: taskIds }),
     })
   }
 
-  // Comments
-  async listComments(projectId: string, taskId: string) {
-    return this.request<APIResponse<Comment[]>>(`/projects/${projectId}/tasks/${taskId}/comments`)
+  // Comments (board-scoped)
+  async listComments(projectId: string, boardId: string, taskId: string) {
+    return this.request<APIResponse<Comment[]>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments`)
   }
 
-  async createComment(projectId: string, taskId: string, data: { content: string }) {
-    return this.request<APIResponse<Comment>>(`/projects/${projectId}/tasks/${taskId}/comments`, {
+  async createComment(projectId: string, boardId: string, taskId: string, data: { content: string }) {
+    return this.request<APIResponse<Comment>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments`, {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async updateComment(projectId: string, taskId: string, commentId: string, data: { content: string }) {
-    return this.request<APIResponse<Comment>>(`/projects/${projectId}/tasks/${taskId}/comments/${commentId}`, {
+  async updateComment(projectId: string, boardId: string, taskId: string, commentId: string, data: { content: string }) {
+    return this.request<APIResponse<Comment>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments/${commentId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     })
   }
 
-  async deleteComment(projectId: string, taskId: string, commentId: string) {
-    return this.request<void>(`/projects/${projectId}/tasks/${taskId}/comments/${commentId}`, {
+  async deleteComment(projectId: string, boardId: string, taskId: string, commentId: string) {
+    return this.request<void>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments/${commentId}`, {
       method: 'DELETE',
     })
+  }
+
+  // Activity
+  async listTaskActivity(projectId: string, taskId: string) {
+    return this.request<PaginatedResponse<ActivityLog>>(`/projects/${projectId}/activity/tasks/${taskId}`)
   }
 
   // Search

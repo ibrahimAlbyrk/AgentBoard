@@ -13,14 +13,14 @@ export function markLocalMove(taskId: string) {
   setTimeout(() => localMoves.delete(taskId), 2000)
 }
 
-export function useWebSocket(projectId: string) {
+export function useWebSocket(projectId: string, boardId: string) {
   const accessToken = useAuthStore((s) => s.accessToken)
   const { addTask, updateTask, relocateTask, removeTask } = useBoardStore()
 
   useEffect(() => {
-    if (!projectId || !accessToken) return
+    if (!projectId || !boardId || !accessToken) return
 
-    wsManager.connect(projectId, accessToken)
+    wsManager.connect(projectId, boardId, accessToken)
 
     const handleCreated = (e: Record<string, unknown>) => {
       addTask(e.data as Task)
@@ -37,7 +37,6 @@ export function useWebSocket(projectId: string) {
 
     const handleUpdated = (e: Record<string, unknown>) => {
       const data = e.data as Task
-      // Only animate if task moved to a different column
       const current = useBoardStore.getState().tasksByStatus
       const currentStatusId = Object.entries(current).find(
         ([, tasks]) => tasks.some((t) => t.id === data.id),
@@ -55,7 +54,6 @@ export function useWebSocket(projectId: string) {
     const handleMoved = (e: Record<string, unknown>) => {
       const data = e.data as Task
       if (localMoves.has(data.id)) {
-        // Drag-drop echo: just sync server data, no animation
         relocateTask(data.id, data)
       } else {
         animatedRelocate(data)
@@ -75,5 +73,5 @@ export function useWebSocket(projectId: string) {
       wsManager.off('task.deleted', handleDeleted)
       wsManager.off('task.moved', handleMoved)
     }
-  }, [projectId, accessToken, addTask, updateTask, relocateTask, removeTask])
+  }, [projectId, boardId, accessToken, addTask, updateTask, relocateTask, removeTask])
 }

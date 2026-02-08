@@ -6,24 +6,26 @@ class WebSocketManager {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private projectId: string | null = null
+  private boardId: string | null = null
   private token: string | null = null
   private reconnectDelay = 3000
   private intentionalClose = false
 
-  connect(projectId: string, token: string) {
-    if (this.ws && this.projectId === projectId && this.token === token) return
+  connect(projectId: string, boardId: string, token: string) {
+    if (this.ws && this.projectId === projectId && this.boardId === boardId && this.token === token) return
     this.disconnect()
     this.projectId = projectId
+    this.boardId = boardId
     this.token = token
     this.intentionalClose = false
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    this.ws = new WebSocket(`${protocol}//${host}/api/v1/ws?token=${token}&project_id=${projectId}`)
+    this.ws = new WebSocket(`${protocol}//${host}/api/v1/ws?token=${token}&project_id=${projectId}&board_id=${boardId}`)
 
     this.ws.onopen = () => {
       this.reconnectDelay = 3000
-      this.send({ type: 'subscribe', project_id: projectId })
+      this.send({ type: 'subscribe', project_id: projectId, board_id: boardId })
       this.heartbeatTimer = setInterval(() => this.send({ type: 'ping' }), 30000)
     }
 
@@ -38,9 +40,9 @@ class WebSocketManager {
       this.cleanup()
       if (this.intentionalClose) return
       this.reconnectTimer = setTimeout(() => {
-        if (this.projectId && this.token) {
+        if (this.projectId && this.boardId && this.token) {
           this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000)
-          this.connect(this.projectId, this.token)
+          this.connect(this.projectId, this.boardId, this.token)
         }
       }, this.reconnectDelay)
     }
