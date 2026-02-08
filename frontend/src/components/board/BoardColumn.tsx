@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Plus } from 'lucide-react'
@@ -9,9 +10,14 @@ interface BoardColumnProps {
   tasks: Task[]
   onTaskClick: (task: Task) => void
   onAddTask: () => void
+  placeholderIdx?: number
 }
 
-export function BoardColumn({ status, tasks, onTaskClick, onAddTask }: BoardColumnProps) {
+const dropPlaceholder = (
+  <div className="h-[72px] rounded-xl border-2 border-dashed border-[var(--accent-solid)]/30 bg-[var(--accent-muted-bg)]/50" />
+)
+
+export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1 }: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status.id}` })
 
   return (
@@ -47,16 +53,19 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask }: BoardColu
           items={tasks.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
         >
-          {tasks.map((task) => (
-            <SortableTaskCard
-              key={task.id}
-              task={task}
-              onClick={() => onTaskClick(task)}
-            />
+          {tasks.map((task, idx) => (
+            <Fragment key={task.id}>
+              {idx === placeholderIdx && dropPlaceholder}
+              <SortableTaskCard
+                task={task}
+                onClick={() => onTaskClick(task)}
+              />
+            </Fragment>
           ))}
+          {placeholderIdx >= 0 && placeholderIdx >= tasks.length && dropPlaceholder}
         </SortableContext>
 
-        {tasks.length === 0 && (
+        {tasks.length === 0 && placeholderIdx < 0 && (
           <div className="flex items-center justify-center h-20 border border-dashed border-[var(--border-subtle)] rounded-lg text-[13px] text-[var(--text-tertiary)]">
             No tasks
           </div>

@@ -5,6 +5,7 @@ import {
   closestCorners,
   type DragStartEvent,
   type DragEndEvent,
+  type DragOverEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -28,6 +29,8 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
   const { tasksByStatus, getFilteredTasks } = useBoardStore()
   const moveTask = useMoveTask(currentProject?.id ?? '')
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -39,13 +42,49 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
       const task = tasks.find((t) => t.id === taskId)
       if (task) {
         setActiveTask(task)
+        setDragOverColumnId(task.status.id)
+        setDragOverItemId(null)
         break
       }
     }
   }, [tasksByStatus])
 
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { over } = event
+    if (!over || !activeTask) return
+
+    const overId = String(over.id)
+    let targetColumnId: string | undefined
+    let overItemId: string | null = null
+
+    if (overId.startsWith('column-')) {
+      targetColumnId = overId.replace('column-', '')
+    } else {
+      overItemId = overId
+      for (const [statusId, tasks] of Object.entries(tasksByStatus)) {
+        if (tasks.some((t) => t.id === overId)) {
+          targetColumnId = statusId
+          break
+        }
+      }
+    }
+
+    if (targetColumnId) {
+      setDragOverColumnId(targetColumnId)
+      setDragOverItemId(overItemId)
+    }
+  }, [activeTask, tasksByStatus])
+
+  const handleDragCancel = useCallback(() => {
+    setActiveTask(null)
+    setDragOverColumnId(null)
+    setDragOverItemId(null)
+  }, [])
+
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      setDragOverColumnId(null)
+      setDragOverItemId(null)
       const { active, over } = event
       if (!over || !activeTask) {
         setActiveTask(null)
@@ -144,12 +183,25 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
     [activeTask, tasksByStatus, moveTask]
   )
 
+  // Cross-column placeholder: index where a gap should appear in the target column
+  const getPlaceholderIdx = (statusId: string): number => {
+    if (!activeTask || dragOverColumnId !== statusId || activeTask.status.id === statusId) return -1
+
+    const tasks = getFilteredTasks(statusId)
+    if (!dragOverItemId) return tasks.length
+
+    const idx = tasks.findIndex(t => t.id === dragOverItemId)
+    return idx === -1 ? tasks.length : idx
+  }
+
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="flex gap-4 p-6 h-full overflow-x-auto">
         {statuses.map((status) => (
@@ -159,6 +211,7 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
             tasks={getFilteredTasks(status.id)}
             onTaskClick={onTaskClick}
             onAddTask={() => onAddTask(status.id)}
+            placeholderIdx={getPlaceholderIdx(status.id)}
           />
         ))}
       </div>
