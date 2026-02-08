@@ -424,6 +424,7 @@ class APIClient {
       message: string
       is_read: boolean
       data: Record<string, unknown> | null
+      project_id: string | null
       created_at: string
     }>>(`/notifications${qs ? `?${qs}` : ''}`)
   }

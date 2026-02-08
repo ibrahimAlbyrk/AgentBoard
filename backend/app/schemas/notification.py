@@ -14,6 +14,7 @@ class NotificationResponse(BaseModel):
     message: str
     is_read: bool
     data: dict[str, Any] | None = None
+    project_id: UUID | None = None
     created_at: datetime
 
 
