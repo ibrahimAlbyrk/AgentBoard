@@ -22,6 +22,9 @@ class Comment(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE")
     )
+    agent_creator_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="SET NULL")
+    )
     content: Mapped[str] = mapped_column(Text)
     is_edited: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -36,6 +39,7 @@ class Comment(Base):
 
     task = relationship("Task", back_populates="comments")
     user = relationship("User")
+    agent_creator = relationship("Agent")
     attachments = relationship(
         "Attachment", back_populates="comment", cascade="all, delete-orphan"
     )

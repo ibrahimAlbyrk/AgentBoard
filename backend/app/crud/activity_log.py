@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.models.activity_log import ActivityLog
 from app.schemas.activity_log import ActivityLogResponse
@@ -27,7 +28,12 @@ class CRUDActivityLog(CRUDBase[ActivityLog, ActivityLogResponse, ActivityLogResp
             query = query.where(ActivityLog.action == action)
         if entity_type is not None:
             query = query.where(ActivityLog.entity_type == entity_type)
-        query = query.order_by(ActivityLog.created_at.desc()).offset(skip).limit(limit)
+        query = (
+            query.options(joinedload(ActivityLog.agent))
+            .order_by(ActivityLog.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
         result = await db.execute(query)
         return list(result.scalars().all())
 
@@ -37,6 +43,7 @@ class CRUDActivityLog(CRUDBase[ActivityLog, ActivityLogResponse, ActivityLogResp
         result = await db.execute(
             select(ActivityLog)
             .where(ActivityLog.task_id == task_id)
+            .options(joinedload(ActivityLog.agent))
             .order_by(ActivityLog.created_at.desc())
         )
         return list(result.scalars().all())
@@ -51,11 +58,13 @@ class CRUDActivityLog(CRUDBase[ActivityLog, ActivityLogResponse, ActivityLogResp
         action: str,
         entity_type: str,
         changes: dict,
+        agent_id: UUID | None = None,
     ) -> ActivityLog:
         db_obj = ActivityLog(
             project_id=project_id,
             task_id=task_id,
             user_id=user_id,
+            agent_id=agent_id,
             action=action,
             entity_type=entity_type,
             changes=changes,

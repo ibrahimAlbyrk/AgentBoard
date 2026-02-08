@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .agent import AgentBrief
 from .attachment import AttachmentResponse
 from .label import LabelResponse
 from .status import StatusResponse
@@ -16,9 +17,17 @@ class TaskCreate(BaseModel):
     status_id: UUID | None = None
     priority: Literal["none", "low", "medium", "high", "urgent"] = "none"
     assignee_id: UUID | None = None
+    agent_assignee_id: UUID | None = None
+    agent_creator_id: UUID | None = None
     label_ids: list[UUID] = []
     due_date: datetime | None = None
     parent_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def check_assignee_exclusive(self):
+        if self.assignee_id and self.agent_assignee_id:
+            raise ValueError("Cannot assign to both user and agent")
+        return self
 
 
 class TaskUpdate(BaseModel):
@@ -27,8 +36,15 @@ class TaskUpdate(BaseModel):
     status_id: UUID | None = None
     priority: Literal["none", "low", "medium", "high", "urgent"] | None = None
     assignee_id: UUID | None = None
+    agent_assignee_id: UUID | None = None
     label_ids: list[UUID] | None = None
     due_date: datetime | None = None
+
+    @model_validator(mode="after")
+    def check_assignee_exclusive(self):
+        if self.assignee_id and self.agent_assignee_id:
+            raise ValueError("Cannot assign to both user and agent")
+        return self
 
 
 class TaskResponse(BaseModel):
@@ -42,7 +58,9 @@ class TaskResponse(BaseModel):
     status: StatusResponse
     priority: str
     assignee: UserBrief | None = None
+    agent_assignee: AgentBrief | None = None
     creator: UserBrief
+    agent_creator: AgentBrief | None = None
     labels: list[LabelResponse]
     attachments: list[AttachmentResponse] = []
     due_date: datetime | None = None

@@ -27,6 +27,7 @@ register_error_handlers(app)
 
 from app.api.v1 import (
     activity,
+    agents,
     api_keys,
     attachments,
     auth,
@@ -52,6 +53,7 @@ for router_module in [
     projects,
     boards,
     members,
+    agents,
     statuses,
     labels,
     tasks,

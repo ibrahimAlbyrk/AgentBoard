@@ -29,6 +29,9 @@ class ActivityLog(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE")
     )
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="SET NULL")
+    )
     action: Mapped[str] = mapped_column(String(50))
     entity_type: Mapped[str] = mapped_column(String(50))
     changes: Mapped[dict | None] = mapped_column(JSON)
@@ -40,3 +43,4 @@ class ActivityLog(Base):
     project = relationship("Project")
     task = relationship("Task")
     user = relationship("User")
+    agent = relationship("Agent")

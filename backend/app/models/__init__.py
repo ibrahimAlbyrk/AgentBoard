@@ -1,4 +1,5 @@
 from app.models.activity_log import ActivityLog
+from app.models.agent import Agent
 from app.models.api_key import APIKey
 from app.models.attachment import Attachment
 from app.models.board import Board
@@ -17,6 +18,7 @@ from app.models.webhook import Webhook
 
 __all__ = [
     "ActivityLog",
+    "Agent",
     "APIKey",
     "Attachment",
     "Board",

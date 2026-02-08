@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import check_board_access, get_current_user
 from app.core.database import get_db
-from app.crud import crud_attachment, crud_comment, crud_task
+from app.crud import crud_agent, crud_attachment, crud_comment, crud_task
 from app.models.board import Board
 from app.models.comment import Comment
 from app.models.user import User
@@ -63,14 +63,25 @@ async def create_comment(
     current_user: User = Depends(get_current_user),
 ):
     task = await _get_task_or_404(task_id, board, db)
+
+    # Validate agent_creator_id if provided
+    if comment_in.agent_creator_id:
+        agent = await crud_agent.get(db, comment_in.agent_creator_id)
+        if not agent or agent.project_id != board.project_id or not agent.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or inactive agent_creator_id",
+            )
+
     comment = Comment(
         task_id=task_id,
         user_id=current_user.id,
+        agent_creator_id=comment_in.agent_creator_id,
         content=comment_in.content,
     )
     db.add(comment)
     await db.flush()
-    await db.refresh(comment)
+    await db.refresh(comment, ["user", "agent_creator", "attachments"])
 
     if comment_in.attachment_ids:
         unlinked = await crud_attachment.get_unlinked_by_ids(

@@ -1,4 +1,5 @@
 from .activity_log import ActivityLogResponse
+from .agent import AgentBrief, AgentCreate, AgentResponse, AgentUpdate
 from .attachment import AttachmentResponse
 from .api_key import APIKeyCreate, APIKeyCreatedResponse, APIKeyResponse
 from .auth import LoginRequest, RefreshRequest, TokenResponse
@@ -101,6 +102,10 @@ __all__ = [
     "CommentCreate",
     "CommentUpdate",
     "CommentResponse",
+    "AgentCreate",
+    "AgentUpdate",
+    "AgentResponse",
+    "AgentBrief",
     "ActivityLogResponse",
     "NotificationMarkRead",
     "NotificationResponse",

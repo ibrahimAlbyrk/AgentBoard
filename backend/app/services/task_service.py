@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud import crud_activity_log, crud_status, crud_task, crud_user
+from app.crud import crud_activity_log, crud_agent, crud_status, crud_task, crud_user
 from app.models.task import Task
 from app.models.task_label import TaskLabel
 from app.schemas.task import TaskCreate, TaskUpdate
@@ -18,6 +18,7 @@ FIELD_LABELS = {
     "priority": "priority",
     "status_id": "status",
     "assignee_id": "assignee",
+    "agent_assignee_id": "agent assignee",
     "due_date": "due date",
 }
 
@@ -58,6 +59,22 @@ class TaskService:
 
         position = await PositionService.get_end_position(db, status_id)
 
+        # Validate agent IDs belong to project and are active
+        if task_in.agent_creator_id:
+            agent = await crud_agent.get(db, task_in.agent_creator_id)
+            if not agent or agent.project_id != project_id or not agent.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or inactive agent_creator_id",
+                )
+        if task_in.agent_assignee_id:
+            agent = await crud_agent.get(db, task_in.agent_assignee_id)
+            if not agent or agent.project_id != project_id or not agent.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or inactive agent_assignee_id",
+                )
+
         task = Task(
             project_id=project_id,
             board_id=board_id,
@@ -67,6 +84,8 @@ class TaskService:
             status_id=status_id,
             priority=task_in.priority,
             assignee_id=task_in.assignee_id,
+            agent_assignee_id=task_in.agent_assignee_id,
+            agent_creator_id=task_in.agent_creator_id,
             due_date=task_in.due_date,
             parent_id=task_in.parent_id,
             position=position,
@@ -86,6 +105,7 @@ class TaskService:
             entity_type="task",
             task_id=task.id,
             changes={"title": task.title},
+            agent_id=task_in.agent_creator_id,
         )
 
         if task_in.assignee_id:
@@ -115,6 +135,23 @@ class TaskService:
         update_data = task_in.model_dump(exclude_unset=True)
         label_ids = update_data.pop("label_ids", None)
 
+        # Validate agent_assignee_id if being set
+        if "agent_assignee_id" in update_data and update_data["agent_assignee_id"]:
+            agent = await crud_agent.get(db, update_data["agent_assignee_id"])
+            if not agent or agent.project_id != task.project_id or not agent.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or inactive agent_assignee_id",
+                )
+            # Clear user assignee when setting agent assignee
+            if "assignee_id" not in update_data:
+                update_data["assignee_id"] = None
+
+        # Clear agent assignee when setting user assignee
+        if "assignee_id" in update_data and update_data["assignee_id"]:
+            if "agent_assignee_id" not in update_data:
+                update_data["agent_assignee_id"] = None
+
         for field, value in update_data.items():
             old_value = getattr(task, field, None)
             if old_value != value:
@@ -127,6 +164,16 @@ class TaskService:
                     if value:
                         new_user = await crud_user.get(db, value)
                         new_name = new_user.full_name or new_user.username if new_user else None
+                    changes[field] = {"old": old_name, "new": new_name}
+                elif field == "agent_assignee_id":
+                    old_name = None
+                    new_name = None
+                    if old_value:
+                        old_agent = await crud_agent.get(db, old_value)
+                        old_name = old_agent.name if old_agent else None
+                    if value:
+                        new_agent = await crud_agent.get(db, value)
+                        new_name = new_agent.name if new_agent else None
                     changes[field] = {"old": old_name, "new": new_name}
                 elif field == "status_id":
                     old_s = await crud_status.get(db, old_value) if old_value else None

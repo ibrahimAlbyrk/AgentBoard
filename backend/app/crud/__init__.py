@@ -1,4 +1,5 @@
 from .activity_log import crud_activity_log
+from .agent import crud_agent
 from .attachment import crud_attachment
 from .api_key import crud_api_key
 from .board import crud_board
@@ -15,6 +16,7 @@ from .webhook import crud_webhook
 
 __all__ = [
     "crud_user",
+    "crud_agent",
     "crud_api_key",
     "crud_board",
     "crud_board_member",

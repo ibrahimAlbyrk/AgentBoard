@@ -3,6 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from .agent import AgentResponse
 from .board import BoardResponse
 from .label import LabelResponse
 from .project_member import ProjectMemberResponse
@@ -46,3 +47,4 @@ class ProjectDetailResponse(ProjectResponse):
     members: list[ProjectMemberResponse]
     boards: list[BoardResponse]
     labels: list[LabelResponse]
+    agents: list[AgentResponse] = []

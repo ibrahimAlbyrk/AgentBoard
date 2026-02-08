@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -73,6 +74,7 @@ async def get_dashboard_stats(
 
 @router.get("/my-tasks", response_model=ResponseBase[MyTasksResponse])
 async def get_my_tasks(
+    agent_id: UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -102,7 +104,7 @@ async def get_my_tasks(
         )
 
     tasks = await crud_task.get_assigned_to_user(
-        db, current_user.id, project_ids, limit=50
+        db, current_user.id, project_ids, limit=50, agent_id=agent_id,
     )
 
     # Build project name map

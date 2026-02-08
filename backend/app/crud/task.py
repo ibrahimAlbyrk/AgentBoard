@@ -16,6 +16,8 @@ _task_load_options = (
     joinedload(Task.status),
     joinedload(Task.assignee),
     joinedload(Task.creator),
+    joinedload(Task.agent_assignee),
+    joinedload(Task.agent_creator),
     selectinload(Task.labels).joinedload(TaskLabel.label),
     selectinload(Task.attachments).joinedload(Attachment.user),
 )
@@ -123,6 +125,7 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
         project_ids: list[UUID],
         *,
         limit: int = 30,
+        agent_id: UUID | None = None,
     ) -> list[Task]:
         from app.models.comment import Comment
         from app.models.status import Status
@@ -135,15 +138,26 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
             .label("comments_count")
         )
 
+        filters = [
+            Task.project_id.in_(project_ids),
+            Task.completed_at.is_(None),
+            Status.is_terminal == False,  # noqa: E712
+        ]
+
+        if agent_id:
+            filters.append(
+                or_(
+                    Task.agent_creator_id == agent_id,
+                    Task.agent_assignee_id == agent_id,
+                )
+            )
+        else:
+            filters.append(Task.assignee_id == user_id)
+
         query = (
             select(Task)
             .join(Status, Task.status_id == Status.id)
-            .where(
-                Task.assignee_id == user_id,
-                Task.project_id.in_(project_ids),
-                Task.completed_at.is_(None),
-                Status.is_terminal == False,  # noqa: E712
-            )
+            .where(*filters)
             .options(*_task_load_options)
             .add_columns(comments_count)
             .order_by(

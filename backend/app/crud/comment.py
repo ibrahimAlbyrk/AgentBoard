@@ -24,6 +24,7 @@ class CRUDComment(CRUDBase[Comment, CommentCreate, CommentUpdate]):
             .where(Comment.task_id == task_id)
             .options(
                 joinedload(Comment.user),
+                joinedload(Comment.agent_creator),
                 selectinload(Comment.attachments).joinedload(Attachment.user),
             )
             .order_by(Comment.created_at)

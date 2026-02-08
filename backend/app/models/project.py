@@ -52,6 +52,9 @@ class Project(Base):
     boards = relationship(
         "Board", back_populates="project", cascade="all, delete-orphan"
     )
+    agents = relationship(
+        "Agent", back_populates="project", cascade="all, delete-orphan"
+    )
 
     @property
     def member_count(self) -> int:

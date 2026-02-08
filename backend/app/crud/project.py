@@ -25,6 +25,7 @@ class CRUDProject(CRUDBase[Project, ProjectCreate, ProjectUpdate]):
                 selectinload(Project.boards).selectinload(Board.tasks),
                 selectinload(Project.boards).selectinload(Board.statuses),
                 selectinload(Project.labels),
+                selectinload(Project.agents),
                 selectinload(Project.tasks),
             )
         )

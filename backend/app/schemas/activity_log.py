@@ -3,6 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from .agent import AgentBrief
 from .user import UserBrief
 
 
@@ -14,5 +15,6 @@ class ActivityLogResponse(BaseModel):
     entity_type: str
     changes: dict
     user: UserBrief
+    agent: AgentBrief | None = None
     task_id: UUID | None = None
     created_at: datetime
