@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   X,
   Calendar,
-  User,
+  Users,
   Flag,
   CircleDot,
   Tag,
@@ -38,7 +38,7 @@ import { TaskComments } from '@/components/tasks/TaskComments'
 import { TaskActivity } from '@/components/tasks/TaskActivity'
 import { TaskAttachments } from '@/components/tasks/TaskAttachments'
 import { LabelManager } from '@/components/labels/LabelManager'
-import type { Task, Priority, WatcherBrief, ProjectMember, Agent } from '@/types'
+import type { Task, Priority, AssigneeBrief, WatcherBrief, ProjectMember, Agent } from '@/types'
 
 const priorities: { value: Priority; label: string; color: string; icon: typeof Flag }[] = [
   { value: 'none', label: 'None', color: 'var(--priority-none)', icon: Flag },
@@ -304,63 +304,19 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                     </Select>
                   </PropertyRow>
 
-                  {/* Assignee */}
-                  <PropertyRow icon={User} label="Assignee">
-                    <Select
-                      value={
-                        displayTask.assignee
-                          ? `user:${displayTask.assignee.id}`
-                          : displayTask.agent_assignee
-                            ? `agent:${displayTask.agent_assignee.id}`
-                            : 'unassigned'
-                      }
-                      onValueChange={(v) => {
-                        if (v === 'unassigned') {
-                          handleFieldUpdate({ assignee_id: null, agent_assignee_id: null })
-                        } else if (v.startsWith('user:')) {
-                          handleFieldUpdate({ assignee_id: v.slice(5), agent_assignee_id: null })
-                        } else if (v.startsWith('agent:')) {
-                          handleFieldUpdate({ assignee_id: null, agent_assignee_id: v.slice(6) })
-                        }
+                  {/* Assignees */}
+                  <PropertyRow icon={Users} label="Assignees">
+                    <AssigneesPicker
+                      assignees={displayTask.assignees ?? []}
+                      members={members}
+                      agents={activeAgents}
+                      onUpdate={(userIds, agentIds) => {
+                        handleFieldUpdate({
+                          assignee_user_ids: userIds,
+                          assignee_agent_ids: agentIds,
+                        })
                       }}
-                    >
-                      <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0">
-                        <SelectValue placeholder="Unassigned" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">
-                          <span className="text-[var(--text-tertiary)]">Unassigned</span>
-                        </SelectItem>
-                        {members.map((m) => (
-                          <SelectItem key={m.id} value={`user:${m.user.id}`}>
-                            <div className="flex items-center gap-2">
-                              <Avatar className="size-5">
-                                <AvatarImage src={m.user.avatar_url || undefined} />
-                                <AvatarFallback className="text-[9px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
-                                  {(m.user.full_name || m.user.username).charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              {m.user.full_name || m.user.username}
-                            </div>
-                          </SelectItem>
-                        ))}
-                        {activeAgents.length > 0 && (
-                          <>
-                            <div className="px-2 py-1.5 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Agents</div>
-                            {activeAgents.map((a) => (
-                              <SelectItem key={a.id} value={`agent:${a.id}`}>
-                                <div className="flex items-center gap-2">
-                                  <span className="size-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ backgroundColor: a.color }}>
-                                    {a.name.charAt(0).toUpperCase()}
-                                  </span>
-                                  {a.name}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    />
                   </PropertyRow>
 
                   {/* Watchers */}
@@ -620,25 +576,27 @@ function PropertyRow({
   )
 }
 
-/* ── Watchers Picker ── */
+/* ── Person Picker (shared by Assignees & Watchers) ── */
 
-function WatchersPicker({
-  watchers,
+function PersonPicker({
+  items,
   members,
   agents,
   onUpdate,
+  label,
 }: {
-  watchers: WatcherBrief[]
+  items: (AssigneeBrief | WatcherBrief)[]
   members: ProjectMember[]
   agents: Agent[]
   onUpdate: (userIds: string[], agentIds: string[]) => void
+  label: string
 }) {
-  const watcherUserIds = new Set(watchers.filter((w) => w.user).map((w) => w.user!.id))
-  const watcherAgentIds = new Set(watchers.filter((w) => w.agent).map((w) => w.agent!.id))
+  const itemUserIds = new Set(items.filter((i) => i.user).map((i) => i.user!.id))
+  const itemAgentIds = new Set(items.filter((i) => i.agent).map((i) => i.agent!.id))
 
   const toggle = (type: 'user' | 'agent', id: string) => {
-    const newUserIds = new Set(watcherUserIds)
-    const newAgentIds = new Set(watcherAgentIds)
+    const newUserIds = new Set(itemUserIds)
+    const newAgentIds = new Set(itemAgentIds)
 
     if (type === 'user') {
       if (newUserIds.has(id)) newUserIds.delete(id)
@@ -653,23 +611,23 @@ function WatchersPicker({
 
   return (
     <div className="flex items-center gap-1.5 flex-1 min-w-0">
-      {/* Watcher avatars */}
+      {/* Avatars */}
       <div className="flex items-center -space-x-1.5 flex-wrap gap-y-1">
-        {watchers.map((w) =>
-          w.user ? (
-            <Avatar key={w.id} className="size-6 border-2 border-[var(--elevated)] ring-0">
-              <AvatarImage src={w.user.avatar_url || undefined} />
+        {items.map((i) =>
+          i.user ? (
+            <Avatar key={i.id} className="size-6 border-2 border-[var(--elevated)] ring-0">
+              <AvatarImage src={i.user.avatar_url || undefined} />
               <AvatarFallback className="text-[8px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
-                {(w.user.full_name || w.user.username).charAt(0).toUpperCase()}
+                {(i.user.full_name || i.user.username).charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-          ) : w.agent ? (
+          ) : i.agent ? (
             <span
-              key={w.id}
+              key={i.id}
               className="size-6 rounded-full flex items-center justify-center text-[8px] font-bold text-white border-2 border-[var(--elevated)] shrink-0"
-              style={{ backgroundColor: w.agent.color }}
+              style={{ backgroundColor: i.agent.color }}
             >
-              {w.agent.name.charAt(0).toUpperCase()}
+              {i.agent.name.charAt(0).toUpperCase()}
             </span>
           ) : null,
         )}
@@ -690,12 +648,12 @@ function WatchersPicker({
           className="w-64 p-0 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden"
         >
           <div className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
-            <span className="text-xs font-semibold text-[var(--text-secondary)]">Add Watchers</span>
+            <span className="text-xs font-semibold text-[var(--text-secondary)]">{label}</span>
           </div>
           <div className="max-h-56 overflow-y-auto py-1">
             {/* Members */}
             {members.map((m) => {
-              const active = watcherUserIds.has(m.user.id)
+              const active = itemUserIds.has(m.user.id)
               return (
                 <button
                   key={m.user.id}
@@ -725,7 +683,7 @@ function WatchersPicker({
                   Agents
                 </div>
                 {agents.map((a) => {
-                  const active = watcherAgentIds.has(a.id)
+                  const active = itemAgentIds.has(a.id)
                   return (
                     <button
                       key={a.id}
@@ -759,9 +717,57 @@ function WatchersPicker({
         </PopoverContent>
       </Popover>
 
-      {watchers.length === 0 && (
+      {items.length === 0 && (
         <span className="text-sm text-[var(--text-tertiary)]">None</span>
       )}
     </div>
+  )
+}
+
+/* ── Assignees Picker ── */
+
+function AssigneesPicker({
+  assignees,
+  members,
+  agents,
+  onUpdate,
+}: {
+  assignees: AssigneeBrief[]
+  members: ProjectMember[]
+  agents: Agent[]
+  onUpdate: (userIds: string[], agentIds: string[]) => void
+}) {
+  return (
+    <PersonPicker
+      items={assignees}
+      members={members}
+      agents={agents}
+      onUpdate={onUpdate}
+      label="Add Assignees"
+    />
+  )
+}
+
+/* ── Watchers Picker ── */
+
+function WatchersPicker({
+  watchers,
+  members,
+  agents,
+  onUpdate,
+}: {
+  watchers: WatcherBrief[]
+  members: ProjectMember[]
+  agents: Agent[]
+  onUpdate: (userIds: string[], agentIds: string[]) => void
+}) {
+  return (
+    <PersonPicker
+      items={watchers}
+      members={members}
+      agents={agents}
+      onUpdate={onUpdate}
+      label="Add Watchers"
+    />
   )
 }

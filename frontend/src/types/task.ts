@@ -14,6 +14,12 @@ export interface Attachment {
   created_at: string
 }
 
+export interface AssigneeBrief {
+  id: string
+  user: UserBrief | null
+  agent: AgentBrief | null
+}
+
 export interface WatcherBrief {
   id: string
   user: UserBrief | null
@@ -28,8 +34,7 @@ export interface Task {
   description: string | null
   status: Status
   priority: Priority
-  assignee: UserBrief | null
-  agent_assignee: AgentBrief | null
+  assignees: AssigneeBrief[]
   creator: UserBrief
   agent_creator: AgentBrief | null
   labels: Label[]
@@ -49,8 +54,8 @@ export interface TaskCreate {
   description?: string
   status_id?: string
   priority?: Priority
-  assignee_id?: string
-  agent_assignee_id?: string
+  assignee_user_ids?: string[]
+  assignee_agent_ids?: string[]
   agent_creator_id?: string
   label_ids?: string[]
   watcher_user_ids?: string[]
@@ -64,8 +69,8 @@ export interface TaskUpdate {
   description?: string
   status_id?: string
   priority?: Priority
-  assignee_id?: string | null
-  agent_assignee_id?: string | null
+  assignee_user_ids?: string[]
+  assignee_agent_ids?: string[]
   label_ids?: string[]
   watcher_user_ids?: string[]
   watcher_agent_ids?: string[]

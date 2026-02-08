@@ -23,6 +23,9 @@ export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
   const visibleLabels = task.labels.slice(0, 3)
   const extraCount = task.labels.length - 3
 
+  const visibleAssignees = task.assignees.slice(0, 3)
+  const extraAssignees = task.assignees.length - 3
+
   return (
     <div
       onClick={onClick}
@@ -70,7 +73,7 @@ export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
         </div>
       )}
 
-      {(task.due_date || task.comments_count > 0 || task.assignee || task.agent_assignee) && (
+      {(task.due_date || task.comments_count > 0 || task.assignees.length > 0) && (
         <>
           <div className="border-t border-[var(--border-subtle)] mt-3 mb-2.5" />
           <div className="flex items-center justify-between">
@@ -94,21 +97,33 @@ export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
               )}
             </div>
 
-            {task.assignee ? (
-              <Avatar className="size-5 ring-2 ring-card">
-                <AvatarImage src={task.assignee.avatar_url || undefined} />
-                <AvatarFallback className="text-[8px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
-                  {(task.assignee.full_name || task.assignee.username).charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            ) : task.agent_assignee ? (
-              <span
-                className="size-5 rounded-full ring-2 ring-card flex items-center justify-center text-[8px] font-bold text-white shrink-0"
-                style={{ backgroundColor: task.agent_assignee.color }}
-              >
-                {task.agent_assignee.name.charAt(0).toUpperCase()}
-              </span>
-            ) : null}
+            {visibleAssignees.length > 0 && (
+              <div className="flex items-center -space-x-1.5">
+                {visibleAssignees.map((a) =>
+                  a.user ? (
+                    <Avatar key={a.id} className="size-5 ring-2 ring-card">
+                      <AvatarImage src={a.user.avatar_url || undefined} />
+                      <AvatarFallback className="text-[8px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                        {(a.user.full_name || a.user.username).charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  ) : a.agent ? (
+                    <span
+                      key={a.id}
+                      className="size-5 rounded-full ring-2 ring-card flex items-center justify-center text-[8px] font-bold text-white shrink-0"
+                      style={{ backgroundColor: a.agent.color }}
+                    >
+                      {a.agent.name.charAt(0).toUpperCase()}
+                    </span>
+                  ) : null
+                )}
+                {extraAssignees > 0 && (
+                  <span className="size-5 rounded-full ring-2 ring-card bg-[var(--overlay)] flex items-center justify-center text-[8px] font-semibold text-[var(--text-tertiary)] shrink-0">
+                    +{extraAssignees}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}

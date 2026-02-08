@@ -124,7 +124,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     return tasks.filter((t) => {
       if (f.search && !t.title.toLowerCase().includes(f.search.toLowerCase())) return false
       if (f.priorities.length && !f.priorities.includes(t.priority)) return false
-      if (f.assignee && t.assignee?.id !== f.assignee) return false
+      if (f.assignee && !t.assignees.some((a) => a.user?.id === f.assignee)) return false
       return true
     })
   },

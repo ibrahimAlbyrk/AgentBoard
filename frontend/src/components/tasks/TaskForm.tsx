@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Tag, Paperclip, X, File as FileIcon, Loader2 } from 'lucide-react'
+import { Tag, Paperclip, X, File as FileIcon, Loader2, Check, Users } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -68,7 +69,8 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
 
   const [statusId, setStatusId] = useState(firstStatusId)
   const [priority, setPriority] = useState<Priority>('none')
-  const [assigneeId, setAssigneeId] = useState('')
+  const [assigneeUserIds, setAssigneeUserIds] = useState<string[]>([])
+  const [assigneeAgentIds, setAssigneeAgentIds] = useState<string[]>([])
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
@@ -107,20 +109,28 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
     )
   }
 
+  const toggleAssignee = (type: 'user' | 'agent', id: string) => {
+    if (type === 'user') {
+      setAssigneeUserIds((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      )
+    } else {
+      setAssigneeAgentIds((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      )
+    }
+  }
+
   const onSubmit = async (data: FormData) => {
     try {
-      const isAgent = assigneeId.startsWith('agent:')
-      const isUser = assigneeId.startsWith('user:')
-      const rawId = assigneeId.replace(/^(user|agent):/, '')
-
       const res = await createTask.mutateAsync({
         title: data.title,
         description: data.description,
         status_id: statusId || firstStatusId,
         priority,
         due_date: data.due_date || undefined,
-        assignee_id: isUser ? rawId : undefined,
-        agent_assignee_id: isAgent ? rawId : undefined,
+        assignee_user_ids: assigneeUserIds.length > 0 ? assigneeUserIds : undefined,
+        assignee_agent_ids: assigneeAgentIds.length > 0 ? assigneeAgentIds : undefined,
         label_ids: selectedLabelIds.length > 0 ? selectedLabelIds : undefined,
       })
 
@@ -140,7 +150,8 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
       reset()
       setStatusId(firstStatusId)
       setPriority('none')
-      setAssigneeId('')
+      setAssigneeUserIds([])
+      setAssigneeAgentIds([])
       setSelectedLabelIds([])
       setPendingFiles([])
       onClose()
@@ -232,43 +243,100 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-xs text-[var(--text-tertiary)] font-medium">Assignee</span>
-              <Select value={assigneeId || 'none'} onValueChange={(v) => setAssigneeId(v === 'none' ? '' : v)}>
-                <SelectTrigger className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors">
-                  <SelectValue placeholder="Unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Unassigned</SelectItem>
-                  {members.map((m) => (
-                    <SelectItem key={m.id} value={`user:${m.user.id}`}>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="size-5">
-                          <AvatarImage src={m.user.avatar_url || undefined} />
-                          <AvatarFallback className="text-[10px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
-                            {(m.user.full_name || m.user.username).charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        {m.user.full_name || m.user.username}
+              <span className="text-xs text-[var(--text-tertiary)] font-medium">Assignees</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2 h-9 px-3 rounded-md border border-[var(--border-subtle)] bg-[var(--surface)] hover:border-[var(--border-strong)] transition-colors text-sm text-left"
+                  >
+                    {assigneeUserIds.length + assigneeAgentIds.length > 0 ? (
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <div className="flex items-center -space-x-1">
+                          {assigneeUserIds.slice(0, 3).map((uid) => {
+                            const m = members.find((m) => m.user.id === uid)
+                            return m ? (
+                              <Avatar key={uid} className="size-5 border-2 border-[var(--surface)]">
+                                <AvatarImage src={m.user.avatar_url || undefined} />
+                                <AvatarFallback className="text-[8px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                                  {(m.user.full_name || m.user.username).charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                            ) : null
+                          })}
+                          {assigneeAgentIds.slice(0, 3).map((aid) => {
+                            const a = activeAgents.find((a) => a.id === aid)
+                            return a ? (
+                              <span key={aid} className="size-5 rounded-full border-2 border-[var(--surface)] flex items-center justify-center text-[8px] font-bold text-white shrink-0" style={{ backgroundColor: a.color }}>
+                                {a.name.charAt(0).toUpperCase()}
+                              </span>
+                            ) : null
+                          })}
+                        </div>
+                        <span className="text-[var(--text-secondary)] truncate">
+                          {assigneeUserIds.length + assigneeAgentIds.length} selected
+                        </span>
                       </div>
-                    </SelectItem>
-                  ))}
-                  {activeAgents.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Agents</div>
-                      {activeAgents.map((a) => (
-                        <SelectItem key={a.id} value={`agent:${a.id}`}>
-                          <div className="flex items-center gap-2">
-                            <span className="size-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ backgroundColor: a.color }}>
-                              {a.name.charAt(0).toUpperCase()}
-                            </span>
-                            {a.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+                    ) : (
+                      <span className="text-[var(--text-tertiary)] flex items-center gap-1.5">
+                        <Users className="size-3.5" />
+                        Unassigned
+                      </span>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" sideOffset={4} className="w-64 p-0 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden">
+                  <div className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
+                    <span className="text-xs font-semibold text-[var(--text-secondary)]">Select Assignees</span>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto py-1">
+                    {members.map((m) => {
+                      const active = assigneeUserIds.includes(m.user.id)
+                      return (
+                        <button
+                          key={m.user.id}
+                          type="button"
+                          onClick={() => toggleAssignee('user', m.user.id)}
+                          className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-[var(--surface)] transition-colors text-left"
+                        >
+                          <Avatar className="size-5">
+                            <AvatarImage src={m.user.avatar_url || undefined} />
+                            <AvatarFallback className="text-[9px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                              {(m.user.full_name || m.user.username).charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm text-foreground flex-1 truncate">
+                            {m.user.full_name || m.user.username}
+                          </span>
+                          {active && <Check className="size-3.5 text-[var(--accent-solid)] shrink-0" />}
+                        </button>
+                      )
+                    })}
+                    {activeAgents.length > 0 && (
+                      <>
+                        <div className="px-3 py-1.5 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Agents</div>
+                        {activeAgents.map((a) => {
+                          const active = assigneeAgentIds.includes(a.id)
+                          return (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => toggleAssignee('agent', a.id)}
+                              className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-[var(--surface)] transition-colors text-left"
+                            >
+                              <span className="size-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ backgroundColor: a.color }}>
+                                {a.name.charAt(0).toUpperCase()}
+                              </span>
+                              <span className="text-sm text-foreground flex-1 truncate">{a.name}</span>
+                              {active && <Check className="size-3.5 text-[var(--accent-solid)] shrink-0" />}
+                            </button>
+                          )
+                        })}
+                      </>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-1.5">

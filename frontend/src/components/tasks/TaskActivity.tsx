@@ -35,13 +35,13 @@ function formatChanges(log: ActivityLog): string {
     const fields = Object.keys(log.changes)
     const parts = fields.map((field) => {
       const change = log.changes[field]
-      if (field === 'assignee_id') {
+      if (field === 'assignee_id' || field === 'assignees') {
         if (typeof change === 'object' && change !== null) {
           if (!change.old && change.new) return `assigned to ${change.new}`
           if (change.old && !change.new) return `unassigned ${change.old}`
           if (change.old && change.new) return `reassigned from ${change.old} to ${change.new}`
         }
-        return 'changed assignee'
+        return 'updated assignees'
       }
       const label = field.replace(/_id$/, '').replace(/_/g, ' ')
       if (typeof change === 'object' && change !== null) {
