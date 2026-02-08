@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_token, hash_api_key
-from app.crud import crud_api_key, crud_project, crud_project_member
+from app.crud import crud_api_key, crud_board, crud_board_member, crud_project, crud_project_member
+from app.models.board import Board
 from app.models.project import Project
 from app.models.user import User
 
@@ -78,3 +79,50 @@ async def check_project_access(
                 detail="Access denied",
             )
     return project
+
+
+async def check_board_access(
+    project_id: UUID,
+    board_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Board:
+    project = await crud_project.get(db, project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    board = await crud_board.get(db, board_id)
+    if not board or board.project_id != project.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Board not found",
+        )
+
+    # Project owner or admin → access all boards
+    if project.owner_id == current_user.id:
+        return board
+
+    project_member = await crud_project_member.get_by_project_and_user(
+        db, project.id, current_user.id
+    )
+    if not project_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+    if project_member.role == "admin":
+        return board
+
+    # Regular member → must be board member
+    is_board_member = await crud_board_member.is_member(
+        db, board_id, current_user.id
+    )
+    if not is_board_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No access to this board",
+        )
+    return board

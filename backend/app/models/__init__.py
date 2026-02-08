@@ -1,6 +1,8 @@
 from app.models.activity_log import ActivityLog
 from app.models.api_key import APIKey
 from app.models.attachment import Attachment
+from app.models.board import Board
+from app.models.board_member import BoardMember
 from app.models.comment import Comment
 from app.models.label import Label
 from app.models.notification import Notification
@@ -17,6 +19,8 @@ __all__ = [
     "ActivityLog",
     "APIKey",
     "Attachment",
+    "Board",
+    "BoardMember",
     "Comment",
     "Label",
     "Notification",

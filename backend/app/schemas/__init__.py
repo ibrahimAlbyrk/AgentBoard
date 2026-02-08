@@ -1,6 +1,18 @@
 from .activity_log import ActivityLogResponse
 from .api_key import APIKeyCreate, APIKeyCreatedResponse, APIKeyResponse
 from .auth import LoginRequest, RefreshRequest, TokenResponse
+from .board import (
+    BoardCreate,
+    BoardDetailResponse,
+    BoardReorder,
+    BoardResponse,
+    BoardUpdate,
+)
+from .board_member import (
+    BoardMemberCreate,
+    BoardMemberResponse,
+    BoardMemberUpdate,
+)
 from .base import (
     ErrorBody,
     ErrorDetail,
@@ -54,6 +66,14 @@ __all__ = [
     "APIKeyCreate",
     "APIKeyResponse",
     "APIKeyCreatedResponse",
+    "BoardCreate",
+    "BoardUpdate",
+    "BoardResponse",
+    "BoardDetailResponse",
+    "BoardReorder",
+    "BoardMemberCreate",
+    "BoardMemberUpdate",
+    "BoardMemberResponse",
     "ProjectCreate",
     "ProjectUpdate",
     "ProjectResponse",

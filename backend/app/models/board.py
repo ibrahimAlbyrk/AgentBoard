@@ -1,31 +1,39 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
 
-class Project(Base):
-    __tablename__ = "projects"
+class Board(Base):
+    __tablename__ = "boards"
+    __table_args__ = (
+        UniqueConstraint("project_id", "slug"),
+        Index("ix_boards_project_position", "project_id", "position"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True, default=uuid.uuid4
     )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
     name: Mapped[str] = mapped_column(String(200))
+    slug: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
-    slug: Mapped[str] = mapped_column(
-        String(200), unique=True, index=True
-    )
-    owner_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE")
-    )
     icon: Mapped[str | None] = mapped_column(String(50))
     color: Mapped[str | None] = mapped_column(String(20))
-    is_archived: Mapped[bool] = mapped_column(
-        Boolean, default=False, index=True
-    )
+    position: Mapped[int] = mapped_column(Integer, default=0)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
@@ -36,21 +44,15 @@ class Project(Base):
         onupdate=lambda: datetime.now(UTC),
     )
 
-    owner = relationship("User", back_populates="owned_projects")
+    project = relationship("Project", back_populates="boards")
     members = relationship(
-        "ProjectMember", back_populates="project", cascade="all, delete-orphan"
+        "BoardMember", back_populates="board", cascade="all, delete-orphan"
     )
     statuses = relationship(
-        "Status", back_populates="project", cascade="all, delete-orphan"
-    )
-    labels = relationship(
-        "Label", back_populates="project", cascade="all, delete-orphan"
+        "Status", back_populates="board", cascade="all, delete-orphan"
     )
     tasks = relationship(
-        "Task", back_populates="project", cascade="all, delete-orphan"
-    )
-    boards = relationship(
-        "Board", back_populates="project", cascade="all, delete-orphan"
+        "Task", back_populates="board", cascade="all, delete-orphan"
     )
 
     @property
@@ -60,3 +62,7 @@ class Project(Base):
     @property
     def task_count(self) -> int:
         return len(self.tasks)
+
+    @property
+    def status_count(self) -> int:
+        return len(self.statuses)

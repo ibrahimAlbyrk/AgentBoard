@@ -44,3 +44,6 @@ class User(Base):
     project_memberships = relationship(
         "ProjectMember", back_populates="user", lazy="selectin"
     )
+    board_memberships = relationship(
+        "BoardMember", back_populates="user", cascade="all, delete-orphan"
+    )
