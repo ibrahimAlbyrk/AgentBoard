@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
+import { Tag } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -50,7 +51,7 @@ const priorityOptions: { value: Priority; label: string; color: string }[] = [
 ]
 
 export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }: TaskFormProps) {
-  const { statuses, members } = useProjectStore()
+  const { statuses, members, labels } = useProjectStore()
   const createTask = useCreateTask(projectId, boardId)
 
   const firstStatusId = defaultStatusId || statuses[0]?.id || ''
@@ -58,6 +59,7 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
   const [statusId, setStatusId] = useState(firstStatusId)
   const [priority, setPriority] = useState<Priority>('none')
   const [assigneeId, setAssigneeId] = useState('')
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
 
   const {
     register,
@@ -68,6 +70,12 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
     resolver: zodResolver(schema),
   })
 
+  const toggleLabel = (labelId: string) => {
+    setSelectedLabelIds((prev) =>
+      prev.includes(labelId) ? prev.filter((id) => id !== labelId) : [...prev, labelId]
+    )
+  }
+
   const onSubmit = async (data: FormData) => {
     try {
       await createTask.mutateAsync({
@@ -77,12 +85,14 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
         priority,
         due_date: data.due_date || undefined,
         assignee_id: assigneeId || undefined,
+        label_ids: selectedLabelIds.length > 0 ? selectedLabelIds : undefined,
       })
       toast.success('Task created')
       reset()
       setStatusId(firstStatusId)
       setPriority('none')
       setAssigneeId('')
+      setSelectedLabelIds([])
       onClose()
     } catch {
       toast.error('Failed to create task')
@@ -205,6 +215,45 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
               />
             </div>
           </div>
+
+          {/* Labels */}
+          {labels.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-xs text-[var(--text-tertiary)] font-medium flex items-center gap-1.5">
+                <Tag className="size-3" />
+                Labels
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {labels.map((label) => {
+                  const active = selectedLabelIds.includes(label.id)
+                  return (
+                    <button
+                      key={label.id}
+                      type="button"
+                      onClick={() => toggleLabel(label.id)}
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium border transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
+                      style={
+                        active
+                          ? {
+                              backgroundColor: label.color,
+                              borderColor: label.color,
+                              color: '#fff',
+                              boxShadow: `0 2px 8px -2px ${label.color}60`,
+                            }
+                          : {
+                              borderColor: `${label.color}40`,
+                              color: label.color,
+                              backgroundColor: `${label.color}08`,
+                            }
+                      }
+                    >
+                      {label.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           <DialogFooter className="pt-2">
             <Button type="button" variant="outline" onClick={onClose} className="border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface)]">

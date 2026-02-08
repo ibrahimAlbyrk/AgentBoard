@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, Tag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useProject } from '@/hooks/useProjects'
 import { useBoard } from '@/hooks/useBoards'
@@ -12,6 +12,7 @@ import { KanbanBoard } from '@/components/board/KanbanBoard'
 import { TaskForm } from '@/components/tasks/TaskForm'
 import { TaskDetailPanel } from '@/components/board/TaskDetailPanel'
 import { TaskFilters } from '@/components/tasks/TaskFilters'
+import { LabelManager } from '@/components/labels/LabelManager'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import type { Task } from '@/types'
 
@@ -27,6 +28,7 @@ export function BoardPage() {
   const { setTasksForStatus, clearBoard } = useBoardStore()
 
   const [showTaskForm, setShowTaskForm] = useState(false)
+  const [showLabelManager, setShowLabelManager] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const selectedTaskRef = useRef(selectedTask)
   selectedTaskRef.current = selectedTask
@@ -100,13 +102,23 @@ export function BoardPage() {
               )}
             </div>
           </div>
-          <Button
-            onClick={() => handleAddTask()}
-            className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)] shadow-[0_0_16px_-4px_var(--glow)] transition-all"
-          >
-            <Plus className="size-4" />
-            New Task
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowLabelManager(true)}
+              className="border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-foreground hover:bg-[var(--surface)]"
+            >
+              <Tag className="size-4" />
+              Labels
+            </Button>
+            <Button
+              onClick={() => handleAddTask()}
+              className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)] shadow-[0_0_16px_-4px_var(--glow)] transition-all"
+            >
+              <Plus className="size-4" />
+              New Task
+            </Button>
+          </div>
         </div>
         <TaskFilters />
       </div>
@@ -132,6 +144,12 @@ export function BoardPage() {
         boardId={boardId!}
         open={!!selectedTask}
         onClose={() => setSelectedTask(null)}
+      />
+
+      <LabelManager
+        projectId={projectId!}
+        open={showLabelManager}
+        onClose={() => setShowLabelManager(false)}
       />
     </div>
   )

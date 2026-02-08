@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Sparkles,
   AlertTriangle,
+  Settings2,
 } from 'lucide-react'
 import {
   Select,
@@ -30,6 +31,7 @@ import { useProjectStore } from '@/stores/projectStore'
 import { useUpdateTask } from '@/hooks/useTasks'
 import { TaskComments } from '@/components/tasks/TaskComments'
 import { TaskActivity } from '@/components/tasks/TaskActivity'
+import { LabelManager } from '@/components/labels/LabelManager'
 import type { Task, Priority } from '@/types'
 
 const priorities: { value: Priority; label: string; color: string; icon: typeof Flag }[] = [
@@ -94,6 +96,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   const [title, setTitle] = useState('')
   const [editingDesc, setEditingDesc] = useState(false)
   const [desc, setDesc] = useState('')
+  const [showLabelManager, setShowLabelManager] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Keep last task in memory so exit animation can render with stale data
@@ -145,6 +148,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   const isOverdue = displayTask.due_date && isPast(parseISO(displayTask.due_date)) && !isToday(parseISO(displayTask.due_date))
 
   return (
+    <>
     <AnimatePresence mode="wait">
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
@@ -249,7 +253,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                       value={displayTask.status.id}
                       onValueChange={(v) => handleFieldUpdate({ status_id: v })}
                     >
-                      <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0">
+                      <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0 [&_[data-slot=select-value]]:overflow-visible">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -257,7 +261,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                           <SelectItem key={s.id} value={s.id}>
                             <div className="flex items-center gap-2">
                               <span
-                                className="size-2.5 rounded-full"
+                                className="size-2.5 rounded-full shrink-0"
                                 style={{ backgroundColor: s.color || 'var(--priority-none)', boxShadow: `0 0 0 2px var(--popover), 0 0 0 3.5px ${s.color || 'var(--priority-none)'}` }}
                               />
                               {s.name}
@@ -350,14 +354,23 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                 </motion.div>
 
                 {/* Labels */}
-                {labels.length > 0 && (
-                  <motion.div variants={fadeUp} className="mb-6">
-                    <div className="flex items-center gap-2 mb-3">
+                <motion.div variants={fadeUp} className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
                       <Tag className="size-3.5 text-[var(--text-tertiary)]" />
                       <span className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
                         Labels
                       </span>
                     </div>
+                    <button
+                      onClick={() => setShowLabelManager(true)}
+                      className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] transition-colors"
+                    >
+                      <Settings2 className="size-3" />
+                      Manage
+                    </button>
+                  </div>
+                  {labels.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {labels.map((label) => {
                         const active = displayTask.labels.some((l) => l.id === label.id)
@@ -391,8 +404,15 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                         )
                       })}
                     </div>
-                  </motion.div>
-                )}
+                  ) : (
+                    <button
+                      onClick={() => setShowLabelManager(true)}
+                      className="w-full py-3 rounded-xl border border-dashed border-[var(--border-strong)] text-xs text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] hover:border-[var(--accent-solid)] hover:bg-[var(--accent-muted-bg)] transition-all duration-200"
+                    >
+                      Create labels to categorize this task
+                    </button>
+                  )}
+                </motion.div>
 
                 {/* Description */}
                 <motion.div variants={fadeUp} className="mb-6">
@@ -479,6 +499,13 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
         </div>
       )}
     </AnimatePresence>
+
+    <LabelManager
+      projectId={projectId}
+      open={showLabelManager}
+      onClose={() => setShowLabelManager(false)}
+    />
+    </>
   )
 }
 

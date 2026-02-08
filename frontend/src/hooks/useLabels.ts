@@ -14,8 +14,10 @@ export function useCreateLabel(projectId: string) {
   return useMutation({
     mutationFn: (data: { name: string; color: string; description?: string }) =>
       api.createLabel(projectId, data),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['labels', projectId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['labels', projectId] })
+      qc.invalidateQueries({ queryKey: ['projects', projectId] })
+    },
   })
 }
 
@@ -29,7 +31,20 @@ export function useUpdateLabel(projectId: string) {
       labelId: string
       data: { name?: string; color?: string; description?: string }
     }) => api.updateLabel(projectId, labelId, data),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['labels', projectId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['labels', projectId] })
+      qc.invalidateQueries({ queryKey: ['projects', projectId] })
+    },
+  })
+}
+
+export function useDeleteLabel(projectId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (labelId: string) => api.deleteLabel(projectId, labelId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['labels', projectId] })
+      qc.invalidateQueries({ queryKey: ['projects', projectId] })
+    },
   })
 }
