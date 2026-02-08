@@ -152,18 +152,20 @@ async def delete_task(
     })
     if assignee_id:
         deleter_name = current_user.full_name or current_user.username
-        await NotificationService.create_notification(
+        notif = await NotificationService.create_notification(
             db,
             user_id=assignee_id,
+            actor_id=current_user.id,
             project_id=board.project_id,
             type="task_deleted",
             title="Task Deleted",
             message=f'{deleter_name} deleted "{task_title}"',
             data={"task_id": str(task_id)},
         )
-        await manager.broadcast_to_user(str(assignee_id), {
-            "type": "notification.new",
-        })
+        if notif:
+            await manager.broadcast_to_user(str(assignee_id), {
+                "type": "notification.new",
+            })
 
 
 @router.post("/{task_id}/move", response_model=ResponseBase[TaskResponse])
@@ -220,16 +222,17 @@ async def bulk_update_tasks(
         if r.assignee:
             uid = str(r.assignee.id)
             updater_name = current_user.full_name or current_user.username
-            await NotificationService.create_notification(
+            notif = await NotificationService.create_notification(
                 db,
                 user_id=r.assignee.id,
+                actor_id=current_user.id,
                 project_id=board.project_id,
                 type="task_updated",
                 title="Task Updated",
                 message=f'{updater_name} updated "{r.title}"',
                 data={"task_id": str(r.id), "board_id": str(board.id)},
             )
-            if uid not in notified_users:
+            if notif and uid not in notified_users:
                 notified_users.add(uid)
                 await manager.broadcast_to_user(uid, {"type": "notification.new"})
     return ResponseBase(data=responses)
@@ -258,16 +261,17 @@ async def bulk_move_tasks(
         if r.assignee:
             uid = str(r.assignee.id)
             mover_name = current_user.full_name or current_user.username
-            await NotificationService.create_notification(
+            notif = await NotificationService.create_notification(
                 db,
                 user_id=r.assignee.id,
+                actor_id=current_user.id,
                 project_id=board.project_id,
                 type="task_moved",
                 title="Task Moved",
                 message=f'{mover_name} moved "{r.title}"',
                 data={"task_id": str(r.id), "board_id": str(board.id)},
             )
-            if uid not in notified_users:
+            if notif and uid not in notified_users:
                 notified_users.add(uid)
                 await manager.broadcast_to_user(uid, {"type": "notification.new"})
     return ResponseBase(data=responses)
@@ -296,15 +300,16 @@ async def bulk_delete_tasks(
             if assignee_id:
                 uid = str(assignee_id)
                 deleter_name = current_user.full_name or current_user.username
-                await NotificationService.create_notification(
+                notif = await NotificationService.create_notification(
                     db,
                     user_id=assignee_id,
+                    actor_id=current_user.id,
                     project_id=board.project_id,
                     type="task_deleted",
                     title="Task Deleted",
                     message=f'{deleter_name} deleted "{task_title}"',
                     data={"task_id": str(task_id)},
                 )
-                if uid not in notified_users:
+                if notif and uid not in notified_users:
                     notified_users.add(uid)
                     await manager.broadcast_to_user(uid, {"type": "notification.new"})

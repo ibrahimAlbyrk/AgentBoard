@@ -25,6 +25,7 @@ class UserResponse(BaseModel):
     full_name: str | None = None
     avatar_url: str | None = None
     role: str
+    notification_preferences: dict | None = None
     created_at: datetime
     last_login_at: datetime | None = None
 

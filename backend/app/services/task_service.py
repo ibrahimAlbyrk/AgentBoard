@@ -94,6 +94,7 @@ class TaskService:
             await NotificationService.create_notification(
                 db,
                 user_id=task_in.assignee_id,
+                actor_id=creator_id,
                 project_id=project_id,
                 type="task_assigned",
                 title="Task Assigned",
@@ -172,6 +173,7 @@ class TaskService:
                 await NotificationService.create_notification(
                     db,
                     user_id=current_assignee,
+                    actor_id=user_id,
                     project_id=task.project_id,
                     type="task_assigned",
                     title="Task Assigned",
@@ -184,6 +186,7 @@ class TaskService:
                 await NotificationService.create_notification(
                     db,
                     user_id=current_assignee,
+                    actor_id=user_id,
                     project_id=task.project_id,
                     type="task_updated",
                     title="Task Updated",
@@ -245,6 +248,7 @@ class TaskService:
             await NotificationService.create_notification(
                 db,
                 user_id=task.assignee_id,
+                actor_id=user_id,
                 project_id=task.project_id,
                 type="task_moved",
                 title="Task Moved",

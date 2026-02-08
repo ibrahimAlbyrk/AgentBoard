@@ -75,18 +75,20 @@ async def create_comment(
     if task.assignee_id:
         commenter_name = current_user.full_name or current_user.username
         preview = comment_in.content[:80] + ("..." if len(comment_in.content) > 80 else "")
-        await NotificationService.create_notification(
+        notif = await NotificationService.create_notification(
             db,
             user_id=task.assignee_id,
+            actor_id=current_user.id,
             project_id=board.project_id,
             type="task_comment",
             title="New Comment",
             message=f'{commenter_name} commented on "{task.title}": {preview}',
             data={"task_id": str(task_id), "board_id": str(board.id)},
         )
-        await manager.broadcast_to_user(str(task.assignee_id), {
-            "type": "notification.new",
-        })
+        if notif:
+            await manager.broadcast_to_user(str(task.assignee_id), {
+                "type": "notification.new",
+            })
 
     return ResponseBase(data=CommentResponse.model_validate(comment))
 

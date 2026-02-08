@@ -20,3 +20,16 @@ class NotificationResponse(BaseModel):
 class NotificationMarkRead(BaseModel):
     notification_ids: list[UUID] | None = None
     mark_all: bool = False
+
+
+class NotificationPreferences(BaseModel):
+    task_assigned: bool = True
+    task_updated: bool = True
+    task_moved: bool = True
+    task_deleted: bool = True
+    task_comment: bool = True
+    self_notifications: bool = True
+    desktop_enabled: bool = False
+    muted_projects: list[str] = []
+    email_enabled: bool = False
+    email_digest: str = "off"  # off, instant, daily, weekly

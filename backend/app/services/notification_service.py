@@ -6,24 +6,58 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud import crud_webhook
+from app.crud import crud_user, crud_webhook
 from app.models.notification import Notification
+from app.schemas.notification import NotificationPreferences
 
 logger = logging.getLogger(__name__)
 
 
 class NotificationService:
     @staticmethod
+    async def get_user_prefs(db: AsyncSession, user_id: UUID) -> NotificationPreferences:
+        user = await crud_user.get(db, user_id)
+        raw = (user.notification_preferences or {}) if user else {}
+        return NotificationPreferences(**raw)
+
+    @staticmethod
+    async def should_notify(
+        db: AsyncSession,
+        *,
+        user_id: UUID,
+        actor_id: UUID,
+        notification_type: str,
+        project_id: UUID | None = None,
+    ) -> bool:
+        prefs = await NotificationService.get_user_prefs(db, user_id)
+        if not prefs.self_notifications and user_id == actor_id:
+            return False
+        if not getattr(prefs, notification_type, True):
+            return False
+        if project_id and str(project_id) in prefs.muted_projects:
+            return False
+        return True
+
+    @staticmethod
     async def create_notification(
         db: AsyncSession,
         *,
         user_id: UUID,
+        actor_id: UUID | None = None,
         project_id: UUID | None = None,
         type: str,
         title: str,
         message: str,
         data: dict | None = None,
-    ) -> Notification:
+    ) -> Notification | None:
+        if actor_id is not None:
+            should = await NotificationService.should_notify(
+                db, user_id=user_id, actor_id=actor_id,
+                notification_type=type, project_id=project_id,
+            )
+            if not should:
+                return None
+
         notif = Notification(
             user_id=user_id,
             project_id=project_id,
