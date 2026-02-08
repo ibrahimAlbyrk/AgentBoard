@@ -133,6 +133,12 @@ All routes are mounted under the `/api/v1` prefix in `main.py`.
 
 ---
 
+### `backend/app/api/v1/dashboard.py`
+- **Purpose**: User-scoped dashboard statistics aggregated across all active projects (requires auth)
+- `GET /api/v1/dashboard/stats` → `get_dashboard_stats()` — Returns `in_progress` (tasks in non-default, non-terminal statuses) and `overdue` (tasks past due_date, not completed) counts across user's non-archived projects
+
+---
+
 ### `backend/app/api/v1/websocket.py`
 - **Purpose**: Real-time WebSocket connection for live board updates (token validated via query param)
 - `WS /api/v1/ws` → `websocket_endpoint()` — WebSocket endpoint; query params: `token`, `project_id`, `board_id`; responds to `ping` with `pong`; broadcasts task events to connected clients

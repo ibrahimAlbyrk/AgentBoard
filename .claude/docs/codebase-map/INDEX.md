@@ -8,16 +8,16 @@
 | Domain | Map File | Key Contents |
 |--------|----------|-------------|
 | Backend Core | [backend-core.md](backend-core.md) | App entry, config, DB, auth, middleware, deps |
-| Backend Routes | [backend-routes.md](backend-routes.md) | All 60+ API endpoints with methods and paths |
+| Backend Routes | [backend-routes.md](backend-routes.md) | All 60+ API endpoints with methods and paths (incl. dashboard) |
 | Backend Models | [backend-models.md](backend-models.md) | 16 ORM models, 31 Pydantic schemas |
 | Backend Services | [backend-services.md](backend-services.md) | 13 CRUD classes, 7 service modules |
-| Frontend Components | [frontend-components.md](frontend-components.md) | App entry, 7 pages, 16 components |
+| Frontend Components | [frontend-components.md](frontend-components.md) | App entry, 7 pages, 17 components (incl. LabelManager) |
 | Frontend State | [frontend-state.md](frontend-state.md) | 11 hooks, 3 stores, 7 type files, 4 lib modules |
 
 ## File Count
-- Backend: 82 files mapped
-- Frontend: 53 files mapped
-- Total: 135 files
+- Backend: 83 files mapped
+- Frontend: 54 files mapped
+- Total: 137 files
 
 ## How to Use
 - **Find a file**: Search this index or the relevant map file

@@ -222,6 +222,17 @@
 
 ---
 
+## Label Components
+
+### `frontend/src/components/labels/LabelManager.tsx`
+- **Purpose**: Dialog for managing project labels — list, create, edit, and delete with animated transitions and color picker.
+- `LabelManager` (named export) — Label CRUD management dialog
+- Props: `projectId` (string), `open` (boolean), `onClose` (() => void)
+- Features: 16 preset colors + custom hex input, inline label preview, confirm-before-delete, animated list/form transition (framer-motion)
+- Key state/hooks used: useState, useLabels, useCreateLabel, useUpdateLabel, useDeleteLabel, useProjectStore, AnimatePresence/motion (framer-motion)
+
+---
+
 ## Shared Components
 
 ### `frontend/src/components/shared/ConfirmDialog.tsx`
