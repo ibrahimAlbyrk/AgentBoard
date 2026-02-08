@@ -1,20 +1,58 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FolderKanban, CheckSquare, Clock, AlertTriangle, ArrowRight } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/authStore'
-import { useProjects } from '@/hooks/useProjects'
+import { useProjects, useDeleteProject } from '@/hooks/useProjects'
+import { api } from '@/lib/api-client'
 import { ProjectCard } from '@/components/projects/ProjectCard'
+import { ProjectForm } from '@/components/projects/ProjectForm'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
+import type { Project } from '@/types'
 
 export function DashboardPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
+  const qc = useQueryClient()
   const { data: projectsRes, isLoading } = useProjects()
+  const { data: dashboardStats } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => api.getDashboardStats(),
+  })
+  const deleteProject = useDeleteProject()
+  const [editProject, setEditProject] = useState<Project | null>(null)
   const projects = projectsRes?.data ?? []
 
   if (isLoading) return <LoadingSpinner text="Loading dashboard..." />
 
   const totalTasks = projects.reduce((sum, p) => sum + p.task_count, 0)
+
+  const handleArchive = async (project: Project) => {
+    try {
+      if (project.is_archived) {
+        await api.unarchiveProject(project.id)
+        toast.success(`"${project.name}" unarchived`)
+      } else {
+        await api.archiveProject(project.id)
+        toast.success(`"${project.name}" archived`)
+      }
+      qc.invalidateQueries({ queryKey: ['projects'] })
+    } catch {
+      toast.error('Failed to update project')
+    }
+  }
+
+  const handleDelete = async (project: Project) => {
+    if (!window.confirm(`Delete "${project.name}"? This cannot be undone.`)) return
+    try {
+      await deleteProject.mutateAsync(project.id)
+      toast.success(`"${project.name}" deleted`)
+    } catch {
+      toast.error('Failed to delete project')
+    }
+  }
 
   const stats = [
     {
@@ -35,7 +73,7 @@ export function DashboardPage() {
     },
     {
       label: 'In Progress',
-      value: '-',
+      value: dashboardStats?.data?.in_progress ?? 0,
       icon: Clock,
       color: 'text-[var(--warning)]',
       bg: 'bg-[var(--warning-muted)]',
@@ -43,7 +81,7 @@ export function DashboardPage() {
     },
     {
       label: 'Overdue',
-      value: '-',
+      value: dashboardStats?.data?.overdue ?? 0,
       icon: AlertTriangle,
       color: 'text-[var(--destructive)]',
       bg: 'bg-[var(--destructive)]/8',
@@ -106,11 +144,23 @@ export function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.slice(0, 6).map((p) => (
-              <ProjectCard key={p.id} project={p} />
+              <ProjectCard
+                key={p.id}
+                project={p}
+                onEdit={(proj) => setEditProject(proj)}
+                onArchive={handleArchive}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         )}
       </div>
+
+      <ProjectForm
+        open={!!editProject}
+        onClose={() => setEditProject(null)}
+        project={editProject}
+      />
     </div>
   )
 }

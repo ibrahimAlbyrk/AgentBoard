@@ -386,6 +386,10 @@ class APIClient {
     return this.request<APIResponse<Record<string, unknown>>>(`/projects/${projectId}/stats`)
   }
 
+  async getDashboardStats() {
+    return this.request<APIResponse<{ in_progress: number; overdue: number }>>('/dashboard/stats')
+  }
+
   // API Keys
   async listApiKeys() {
     return this.request<APIResponse<Array<{ id: string; name: string; key_prefix: string; last_used: string | null; created_at: string }>>>('/api-keys')

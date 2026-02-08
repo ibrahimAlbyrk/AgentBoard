@@ -31,6 +31,7 @@ from app.api.v1 import (
     auth,
     boards,
     comments,
+    dashboard,
     labels,
     members,
     notifications,
@@ -58,6 +59,7 @@ for router_module in [
     notifications,
     search,
     stats,
+    dashboard,
 ]:
     app.include_router(router_module.router, prefix="/api/v1")
 
