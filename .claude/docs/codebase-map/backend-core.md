@@ -1,10 +1,10 @@
-### `backend/app/main.py`
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/main.py`
 - **Purpose**: FastAPI application factory — configures middleware, registers all v1 routers, and initializes the database on startup.
 - `app` — FastAPI instance with CORS, request-ID middleware, error handlers
 - `startup()` — calls `init_db()` to auto-create tables
 - `health()` — GET `/health` returning status and version
 
-### `backend/app/core/config.py`
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/core/config.py`
 - **Purpose**: Centralised app configuration loaded from environment variables via Pydantic Settings.
 - `Settings` — BaseSettings subclass holding all config fields
   - `DATABASE_URL` — SQLite default, PostgreSQL in prod
@@ -18,7 +18,7 @@
   - `parse_cors_origins()` — splits comma-separated string into list
 - `settings` — singleton Settings instance
 
-### `backend/app/core/database.py`
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/core/database.py`
 - **Purpose**: SQLAlchemy async engine, session factory, and base model setup.
 - `_build_engine()` — creates async engine with SQLite StaticPool fallback
 - `engine` — module-level async engine instance
@@ -27,7 +27,7 @@
 - `get_db()` — async generator yielding a session with auto commit/rollback
 - `init_db()` — creates all tables from Base metadata
 
-### `backend/app/core/security.py`
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/core/security.py`
 - **Purpose**: Password hashing, JWT token creation/verification, and API key generation utilities.
 - `hash_password()` — bcrypt hash a plaintext password
 - `verify_password()` — bcrypt verify plain against hashed
@@ -37,18 +37,18 @@
 - `generate_api_key()` — return `(raw_key, sha256_hash)` pair
 - `hash_api_key()` — SHA-256 hash an API key string
 
-### `backend/app/middleware/request_id.py`
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/middleware/request_id.py`
 - **Purpose**: Starlette middleware that attaches a UUID `X-Request-ID` header to every response.
 - `RequestIDMiddleware` — generates UUID per request, sets response header
 
-### `backend/app/middleware/error_handler.py`
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/middleware/error_handler.py`
 - **Purpose**: Global exception handlers returning standardised JSON error responses.
 - `register_error_handlers()` — attaches three exception handlers to the app
   - `validation_exception_handler` — 422 for Pydantic validation errors
   - `http_exception_handler` — forwards HTTP exception status and detail
   - `generic_exception_handler` — 500 catch-all with traceback logging
 
-### `backend/app/api/deps.py`
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/deps.py`
 - **Purpose**: FastAPI dependency functions for authentication and resource access control.
 - `oauth2_scheme` — OAuth2 bearer token extractor
 - `api_key_header` — `X-API-Key` header extractor

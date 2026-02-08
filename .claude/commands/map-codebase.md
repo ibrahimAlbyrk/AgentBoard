@@ -22,9 +22,9 @@ CLAUDE_MD: CLAUDE.md
 - **Full mode**: If `INDEX.md` does not exist, perform a complete mapping from scratch
 - Maximize parallelism: spawn one Task agent per domain/layer to map files concurrently
 - Each map file must stay under 300 lines to avoid context bloat
-- Use this exact format for every entry — no deviations:
+- Use this exact format for every entry — no deviations. **CRITICAL**: File paths in headers MUST be absolute paths (as returned by Glob), NOT relative paths. This allows agents to directly Read/Edit files without searching:
   ```
-  ### `relative/path/to/file.ext`
+  ### `/absolute/path/to/project/file.ext`
   - **Purpose**: One-line description of what this file does
   - `ClassName` — what it does
   - `function_name()` — what it does
@@ -95,7 +95,7 @@ Prompt:
 You are mapping backend infrastructure files for a codebase index. Your job is to READ each file listed below completely and produce a structured markdown map.
 
 OUTPUT FORMAT (strict — no deviations):
-### `<relative_path_from_project_root>`
+### `<absolute_file_path>`
 - **Purpose**: <one clear sentence: what this file does>
 - `<ClassName>` — <what it does, max 10 words>
 - `<function_name()>` — <what it does, max 10 words>
@@ -121,7 +121,7 @@ Prompt:
 You are mapping API route files for a codebase index. Your job is to READ each file listed below completely and document every route handler.
 
 OUTPUT FORMAT (strict):
-### `<relative_path_from_project_root>`
+### `<absolute_file_path>`
 - **Purpose**: <one sentence>
 - `METHOD /full/path` → `handler_name()` — <what it does>
 
@@ -146,14 +146,14 @@ You are mapping SQLAlchemy models and Pydantic schemas for a codebase index. You
 
 OUTPUT FORMAT (strict):
 For models:
-### `<relative_path_from_project_root>`
+### `<absolute_file_path>`
 - **Purpose**: <one sentence>
 - `ClassName` — <what it represents>
   - Key fields: `field1` (type), `field2` (type), ...
   - Relationships: `rel_name` → TargetModel
 
 For schemas:
-### `<relative_path_from_project_root>`
+### `<absolute_file_path>`
 - **Purpose**: <one sentence>
 - `SchemaName` — <Create/Update/Response for what>
   - Fields: `field1` (type, required/optional), ...
@@ -178,7 +178,7 @@ Prompt:
 You are mapping service and CRUD layer files for a codebase index. Your job is to READ each file listed below and document business logic functions.
 
 OUTPUT FORMAT (strict):
-### `<relative_path_from_project_root>`
+### `<absolute_file_path>`
 - **Purpose**: <one sentence>
 - `ClassName` (extends BaseClass) — <what it does>
 - `method_name(params)` — <what it does, max 10 words>
@@ -202,7 +202,7 @@ Prompt:
 You are mapping React components for a codebase index. Your job is to READ each file listed below and document the component's role and key exports.
 
 OUTPUT FORMAT (strict):
-### `<relative_path_from_project_root>`
+### `<absolute_file_path>`
 - **Purpose**: <one sentence>
 - `ComponentName` — <what it renders/does>
 - Props: `propName` (type) — <purpose>  (skip if no props)
@@ -230,7 +230,7 @@ Prompt:
 You are mapping React hooks, Zustand stores, type definitions, and utility modules for a codebase index. Your job is to READ each file listed below and document every export.
 
 OUTPUT FORMAT (strict):
-### `<relative_path_from_project_root>`
+### `<absolute_file_path>`
 - **Purpose**: <one sentence>
 - `useHookName()` — <what it returns/does>
 - `storeName` — state: `field1`, `field2`; actions: `action1()`, `action2()`
