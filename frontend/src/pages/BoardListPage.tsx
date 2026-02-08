@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, LayoutGrid, ListTodo, Users, Trash2, Pencil, MoreHorizontal, ArrowRight, Bot } from 'lucide-react'
+import { Plus, LayoutGrid, ListTodo, Users, Trash2, Pencil, MoreHorizontal, ArrowRight, Bot, Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -120,6 +120,66 @@ export function BoardListPage() {
             New Board
           </Button>
         </div>
+      </div>
+
+      {/* Agents Strip */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bot className="size-3.5 text-[var(--text-tertiary)]" />
+            <span className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+              Agents
+            </span>
+            {(project.agents ?? []).length > 0 && (
+              <span className="text-[10px] text-[var(--text-tertiary)] bg-[var(--overlay)] px-1.5 py-0.5 rounded-full font-medium">
+                {(project.agents ?? []).filter((a) => a.is_active).length} active
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setShowAgents(true)}
+            className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-foreground transition-colors"
+          >
+            <Settings className="size-3" />
+            Manage
+          </button>
+        </div>
+        {(project.agents ?? []).filter((a) => a.is_active).length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {(project.agents ?? []).map((agent) => (
+              <div
+                key={agent.id}
+                className="group/agent flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-all duration-200 cursor-default"
+              >
+                <span
+                  className="size-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 transition-transform duration-200 group-hover/agent:scale-110"
+                  style={{ backgroundColor: agent.is_active ? agent.color : 'var(--text-tertiary)' }}
+                >
+                  {agent.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="text-[13px] font-medium text-foreground">
+                  {agent.name}
+                </span>
+                {!agent.is_active && (
+                  <span className="text-[10px] text-[var(--text-tertiary)] bg-[var(--overlay)] px-1.5 py-0.5 rounded-full">
+                    inactive
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface)]">
+            <Bot className="size-4 text-[var(--text-tertiary)]" />
+            <span className="text-sm text-[var(--text-tertiary)]">No active agents</span>
+            <button
+              onClick={() => setShowAgents(true)}
+              className="text-sm text-[var(--accent-solid)] hover:underline ml-auto"
+            >
+              Add Agent
+            </button>
+          </div>
+        )}
       </div>
 
       {boards.length === 0 ? (
