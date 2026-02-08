@@ -17,7 +17,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
       {/* Color accent bar */}
       <div
         className="h-1"
-        style={{ backgroundColor: project.color || '#6C5CE7' }}
+        style={{ backgroundColor: project.color || '#3B82F6' }}
       />
 
       <div className="p-4">

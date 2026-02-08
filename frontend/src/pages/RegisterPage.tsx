@@ -52,18 +52,18 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#0B0B0E] grain-overlay">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#09090B] grain-overlay">
       {/* Animated gradient mesh */}
       <div className="absolute inset-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-[#6C5CE7]/20 blur-[120px] animate-gradient" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#F0ABFC]/15 blur-[120px] animate-gradient" style={{ animationDelay: '-4s' }} />
-        <div className="absolute top-[40%] right-[20%] w-[30%] h-[30%] rounded-full bg-[#60A5FA]/10 blur-[100px] animate-gradient" style={{ animationDelay: '-2s' }} />
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-[#2563EB]/15 blur-[120px] animate-gradient" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#60A5FA]/10 blur-[120px] animate-gradient" style={{ animationDelay: '-4s' }} />
+        <div className="absolute top-[40%] right-[20%] w-[30%] h-[30%] rounded-full bg-[#3B82F6]/8 blur-[100px] animate-gradient" style={{ animationDelay: '-2s' }} />
       </div>
 
       <div className="relative z-10 w-full max-w-[420px] animate-fade-in">
-        <div className="bg-[#18181E]/80 backdrop-blur-2xl border border-[#ffffff08] rounded-2xl p-8 shadow-[0_0_80px_-20px_#6C5CE720]">
+        <div className="bg-[#18181B]/80 backdrop-blur-2xl border border-[#ffffff08] rounded-2xl p-8 shadow-[0_0_80px_-20px_#3B82F620]">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center size-12 rounded-xl bg-gradient-to-br from-[#6C5CE7] to-[#7C6AEF] mb-4 shadow-[0_0_24px_-4px_#6C5CE780]">
+            <div className="inline-flex items-center justify-center size-12 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#3B82F6] mb-4 shadow-[0_0_24px_-4px_#2563EB80]">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" rx="1" />
                 <rect x="14" y="3" width="7" height="7" rx="1" />
@@ -72,76 +72,76 @@ export function RegisterPage() {
               </svg>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Create account</h1>
-            <p className="text-sm text-[#8B8AA0] mt-1.5">Get started with AgentBoard</p>
+            <p className="text-sm text-[#A1A1AA] mt-1.5">Get started with AgentBoard</p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#8B8AA0] text-xs font-medium uppercase tracking-wider">Email</Label>
+              <Label htmlFor="email" className="text-[#A1A1AA] text-xs font-medium uppercase tracking-wider">Email</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="you@example.com"
-                className="bg-[#0F0F12] border-[#2A2A35] h-11 text-white placeholder:text-[#5C5B72] focus:border-[#6C5CE7] transition-colors"
+                className="bg-[#09090B] border-[#27272A] h-11 text-white placeholder:text-[#52525B] focus:border-[#2563EB] transition-colors"
                 {...register('email')}
                 aria-invalid={!!errors.email}
               />
-              {errors.email && <p className="text-sm text-[#F87171]">{errors.email.message}</p>}
+              {errors.email && <p className="text-sm text-[#EF4444]">{errors.email.message}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-[#8B8AA0] text-xs font-medium uppercase tracking-wider">Username</Label>
+              <Label htmlFor="username" className="text-[#A1A1AA] text-xs font-medium uppercase tracking-wider">Username</Label>
               <Input
                 id="username"
                 placeholder="johndoe"
-                className="bg-[#0F0F12] border-[#2A2A35] h-11 text-white placeholder:text-[#5C5B72] focus:border-[#6C5CE7] transition-colors"
+                className="bg-[#09090B] border-[#27272A] h-11 text-white placeholder:text-[#52525B] focus:border-[#2563EB] transition-colors"
                 {...register('username')}
                 aria-invalid={!!errors.username}
               />
-              {errors.username && <p className="text-sm text-[#F87171]">{errors.username.message}</p>}
+              {errors.username && <p className="text-sm text-[#EF4444]">{errors.username.message}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="full_name" className="text-[#8B8AA0] text-xs font-medium uppercase tracking-wider">Full Name <span className="text-[#5C5B72] normal-case">(optional)</span></Label>
+              <Label htmlFor="full_name" className="text-[#A1A1AA] text-xs font-medium uppercase tracking-wider">Full Name <span className="text-[#52525B] normal-case">(optional)</span></Label>
               <Input
                 id="full_name"
                 placeholder="John Doe"
-                className="bg-[#0F0F12] border-[#2A2A35] h-11 text-white placeholder:text-[#5C5B72] focus:border-[#6C5CE7] transition-colors"
+                className="bg-[#09090B] border-[#27272A] h-11 text-white placeholder:text-[#52525B] focus:border-[#2563EB] transition-colors"
                 {...register('full_name')}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-[#8B8AA0] text-xs font-medium uppercase tracking-wider">Password</Label>
+                <Label htmlFor="password" className="text-[#A1A1AA] text-xs font-medium uppercase tracking-wider">Password</Label>
                 <Input
                   id="password"
                   type="password"
                   placeholder="Min 8 chars"
-                  className="bg-[#0F0F12] border-[#2A2A35] h-11 text-white placeholder:text-[#5C5B72] focus:border-[#6C5CE7] transition-colors"
+                  className="bg-[#09090B] border-[#27272A] h-11 text-white placeholder:text-[#52525B] focus:border-[#2563EB] transition-colors"
                   {...register('password')}
                   aria-invalid={!!errors.password}
                 />
-                {errors.password && <p className="text-sm text-[#F87171]">{errors.password.message}</p>}
+                {errors.password && <p className="text-sm text-[#EF4444]">{errors.password.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm_password" className="text-[#8B8AA0] text-xs font-medium uppercase tracking-wider">Confirm</Label>
+                <Label htmlFor="confirm_password" className="text-[#A1A1AA] text-xs font-medium uppercase tracking-wider">Confirm</Label>
                 <Input
                   id="confirm_password"
                   type="password"
                   placeholder="Re-enter"
-                  className="bg-[#0F0F12] border-[#2A2A35] h-11 text-white placeholder:text-[#5C5B72] focus:border-[#6C5CE7] transition-colors"
+                  className="bg-[#09090B] border-[#27272A] h-11 text-white placeholder:text-[#52525B] focus:border-[#2563EB] transition-colors"
                   {...register('confirm_password')}
                   aria-invalid={!!errors.confirm_password}
                 />
-                {errors.confirm_password && <p className="text-sm text-[#F87171]">{errors.confirm_password.message}</p>}
+                {errors.confirm_password && <p className="text-sm text-[#EF4444]">{errors.confirm_password.message}</p>}
               </div>
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-gradient-to-r from-[#6C5CE7] to-[#7C6AEF] hover:from-[#5B4BD6] hover:to-[#6C5CE7] text-white font-medium shadow-[0_0_20px_-4px_#6C5CE750] hover:shadow-[0_0_28px_-4px_#6C5CE780] transition-all duration-200"
+              className="w-full h-11 bg-gradient-to-r from-[#2563EB] to-[#3B82F6] hover:from-[#1D4ED8] hover:to-[#2563EB] text-white font-medium shadow-[0_0_20px_-4px_#2563EB50] hover:shadow-[0_0_28px_-4px_#2563EB80] transition-all duration-200"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
@@ -156,9 +156,9 @@ export function RegisterPage() {
               )}
             </Button>
 
-            <p className="text-center text-sm text-[#5C5B72]">
+            <p className="text-center text-sm text-[#52525B]">
               Already have an account?{' '}
-              <Link to="/login" className="text-[#7C6AEF] hover:text-[#9B8AFF] transition-colors">
+              <Link to="/login" className="text-[#3B82F6] hover:text-[#60A5FA] transition-colors">
                 Sign in
               </Link>
             </p>
