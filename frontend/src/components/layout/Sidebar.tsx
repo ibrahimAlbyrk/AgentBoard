@@ -1,16 +1,99 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FolderKanban, Settings, Search, Plus, X } from 'lucide-react'
+import { Link, useLocation, useParams } from 'react-router-dom'
+import { LayoutDashboard, FolderKanban, Settings, Search, Plus, X, ChevronRight, Kanban } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useProjects } from '@/hooks/useProjects'
+import { useBoards } from '@/hooks/useBoards'
 import { useAuthStore } from '@/stores/authStore'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import type { Project } from '@/types'
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
+
+function SidebarProjectItem({
+  project,
+  onClose,
+}: {
+  project: Project
+  onClose?: () => void
+}) {
+  const location = useLocation()
+  const { projectId: routeProjectId, boardId: routeBoardId } = useParams()
+  const isProjectRoute = routeProjectId === project.id
+  const [expanded, setExpanded] = useState(isProjectRoute)
+  const { data: boardsRes } = useBoards(project.id)
+  const boards = boardsRes?.data ?? []
+
+  useEffect(() => {
+    if (isProjectRoute && !expanded) setExpanded(true)
+  }, [isProjectRoute])
+
+  const projectActive =
+    location.pathname === `/projects/${project.id}` && !routeBoardId
+
+  return (
+    <div>
+      <div className="flex items-center gap-0.5">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="size-5 inline-flex items-center justify-center rounded text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--sidebar-hover)] transition-all flex-shrink-0"
+        >
+          <ChevronRight
+            className={cn(
+              'size-3 transition-transform duration-150',
+              expanded && 'rotate-90'
+            )}
+          />
+        </button>
+        <Link
+          to={`/projects/${project.id}`}
+          onClick={onClose}
+          className={cn(
+            'flex-1 flex items-center gap-2 px-2 h-7 rounded-lg text-[13px] transition-all duration-150 min-w-0',
+            projectActive
+              ? 'bg-[var(--accent-muted-bg)] text-[var(--accent-solid)] font-semibold'
+              : 'text-[var(--text-secondary)] hover:text-foreground hover:bg-[var(--sidebar-hover)]'
+          )}
+        >
+          <span
+            className="size-2.5 rounded flex-shrink-0"
+            style={{ backgroundColor: project.color || '#3B82F6' }}
+          />
+          <span className="truncate">{project.name}</span>
+        </Link>
+      </div>
+
+      {expanded && boards.length > 0 && (
+        <div className="ml-3 pl-2.5 border-l border-[var(--border-subtle)] mt-0.5 space-y-0.5">
+          {boards.map((b) => {
+            const boardActive =
+              routeProjectId === project.id && routeBoardId === b.id
+            return (
+              <Link
+                key={b.id}
+                to={`/projects/${project.id}/boards/${b.id}`}
+                onClick={onClose}
+                className={cn(
+                  'flex items-center gap-2 px-2 h-7 rounded-lg text-[12px] transition-all duration-150',
+                  boardActive
+                    ? 'bg-[var(--accent-muted-bg)] text-[var(--accent-solid)] font-semibold'
+                    : 'text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--sidebar-hover)]'
+                )}
+              >
+                <Kanban className="size-3 flex-shrink-0" />
+                <span className="truncate">{b.name}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface SidebarProps {
   onClose?: () => void
@@ -123,23 +206,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               </Link>
             </div>
             {filteredProjects.slice(0, 8).map((p) => (
-              <Link
-                key={p.id}
-                to={`/projects/${p.id}`}
-                onClick={onClose}
-                className={cn(
-                  'flex items-center gap-2.5 px-3 h-8 rounded-lg text-[13px] transition-all duration-150',
-                  location.pathname === `/projects/${p.id}`
-                    ? 'bg-[var(--accent-muted-bg)] text-[var(--accent-solid)] font-semibold'
-                    : 'text-[var(--text-secondary)] hover:text-foreground hover:bg-[var(--sidebar-hover)]'
-                )}
-              >
-                <span
-                  className="size-2.5 rounded flex-shrink-0"
-                  style={{ backgroundColor: p.color || '#3B82F6' }}
-                />
-                <span className="truncate">{p.name}</span>
-              </Link>
+              <SidebarProjectItem key={p.id} project={p} onClose={onClose} />
             ))}
           </div>
         )}
