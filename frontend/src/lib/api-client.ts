@@ -17,6 +17,7 @@ import type {
   TaskMove,
   TaskFilters,
   Comment,
+  Attachment,
   ActivityLog,
   User,
   LoginCredentials,
@@ -79,6 +80,35 @@ class APIClient {
     }
 
     if (response.status === 204) return undefined as T
+
+    return response.json()
+  }
+
+  private async upload<T>(path: string, file: File, retry = true): Promise<T> {
+    const token = this.getToken()
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    const response = await fetch(`${BASE_URL}${path}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+
+    if (response.status === 401 && retry) {
+      const refreshed = await this.refreshToken()
+      if (refreshed) return this.upload<T>(path, file, false)
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        error: { code: 'UNKNOWN', message: response.statusText },
+      }))
+      throw error
+    }
 
     return response.json()
   }
@@ -349,7 +379,7 @@ class APIClient {
     return this.request<APIResponse<Comment[]>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments`)
   }
 
-  async createComment(projectId: string, boardId: string, taskId: string, data: { content: string }) {
+  async createComment(projectId: string, boardId: string, taskId: string, data: { content: string; attachment_ids?: string[] }) {
     return this.request<APIResponse<Comment>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -367,6 +397,27 @@ class APIClient {
     return this.request<void>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments/${commentId}`, {
       method: 'DELETE',
     })
+  }
+
+  // Attachments
+  async uploadAttachment(projectId: string, boardId: string, taskId: string, file: File) {
+    return this.upload<APIResponse<Attachment>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/attachments/`,
+      file,
+    )
+  }
+
+  async listAttachments(projectId: string, boardId: string, taskId: string) {
+    return this.request<PaginatedResponse<Attachment>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/attachments`,
+    )
+  }
+
+  async deleteAttachment(projectId: string, boardId: string, taskId: string, attachmentId: string) {
+    return this.request<void>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/attachments/${attachmentId}`,
+      { method: 'DELETE' },
+    )
   }
 
   // Activity

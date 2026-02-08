@@ -10,6 +10,7 @@ import {
   Tag,
   MessageSquare,
   Activity,
+  Paperclip,
   Clock,
   ChevronRight,
   Sparkles,
@@ -31,6 +32,7 @@ import { useProjectStore } from '@/stores/projectStore'
 import { useUpdateTask } from '@/hooks/useTasks'
 import { TaskComments } from '@/components/tasks/TaskComments'
 import { TaskActivity } from '@/components/tasks/TaskActivity'
+import { TaskAttachments } from '@/components/tasks/TaskAttachments'
 import { LabelManager } from '@/components/labels/LabelManager'
 import type { Task, Priority } from '@/types'
 
@@ -468,15 +470,27 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                           </span>
                         )}
                       </TabsTrigger>
+                      <TabsTrigger value="attachments" className="gap-1.5 text-sm">
+                        <Paperclip className="size-3.5" />
+                        Files
+                        {displayTask.attachments?.length > 0 && (
+                          <span className="ml-1 text-[10px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)] px-1.5 py-0.5 rounded-full font-semibold">
+                            {displayTask.attachments.length}
+                          </span>
+                        )}
+                      </TabsTrigger>
                       <TabsTrigger value="activity" className="gap-1.5 text-sm">
                         <Activity className="size-3.5" />
                         Activity
                       </TabsTrigger>
                     </TabsList>
-                    <TabsContent value="comments">
+                    <TabsContent value="comments" forceMount className="data-[state=inactive]:hidden">
                       <TaskComments projectId={projectId} boardId={boardId} taskId={displayTask.id} />
                     </TabsContent>
-                    <TabsContent value="activity">
+                    <TabsContent value="attachments" forceMount className="data-[state=inactive]:hidden">
+                      <TaskAttachments projectId={projectId} boardId={boardId} taskId={displayTask.id} />
+                    </TabsContent>
+                    <TabsContent value="activity" forceMount className="data-[state=inactive]:hidden">
                       <TaskActivity projectId={projectId} taskId={displayTask.id} />
                     </TabsContent>
                   </Tabs>

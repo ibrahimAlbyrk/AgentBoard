@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Tag } from 'lucide-react'
+import { Tag, Paperclip, X, File as FileIcon, Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,16 @@ import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useProjectStore } from '@/stores/projectStore'
 import { useCreateTask } from '@/hooks/useTasks'
+import { api } from '@/lib/api-client'
 import type { Priority } from '@/types'
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 const schema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -60,6 +69,9 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
   const [priority, setPriority] = useState<Priority>('none')
   const [assigneeId, setAssigneeId] = useState('')
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
     register,
@@ -70,6 +82,24 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
     resolver: zodResolver(schema),
   })
 
+  const addFiles = useCallback((files: FileList | File[]) => {
+    const valid: File[] = []
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`"${file.name}" is too large. Maximum size is 10MB.`)
+        continue
+      }
+      valid.push(file)
+    }
+    if (valid.length) setPendingFiles((prev) => [...prev, ...valid])
+  }, [])
+
+  const removeFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const isImage = (file: File) => file.type.startsWith('image/')
+
   const toggleLabel = (labelId: string) => {
     setSelectedLabelIds((prev) =>
       prev.includes(labelId) ? prev.filter((id) => id !== labelId) : [...prev, labelId]
@@ -78,7 +108,7 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
 
   const onSubmit = async (data: FormData) => {
     try {
-      await createTask.mutateAsync({
+      const res = await createTask.mutateAsync({
         title: data.title,
         description: data.description,
         status_id: statusId || firstStatusId,
@@ -87,14 +117,29 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
         assignee_id: assigneeId || undefined,
         label_ids: selectedLabelIds.length > 0 ? selectedLabelIds : undefined,
       })
+
+      if (pendingFiles.length > 0) {
+        setUploading(true)
+        const taskId = res.data.id
+        const uploads = pendingFiles.map((file) =>
+          api.uploadAttachment(projectId, boardId, taskId, file).catch(() => {
+            toast.error(`Failed to upload "${file.name}"`)
+          })
+        )
+        await Promise.allSettled(uploads)
+        setUploading(false)
+      }
+
       toast.success('Task created')
       reset()
       setStatusId(firstStatusId)
       setPriority('none')
       setAssigneeId('')
       setSelectedLabelIds([])
+      setPendingFiles([])
       onClose()
     } catch {
+      setUploading(false)
       toast.error('Failed to create task')
     }
   }
@@ -255,12 +300,78 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
             </div>
           )}
 
+          {/* Attachments */}
+          <div className="space-y-1.5">
+            <span className="text-xs text-[var(--text-tertiary)] font-medium flex items-center gap-1.5">
+              <Paperclip className="size-3" />
+              Attachments
+            </span>
+
+            {pendingFiles.length > 0 && (
+              <div className="space-y-1.5">
+                {pendingFiles.map((file, i) => (
+                  <div
+                    key={`${file.name}-${i}`}
+                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] group"
+                  >
+                    {isImage(file) ? (
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={file.name}
+                        className="size-8 rounded object-cover shrink-0 border border-[var(--border-subtle)]"
+                      />
+                    ) : (
+                      <div className="size-8 rounded bg-[var(--accent-muted-bg)] flex items-center justify-center shrink-0">
+                        <FileIcon className="size-3.5 text-[var(--accent-solid)]" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{file.name}</p>
+                      <p className="text-[10px] text-[var(--text-tertiary)]">{formatFileSize(file.size)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      className="size-6 rounded-md flex items-center justify-center text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--surface)] text-[var(--text-tertiary)] hover:text-foreground transition-all text-xs"
+            >
+              <Paperclip className="size-3.5" />
+              {pendingFiles.length > 0 ? 'Add more files' : 'Attach files'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) addFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
+          </div>
+
           <DialogFooter className="pt-2">
             <Button type="button" variant="outline" onClick={onClose} className="border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface)]">
               Cancel
             </Button>
-            <Button type="submit" disabled={createTask.isPending} className="bg-primary text-primary-foreground hover:bg-primary/90">
-              {createTask.isPending ? 'Creating...' : 'Create Task'}
+            <Button type="submit" disabled={createTask.isPending || uploading} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              {uploading ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Uploading...
+                </>
+              ) : createTask.isPending ? 'Creating...' : pendingFiles.length > 0 ? `Create with ${pendingFiles.length} file${pendingFiles.length > 1 ? 's' : ''}` : 'Create Task'}
             </Button>
           </DialogFooter>
         </form>

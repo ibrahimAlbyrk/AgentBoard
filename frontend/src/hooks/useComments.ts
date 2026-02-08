@@ -12,8 +12,8 @@ export function useComments(projectId: string, boardId: string, taskId: string) 
 export function useCreateComment(projectId: string, boardId: string, taskId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (content: string) =>
-      api.createComment(projectId, boardId, taskId, { content }),
+    mutationFn: (data: { content: string; attachment_ids?: string[] }) =>
+      api.createComment(projectId, boardId, taskId, data),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['comments', projectId, boardId, taskId] }),
   })

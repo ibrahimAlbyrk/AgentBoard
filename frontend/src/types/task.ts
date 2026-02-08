@@ -3,6 +3,16 @@ import type { UserBrief } from './user'
 
 export type Priority = 'none' | 'low' | 'medium' | 'high' | 'urgent'
 
+export interface Attachment {
+  id: string
+  filename: string
+  file_size: number
+  mime_type: string
+  download_url: string
+  user: UserBrief
+  created_at: string
+}
+
 export interface Task {
   id: string
   project_id: string
@@ -14,6 +24,7 @@ export interface Task {
   assignee: UserBrief | null
   creator: UserBrief
   labels: Label[]
+  attachments: Attachment[]
   due_date: string | null
   position: number
   parent_id: string | null
@@ -53,6 +64,7 @@ export interface Comment {
   id: string
   content: string
   user: UserBrief
+  attachments: Attachment[]
   created_at: string
   updated_at: string
   is_edited: boolean
