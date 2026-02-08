@@ -55,32 +55,34 @@ interface TaskDetailPanelProps {
 }
 
 const overlay = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-  exit: { opacity: 0 },
+  hidden: { opacity: 0, backdropFilter: 'blur(0px)' },
+  visible: { opacity: 1, backdropFilter: 'blur(8px)' },
+  exit: { opacity: 0, backdropFilter: 'blur(0px)' },
 }
 
-const panel = {
-  hidden: { x: '100%', opacity: 0.5 },
+const island = {
+  hidden: { scale: 0.92, opacity: 0, y: 24 },
   visible: {
-    x: 0,
+    scale: 1,
     opacity: 1,
-    transition: { type: 'spring' as const, damping: 30, stiffness: 300, mass: 0.8 },
+    y: 0,
+    transition: { type: 'spring' as const, damping: 28, stiffness: 360, mass: 0.7 },
   },
   exit: {
-    x: '100%',
+    scale: 0.95,
     opacity: 0,
-    transition: { duration: 0.25, ease: [0.4, 0, 1, 1] as const },
+    y: 16,
+    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] as const },
   },
 }
 
 const stagger = {
-  visible: { transition: { staggerChildren: 0.04, delayChildren: 0.12 } },
+  visible: { transition: { staggerChildren: 0.035, delayChildren: 0.1 } },
 }
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as const } },
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] as const } },
 }
 
 export function TaskDetailPanel({ task, projectId, open, onClose }: TaskDetailPanelProps) {
@@ -143,23 +145,32 @@ export function TaskDetailPanel({ task, projectId, open, onClose }: TaskDetailPa
   return (
     <AnimatePresence mode="wait">
       {open && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
           {/* Overlay */}
           <motion.div
-            className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-black/30"
             variants={overlay}
             initial="hidden"
             animate="visible"
             exit="exit"
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.25 }}
             onClick={onClose}
           />
 
-          {/* Panel */}
+          {/* Floating Island */}
           <motion.div
             ref={panelRef}
-            className="relative z-10 h-full w-full max-w-[620px] flex flex-col bg-[var(--elevated)] shadow-2xl"
-            variants={panel}
+            className="relative z-10 w-full max-w-[640px] max-h-[min(88vh,860px)] flex flex-col bg-[var(--elevated)] overflow-hidden"
+            style={{
+              borderRadius: '20px',
+              boxShadow: [
+                `0 0 0 1px var(--border-subtle)`,
+                `0 8px 40px -8px rgba(0,0,0,0.25)`,
+                `0 24px 80px -16px rgba(0,0,0,0.18)`,
+                `0 0 60px -12px ${priorityBg[displayTask.priority]}20`,
+              ].join(', '),
+            }}
+            variants={island}
             initial="hidden"
             animate="visible"
             exit="exit"
@@ -167,7 +178,10 @@ export function TaskDetailPanel({ task, projectId, open, onClose }: TaskDetailPa
             {/* Priority accent bar */}
             <div
               className="h-[3px] w-full shrink-0 transition-colors duration-300"
-              style={{ backgroundColor: priorityBg[displayTask.priority] }}
+              style={{
+                backgroundColor: priorityBg[displayTask.priority],
+                borderRadius: '20px 20px 0 0',
+              }}
             />
 
             {/* Top bar */}
@@ -181,7 +195,7 @@ export function TaskDetailPanel({ task, projectId, open, onClose }: TaskDetailPa
               </div>
               <button
                 onClick={onClose}
-                className="size-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--surface)] transition-all duration-150"
+                className="size-8 rounded-xl flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--surface)] transition-all duration-150"
               >
                 <X className="size-4" />
               </button>
@@ -452,7 +466,7 @@ export function TaskDetailPanel({ task, projectId, open, onClose }: TaskDetailPa
             </div>
 
             {/* Footer timestamps */}
-            <div className="px-6 py-3 border-t border-[var(--border-subtle)] flex items-center gap-4 text-[11px] text-[var(--text-tertiary)] shrink-0 bg-[var(--surface)]">
+            <div className="px-6 py-3 border-t border-[var(--border-subtle)] flex items-center gap-4 text-[11px] text-[var(--text-tertiary)] shrink-0 bg-[var(--surface)] rounded-b-[20px]">
               <div className="flex items-center gap-1.5">
                 <Clock className="size-3" />
                 Created {formatDistanceToNow(parseISO(displayTask.created_at), { addSuffix: true })}
