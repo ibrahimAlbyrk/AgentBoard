@@ -143,11 +143,12 @@ class APIClient {
   }
 
   // Projects
-  async listProjects(params?: { page?: number; per_page?: number; search?: string }) {
+  async listProjects(params?: { page?: number; per_page?: number; search?: string; include_archived?: boolean }) {
     const query = new URLSearchParams()
     if (params?.page) query.set('page', String(params.page))
     if (params?.per_page) query.set('per_page', String(params.per_page))
     if (params?.search) query.set('search', params.search)
+    if (params?.include_archived) query.set('include_archived', 'true')
     const qs = query.toString()
     return this.request<PaginatedResponse<Project>>(`/projects${qs ? `?${qs}` : ''}`)
   }

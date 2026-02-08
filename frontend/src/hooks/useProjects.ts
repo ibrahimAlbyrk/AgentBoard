@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
 import type { ProjectCreate } from '@/types'
 
-export function useProjects(params?: { page?: number; per_page?: number; search?: string }) {
+export function useProjects(params?: { page?: number; per_page?: number; search?: string; include_archived?: boolean }) {
   return useQuery({
     queryKey: ['projects', params],
     queryFn: () => api.listProjects(params),
