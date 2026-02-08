@@ -32,7 +32,7 @@
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/hooks/useComments.ts`
 - **Purpose**: Query and create hooks for task comments.
 - `useComments(projectId, boardId, taskId)` — query key `['comments', projectId, boardId, taskId]`. Enabled when all three IDs truthy.
-- `useCreateComment(projectId, boardId, taskId)` — mutation taking `content: string`. Invalidates `['comments', ...]`.
+- `useCreateComment(projectId, boardId, taskId)` — mutation taking `{ content: string, attachment_ids?: string[] }`. Invalidates `['comments', ...]`.
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/hooks/useLabels.ts`
 - **Purpose**: CRUD hooks for project-scoped labels.
@@ -72,6 +72,19 @@
 - `useUpdateBoard(projectId)` — mutation taking `{ boardId, data: BoardUpdate }`. Invalidates `['boards', projectId]` and `['projects', projectId]`.
 - `useDeleteBoard(projectId)` — mutation taking `boardId`. Invalidates `['boards', projectId]` and `['projects', projectId]`.
 
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/hooks/useAgents.ts`
+- **Purpose**: CRUD hooks for project-scoped agents via TanStack Query.
+- `useAgents(projectId, includeInactive?)` — query key `['agents', projectId, includeInactive]`. Fetches agent list. Enabled when `projectId` truthy. Defaults `includeInactive` to `true`.
+- `useCreateAgent(projectId)` — mutation taking `AgentCreate`. Invalidates `['agents', projectId]` and `['project', projectId]`.
+- `useUpdateAgent(projectId)` — mutation taking `{ agentId, data: AgentUpdate }`. Invalidates `['agents', projectId]` and `['project', projectId]`.
+- `useDeleteAgent(projectId)` — mutation taking `agentId`. Invalidates `['agents', projectId]` and `['project', projectId]`.
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/hooks/useAttachments.ts`
+- **Purpose**: Query and mutation hooks for task file attachments.
+- `useAttachments(projectId, boardId, taskId)` — query key `['attachments', projectId, boardId, taskId]`. Enabled when all three IDs truthy.
+- `useUploadAttachment(projectId, boardId, taskId)` — mutation taking `File`. Invalidates `['attachments', ...]` and `['tasks', projectId, boardId]`.
+- `useDeleteAttachment(projectId, boardId, taskId)` — mutation taking `attachmentId`. Invalidates `['attachments', ...]` and `['tasks', projectId, boardId]`.
+
 ---
 
 ## Stores
@@ -81,12 +94,12 @@
 - `useAuthStore` — state: `user: User | null`, `accessToken: string | null`, `refreshToken: string | null`; actions: `setTokens(access, refresh)`, `setUser(user)`, `login(credentials)` (calls `api.login`, sets all state), `register(data)` (calls `api.register`, sets all state), `logout()` (calls `api.logout`, clears state).
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/stores/projectStore.ts`
-- **Purpose**: Zustand store for current project context (project, boards, statuses, labels, members).
-- `useProjectStore` — state: `currentProject: Project | null`, `boards: Board[]`, `currentBoard: Board | null`, `statuses: Status[]`, `labels: Label[]`, `members: ProjectMember[]`; actions: `setCurrentProject(project)`, `setBoards(boards)` (sorts by position), `setCurrentBoard(board | null)`, `setStatuses(statuses)` (sorts by position), `setLabels(labels)`, `setMembers(members)`, `clearProject()` (resets all to defaults).
+- **Purpose**: Zustand store for current project context (project, boards, statuses, labels, members, agents).
+- `useProjectStore` — state: `currentProject: Project | null`, `boards: Board[]`, `currentBoard: Board | null`, `statuses: Status[]`, `labels: Label[]`, `members: ProjectMember[]`, `agents: Agent[]`; actions: `setCurrentProject(project)`, `setBoards(boards)` (sorts by position), `setCurrentBoard(board | null)`, `setStatuses(statuses)` (sorts by position), `setLabels(labels)`, `setMembers(members)`, `setAgents(agents)`, `clearProject()` (resets all to defaults including agents).
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/stores/boardStore.ts`
 - **Purpose**: Zustand store for Kanban board task state and client-side filters.
-- `useBoardStore` — state: `tasksByStatus: Record<string, Task[]>`, `filters: FilterState` (`search`, `statuses`, `priorities`, `assignee`); actions: `setTasksForStatus(statusId, tasks)` (sorts by position), `addTask(task)` (inserts into correct status bucket sorted by position), `updateTask(taskId, data)` (in-place merge across all statuses), `moveTask(taskId, fromStatusId, toStatusId, position)` (optimistic local move with position sort), `relocateTask(taskId, newTask)` (removes from all statuses, inserts into target status), `removeTask(taskId)` (filters out from all statuses), `setFilters(partial)`, `clearFilters()`, `getFilteredTasks(statusId)` (applies search, priority, assignee filters), `clearBoard()` (resets tasks and filters).
+- `useBoardStore` — state: `tasksByStatus: Record<string, Task[]>`, `filters: FilterState` (`search`, `statuses`, `priorities`, `assignee`); actions: `setTasksForStatus(statusId, tasks)` (sorts by position), `addTask(task)` (inserts into correct status bucket sorted by position), `updateTask(taskId, data)` (in-place merge across all statuses), `moveTask(taskId, fromStatusId, toStatusId, position)` (optimistic local move with position sort), `relocateTask(taskId, newTask)` (removes from all statuses, inserts into target status), `removeTask(taskId)` (filters out from all statuses), `setFilters(partial)`, `clearFilters()`, `getFilteredTasks(statusId)` (applies search, priority, assignee filters — assignee filter checks `t.assignees` array with `user?.id` match), `clearBoard()` (resets tasks and filters).
 - Internal `FilterState` — `search: string`, `statuses: string[]`, `priorities: string[]`, `assignee: string | null`.
 
 ---
@@ -95,14 +108,22 @@
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/types/index.ts`
 - **Purpose**: Barrel re-export for all type modules.
-- Re-exports all types from `./api`, `./board`, `./project`, `./task`, `./user`, `./websocket`.
+- Re-exports all types from `./agent`, `./api`, `./board`, `./project`, `./task`, `./user`, `./websocket`.
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/types/user.ts`
-- **Purpose**: User-related type definitions.
-- `User` — full user: `id`, `email`, `username`, `full_name`, `avatar_url`, `role`, `created_at`, `last_login_at`.
+- **Purpose**: User, auth, and notification preference type definitions.
+- `NotificationPreferences` — `task_assigned`, `task_updated`, `task_moved`, `task_deleted`, `task_comment`, `self_notifications`, `desktop_enabled`, `muted_projects: string[]`, `email_enabled`, `email_digest: 'off' | 'instant'`.
+- `User` — full user: `id`, `email`, `username`, `full_name`, `avatar_url`, `role`, `notification_preferences: NotificationPreferences | null`, `created_at`, `last_login_at`.
 - `UserBrief` — compact user reference: `id`, `username`, `full_name`, `avatar_url`.
 - `LoginCredentials` — `email`, `password`.
 - `RegisterData` — `email`, `username`, `password`, `full_name?`.
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/types/agent.ts`
+- **Purpose**: Agent-related type definitions for project-scoped AI agents.
+- `Agent` — full agent: `id`, `name`, `color`, `is_active`, `created_at`, `updated_at`.
+- `AgentBrief` — compact agent reference: `id`, `name`, `color`.
+- `AgentCreate` — `name`, `color`.
+- `AgentUpdate` — `name?`, `color?`, `is_active?`.
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/types/api.ts`
 - **Purpose**: Generic API response envelope types.
@@ -119,20 +140,23 @@
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/types/project.ts`
 - **Purpose**: Project, status, and label type definitions.
 - `Project` — `id`, `name`, `description`, `slug`, `owner: UserBrief`, `icon`, `color`, `is_archived`, `member_count`, `task_count`, `created_at`, `updated_at`.
-- `ProjectDetail` — extends `Project` with `members: ProjectMember[]`, `boards: Board[]`, `labels: Label[]`.
+- `ProjectDetail` — extends `Project` with `members: ProjectMember[]`, `boards: Board[]`, `labels: Label[]`, `agents: Agent[]`.
 - `ProjectMember` — `id`, `user: UserBrief`, `role`, `joined_at`.
 - `ProjectCreate` — `name`, `description?`, `slug?`, `icon?`, `color?`, `create_default_board?`.
 - `Status` — `id`, `board_id`, `name`, `slug`, `color`, `position`, `is_default`, `is_terminal`, `task_count`, `created_at`.
 - `Label` — `id`, `name`, `color`, `description`, `task_count`, `created_at`.
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/types/task.ts`
-- **Purpose**: Task, comment, filter, and activity log type definitions.
+- **Purpose**: Task, comment, attachment, filter, and activity log type definitions.
 - `Priority` — union type: `'none' | 'low' | 'medium' | 'high' | 'urgent'`.
-- `Task` — `id`, `project_id`, `board_id`, `title`, `description`, `status: Status`, `priority: Priority`, `assignee: UserBrief | null`, `creator: UserBrief`, `labels: Label[]`, `due_date`, `position`, `parent_id`, `comments_count`, `created_at`, `updated_at`, `completed_at`.
-- `TaskCreate` — `title`, `description?`, `status_id?`, `priority?`, `assignee_id?`, `label_ids?`, `due_date?`, `parent_id?`.
-- `TaskUpdate` — `title?`, `description?`, `status_id?`, `priority?`, `assignee_id?`, `label_ids?`, `due_date?`.
+- `Attachment` — `id`, `filename`, `file_size`, `mime_type`, `download_url`, `user: UserBrief`, `created_at`.
+- `AssigneeBrief` — `id`, `user: UserBrief | null`, `agent: AgentBrief | null`.
+- `WatcherBrief` — `id`, `user: UserBrief | null`, `agent: AgentBrief | null`.
+- `Task` — `id`, `project_id`, `board_id`, `title`, `description`, `status: Status`, `priority: Priority`, `assignees: AssigneeBrief[]`, `creator: UserBrief`, `agent_creator: AgentBrief | null`, `labels: Label[]`, `attachments: Attachment[]`, `watchers: WatcherBrief[]`, `due_date`, `position`, `parent_id`, `comments_count`, `created_at`, `updated_at`, `completed_at`.
+- `TaskCreate` — `title`, `description?`, `status_id?`, `priority?`, `assignee_user_ids?`, `assignee_agent_ids?`, `agent_creator_id?`, `label_ids?`, `watcher_user_ids?`, `watcher_agent_ids?`, `due_date?`, `parent_id?`.
+- `TaskUpdate` — `title?`, `description?`, `status_id?`, `priority?`, `assignee_user_ids?`, `assignee_agent_ids?`, `label_ids?`, `watcher_user_ids?`, `watcher_agent_ids?`, `due_date?`.
 - `TaskMove` — `status_id`, `position?`.
-- `Comment` — `id`, `content`, `user: UserBrief`, `created_at`, `updated_at`, `is_edited`.
+- `Comment` — `id`, `content`, `user: UserBrief`, `agent_creator: AgentBrief | null`, `attachments: Attachment[]`, `created_at`, `updated_at`, `is_edited`.
 - `TaskFilters` — `status_id?`, `priority?`, `assignee_id?`, `search?`, `page?`, `per_page?`.
 - `ActivityLog` — `id`, `action`, `entity_type`, `changes: Record<string, { old?, new? } | string>`, `user: UserBrief`, `task_id`, `created_at`.
 - `DashboardTask` — extends `Task` with `project_name: string`.
@@ -156,6 +180,7 @@
 - **Base URL**: `/api/v1`
 - **Auth**: Reads `accessToken`/`refreshToken` from `localStorage` key `agentboard-auth` (Zustand persist). Attaches `Authorization: Bearer` header.
 - **Interceptor**: On 401 response, attempts `POST /auth/refresh` with refresh token. If successful, updates tokens in localStorage and retries request once.
+- **File upload**: `upload<T>(path, file)` method using `FormData` with same 401 retry logic.
 - **Exported singleton**: `api` (instance of `APIClient`)
 - **Endpoint methods**:
   - Auth: `login(credentials)` (form-urlencoded), `register(data)`, `logout()`
@@ -163,14 +188,16 @@
   - Boards: `listBoards(projectId)`, `getBoard(projectId, boardId)`, `createBoard(projectId, data)`, `updateBoard(projectId, boardId, data)`, `deleteBoard(projectId, boardId)`
   - Statuses: `listStatuses(projectId, boardId)`, `createStatus(projectId, boardId, data)`, `updateStatus(projectId, boardId, statusId, data)`, `deleteStatus(projectId, boardId, statusId)`, `reorderStatuses(projectId, boardId, statusIds)`
   - Labels: `listLabels(projectId)`, `createLabel(projectId, data)`, `updateLabel(projectId, labelId, data)`, `deleteLabel(projectId, labelId)`
+  - Agents: `listAgents(projectId, includeInactive?)`, `createAgent(projectId, data)`, `updateAgent(projectId, agentId, data)`, `deleteAgent(projectId, agentId)`
   - Tasks: `listTasks(projectId, boardId, filters?)`, `getTask(projectId, boardId, taskId)`, `createTask(projectId, boardId, data)`, `updateTask(projectId, boardId, taskId, data)`, `deleteTask(projectId, boardId, taskId)`, `moveTask(projectId, boardId, taskId, data)`, `bulkUpdateTasks(projectId, boardId, taskIds, data)`, `bulkMoveTasks(projectId, boardId, taskIds, data)`, `bulkDeleteTasks(projectId, boardId, taskIds)`
   - Comments: `listComments(projectId, boardId, taskId)`, `createComment(projectId, boardId, taskId, data)`, `updateComment(projectId, boardId, taskId, commentId, data)`, `deleteComment(projectId, boardId, taskId, commentId)`
+  - Attachments: `uploadAttachment(projectId, boardId, taskId, file)`, `listAttachments(projectId, boardId, taskId)`, `deleteAttachment(projectId, boardId, taskId, attachmentId)`
   - Activity: `listTaskActivity(projectId, taskId)`
   - Search: `search(q, types?, projectId?)`
-  - Stats: `getProjectStats(projectId)`
-  - API Keys: `listApiKeys()`, `createApiKey(data)`, `deleteApiKey(keyId)`
-  - Notifications: `listNotifications(params?)`, `getUnreadCount()`, `markNotificationsRead(ids?, markAll?)`
+  - Stats: `getProjectStats(projectId)`, `getDashboardStats()`
   - Dashboard: `getMyTasks()`
+  - API Keys: `listApiKeys()`, `createApiKey(data)`, `deleteApiKey(keyId)`
+  - Notifications: `listNotifications(params?)`, `getUnreadCount()`, `markNotificationsRead(ids?, markAll?)`, `clearNotifications()`, `getNotificationPreferences()`, `updateNotificationPreferences(prefs)`
   - Users: `getMe()`, `updateMe(data)`
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/lib/api.ts`

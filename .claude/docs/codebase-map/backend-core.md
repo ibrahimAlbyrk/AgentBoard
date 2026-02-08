@@ -1,7 +1,7 @@
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/main.py`
 - **Purpose**: FastAPI application factory — configures middleware, registers all v1 routers, and initializes the database on startup.
 - `app` — FastAPI instance with CORS, request-ID middleware, error handlers
-- `startup()` — calls `init_db()` to auto-create tables
+- `startup()` — creates upload dir and calls `init_db()`
 - `health()` — GET `/health` returning status and version
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/core/config.py`
@@ -14,7 +14,10 @@
   - `ACCESS_TOKEN_EXPIRE_MINUTES` — default 60
   - `REFRESH_TOKEN_EXPIRE_DAYS` — default 30
   - `CORS_ORIGINS` — allowed origins list
-  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` — email settings
+  - `UPLOAD_DIR` — file upload directory, default `uploads`
+  - `MAX_FILE_SIZE` — max upload size, default 10MB
+  - `RESEND_API_KEY` — optional Resend API key for email
+  - `EMAIL_FROM` — sender address for outbound email
   - `parse_cors_origins()` — splits comma-separated string into list
 - `settings` — singleton Settings instance
 

@@ -23,8 +23,8 @@ All routes are mounted under the `/api/v1` prefix in `main.py`.
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/api_keys.py`
 - **Purpose**: CRUD for API keys used for agent/programmatic auth (requires auth)
 - `GET /api/v1/api-keys/` → `list_api_keys()` — List all API keys for the current user
-- `POST /api/v1/api-keys/` → `create_api_key()` — Create a new API key; returns the raw key once
-- `DELETE /api/v1/api-keys/{key_id}` → `delete_api_key()` — Soft-delete an API key (sets `is_active=False`); owner only
+- `POST /api/v1/api-keys/` → `create_api_key()` — Create a new API key via AuthService; returns the raw key once. 409 if name already exists for user
+- `DELETE /api/v1/api-keys/{key_id}` → `delete_api_key()` — Soft-delete an API key (sets `is_active=False`); owner only, 404 if not found or not owned
 
 ---
 
@@ -64,6 +64,15 @@ All routes are mounted under the `/api/v1` prefix in `main.py`.
 
 ---
 
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/agents.py`
+- **Purpose**: Project-scoped agent CRUD (requires project membership)
+- `GET /api/v1/projects/{project_id}/agents/` → `list_agents()` — List all agents in a project; query param: `include_inactive` (default false)
+- `POST /api/v1/projects/{project_id}/agents/` → `create_agent()` — Create a new agent with name and color; 409 if name already exists in project; requires auth
+- `PATCH /api/v1/projects/{project_id}/agents/{agent_id}` → `update_agent()` — Update agent fields; 409 if renaming to existing name; 404 if not found or wrong project
+- `DELETE /api/v1/projects/{project_id}/agents/{agent_id}` → `delete_agent()` — Delete an agent; 404 if not found or wrong project
+
+---
+
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/labels.py`
 - **Purpose**: CRUD for project-scoped labels (requires project membership)
 - `GET /api/v1/projects/{project_id}/labels/` → `list_labels()` — List all labels in a project
@@ -84,25 +93,34 @@ All routes are mounted under the `/api/v1` prefix in `main.py`.
 ---
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/tasks.py`
-- **Purpose**: Board-scoped task CRUD, move, and bulk operations with WebSocket broadcasts (requires board access)
+- **Purpose**: Board-scoped task CRUD, move, and bulk operations with WebSocket broadcasts and notifications (requires board access)
 - `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/` → `list_tasks()` — Paginated task list; query params: `status_id`, `priority`, `assignee_id`, `search`, `page`, `per_page`
-- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/` → `create_task()` — Create task via TaskService; broadcasts `task.created` via WebSocket
-- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `get_task()` — Get single task with relations
-- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `update_task()` — Update task fields; broadcasts `task.updated`
-- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `delete_task()` — Delete a task; broadcasts `task.deleted`
-- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/move` → `move_task()` — Move task to new status/position; broadcasts `task.moved`
-- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/bulk-update` → `bulk_update_tasks()` — Update multiple tasks at once; broadcasts per task
-- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/bulk-move` → `bulk_move_tasks()` — Move multiple tasks to a status; broadcasts per task
-- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/bulk-delete` → `bulk_delete_tasks()` — Delete multiple tasks; broadcasts per task
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/` → `create_task()` — Create task via TaskService; broadcasts `task.created` via WebSocket; notifies assignees and watchers
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `get_task()` — Get single task with all relations
+- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `update_task()` — Update task fields via TaskService; broadcasts `task.updated`; notifies assignees and watchers
+- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `delete_task()` — Delete a task; broadcasts `task.deleted`; creates notifications for assignees and watchers
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/move` → `move_task()` — Move task to new status/position via TaskService; broadcasts `task.moved`; notifies assignees and watchers
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/bulk-update` → `bulk_update_tasks()` — Update multiple tasks via TaskService; broadcasts `task.updated` per task; notifies assignees
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/bulk-move` → `bulk_move_tasks()` — Move multiple tasks to a status via TaskService; broadcasts `task.moved` per task; notifies assignees
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/bulk-delete` → `bulk_delete_tasks()` — Delete multiple tasks; broadcasts `task.deleted` per task; notifies assignees
 
 ---
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/comments.py`
-- **Purpose**: Task-scoped comment CRUD (requires board access; edit/delete restricted to comment owner)
-- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/` → `list_comments()` — Paginated list of comments on a task
-- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/` → `create_comment()` — Add a comment to a task
-- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/{comment_id}` → `update_comment()` — Edit own comment; sets `is_edited=True`; 403 if not owner
+- **Purpose**: Task-scoped comment CRUD with notifications to assignees (requires board access; edit/delete restricted to comment owner)
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/` → `list_comments()` — Paginated list of comments on a task; query params: `page`, `per_page`
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/` → `create_comment()` — Add a comment to a task; supports `agent_creator_id` for agent-authored comments; links `attachment_ids` if provided; sends `task_comment` notifications to assignees via WebSocket
+- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/{comment_id}` → `update_comment()` — Edit own comment content; sets `is_edited=True`; 403 if not owner
 - `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/{comment_id}` → `delete_comment()` — Delete own comment; 403 if not owner
+
+---
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/attachments.py`
+- **Purpose**: Task-scoped file attachment upload, listing, deletion, and a separate download endpoint (requires board access for task-scoped ops)
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/attachments/` → `upload_attachment()` — Upload a file attachment to a task; enforces `MAX_FILE_SIZE`; stores via storage service; requires auth
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/attachments/` → `list_attachments()` — List all attachments for a task
+- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/attachments/{attachment_id}` → `delete_attachment()` — Delete own attachment; removes file from storage; 403 if not uploader
+- `GET /api/v1/attachments/{attachment_id}/download` → `download_attachment()` — Download an attachment file by ID (separate `download_router`, not task-scoped); returns `FileResponse`
 
 ---
 
@@ -135,8 +153,8 @@ All routes are mounted under the `/api/v1` prefix in `main.py`.
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/dashboard.py`
 - **Purpose**: User-scoped dashboard statistics and my-tasks view aggregated across all active projects (requires auth)
-- `GET /api/v1/dashboard/stats` → `get_dashboard_stats()` — Returns `in_progress` and `overdue` task counts across user's non-archived projects
-- `GET /api/v1/dashboard/my-tasks` → `get_my_tasks()` — Returns summary (overdue/due_today/due_this_week/total_assigned counts) and up to 50 tasks assigned to current user across all active projects
+- `GET /api/v1/dashboard/stats` → `get_dashboard_stats()` — Returns `in_progress` (non-default, non-terminal, not completed) and `overdue` (past due_date, not completed) task counts across user's non-archived projects
+- `GET /api/v1/dashboard/my-tasks` → `get_my_tasks()` — Returns summary (overdue/due_today/due_this_week/total_assigned counts) and up to 50 tasks assigned to current user; optional query param: `agent_id` to filter by agent assignee
 
 ---
 

@@ -4,7 +4,7 @@
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/__init__.py`
 - **Purpose**: Re-exports all CRUD singletons and defines `__all__`
-- Exports: `crud_user`, `crud_api_key`, `crud_board`, `crud_board_member`, `crud_project`, `crud_project_member`, `crud_status`, `crud_label`, `crud_task`, `crud_comment`, `crud_activity_log`, `crud_notification`, `crud_webhook`
+- Exports: `crud_user`, `crud_agent`, `crud_api_key`, `crud_board`, `crud_board_member`, `crud_project`, `crud_project_member`, `crud_status`, `crud_label`, `crud_task`, `crud_comment`, `crud_activity_log`, `crud_attachment`, `crud_notification`, `crud_webhook`
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/base.py`
 - **Purpose**: Generic async CRUD base class parameterized by model and schema types
@@ -27,22 +27,23 @@
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/project.py`
 - **Purpose**: Project CRUD with eager-loading and user-scoped queries
 - `CRUDProject` (extends `CRUDBase[Project, ProjectCreate, ProjectUpdate]`) — project DB operations
-  - `get(db, id)` — override: eager-loads members, boards, labels, tasks
+  - `get(db, id)` — override: eager-loads members, boards (with members/tasks/statuses), labels, agents, tasks
   - `update(db, db_obj, obj_in)` — override: re-fetches with eager-loads after update
-  - `get_multi_by_user(db, user_id, include_archived)` — projects where user is owner or member
+  - `get_multi_by_user(db, user_id, include_archived)` — projects where user is owner or member, eager-loads owner/members/tasks
   - `get_by_slug(db, slug)` — lookup project by URL slug
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/task.py`
 - **Purpose**: Task CRUD with relation loading, filtering, and aggregate queries
+- `_task_load_options` — shared eager-load tuple: status, creator, agent_creator, assignees (user+agent), labels, attachments (user), watchers (user+agent)
 - `CRUDTask` (extends `CRUDBase[Task, TaskCreate, TaskUpdate]`) — task DB operations
-  - `get_with_relations(db, task_id)` — fetch task with status, assignee, creator, labels
-  - `get_multi_by_board(db, board_id, status_id, priority, assignee_id, search, skip, limit)` — filtered board tasks ordered by position
+  - `get_with_relations(db, task_id)` — fetch task with all relations via `_task_load_options`
+  - `get_multi_by_board(db, board_id, status_id, priority, assignee_id, search, skip, limit)` — filtered board tasks ordered by position, filters by assignee via TaskAssignee subquery
   - `get_max_position(db, status_id)` — highest position value in a status column
   - `get_children(db, parent_id)` — fetch subtasks of a parent
   - `bulk_update(db, task_ids, updates)` — apply same updates to multiple tasks
-  - `count_by_status(db, project_id)` — task count grouped by status
-  - `count_by_priority(db, project_id)` — task count grouped by priority
-  - `get_assigned_to_user(db, user_id, project_ids, limit)` — tasks assigned to user across given projects, ordered by due_date
+  - `count_by_status(db, project_id)` — task count grouped by status UUID
+  - `get_assigned_to_user(db, user_id, project_ids, limit, agent_id)` — incomplete tasks assigned to user/agent across projects, joins Status to exclude terminal, includes comments_count subquery, ordered by due_date
+  - `count_by_priority(db, project_id)` — task count grouped by priority string
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/status.py`
 - **Purpose**: Status column CRUD with board-scoped queries
@@ -57,15 +58,16 @@
   - `get_multi_by_project(db, project_id)` — all labels for a project
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/comment.py`
-- **Purpose**: Comment CRUD with task-scoped listing and user eager-loading
+- **Purpose**: Comment CRUD with task-scoped listing, user/agent eager-loading, and attachments
 - `CRUDComment` (extends `CRUDBase[Comment, CommentCreate, CommentUpdate]`) — comment DB operations
-  - `get_multi_by_task(db, task_id, skip, limit)` — paginated comments with user, ordered by created_at
+  - `get_multi_by_task(db, task_id, skip, limit)` — paginated comments with user, agent_creator, and attachments (with user), ordered by created_at, uses `.unique()` for collection dedup
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/api_key.py`
-- **Purpose**: API key CRUD with hash lookup and usage tracking
+- **Purpose**: API key CRUD with hash lookup, name uniqueness, and usage tracking
 - `CRUDAPIKey` (extends `CRUDBase[APIKey, APIKeyCreate, APIKeyResponse]`) — API key DB operations
   - `get_by_key_hash(db, key_hash)` — lookup key by SHA256 hash
-  - `get_multi_by_user(db, user_id)` — all API keys for a user
+  - `get_multi_by_user(db, user_id)` — all active API keys for a user
+  - `get_by_name_and_user(db, name, user_id)` — lookup active key by name and user
   - `update_last_used(db, api_key)` — stamp last_used_at timestamp
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/project_member.py`
@@ -76,11 +78,11 @@
   - `is_member(db, project_id, user_id)` — boolean membership check
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/activity_log.py`
-- **Purpose**: Activity log CRUD with project/task scoped queries and convenience log method
+- **Purpose**: Activity log CRUD with project/task scoped queries, agent eager-loading, and convenience log method
 - `CRUDActivityLog` (extends `CRUDBase[ActivityLog, ActivityLogResponse, ActivityLogResponse]`) — activity log DB operations
-  - `get_multi_by_project(db, project_id, action, entity_type, skip, limit)` — filtered project activity, newest first
-  - `get_multi_by_task(db, task_id)` — all activity for a task, newest first
-  - `log(db, project_id, task_id, user_id, action, entity_type, changes)` — create activity log entry directly
+  - `get_multi_by_project(db, project_id, action, entity_type, skip, limit)` — filtered project activity with agent, newest first
+  - `get_multi_by_task(db, task_id)` — all activity for a task with agent, newest first
+  - `log(db, project_id, task_id, user_id, action, entity_type, changes, agent_id)` — create activity log entry directly, supports optional agent_id
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/notification.py`
 - **Purpose**: Notification CRUD with read/unread management and bulk operations
@@ -112,6 +114,19 @@
   - `get_multi_by_board(db, board_id)` — all board members with eager-loaded user
   - `is_member(db, board_id, user_id)` — boolean board membership check
 
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/agent.py`
+- **Purpose**: Agent CRUD with project-scoped listing and name lookup
+- `CRUDAgent` (extends `CRUDBase[Agent, AgentCreate, AgentUpdate]`) — agent DB operations
+  - `get_multi_by_project(db, project_id, include_inactive)` — agents for a project, optionally including inactive, ordered by name
+  - `get_by_name(db, project_id, name)` — lookup agent by project and name
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/attachment.py`
+- **Purpose**: Attachment CRUD with task/comment-scoped queries and unlinked lookup
+- `CRUDAttachment` (extends `CRUDBase[Attachment, AttachmentResponse, AttachmentResponse]`) — attachment DB operations
+  - `get_by_task(db, task_id)` — task-level attachments (excludes comment attachments), with user, ordered by created_at
+  - `get_by_comment(db, comment_id)` — attachments for a comment, with user, ordered by created_at
+  - `get_unlinked_by_ids(db, ids, task_id, user_id)` — fetch attachments by IDs that belong to task/user and have no comment link
+
 ---
 
 ## Service Layer
@@ -122,11 +137,18 @@
   - `create_project(db, user_id, project_in)` — creates project, generates slug, adds owner as admin member, optionally creates default board via BoardService
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/task_service.py`
-- **Purpose**: Task lifecycle orchestration with position management, label syncing, and activity logging
+- **Purpose**: Task lifecycle orchestration with position management, assignee/watcher/label syncing, activity logging, and notification dispatch
+- `FIELD_LABELS` — dict mapping field names to human-readable labels for change descriptions
+- `_describe_changes(changes, label_changed)` — format changes dict into human-readable string
+- `_get_assignee_user_ids(task)` — extract user IDs from task assignees
+- `_sync_assignees(db, task_id, user_ids, agent_ids)` — replace all assignees on a task (delete + re-insert)
+- `_sync_watchers(db, task_id, user_ids, agent_ids)` — replace all watchers on a task (delete + re-insert)
+- `_notify_watchers(db, task, actor_id, type, title, message)` — notify user-watchers excluding assignees to avoid duplicates
+- `_notify_assignees(db, task, actor_id, type, title, message)` — notify all user-assignees
 - `TaskService` — static methods for task business logic
-  - `create_task(db, project_id, board_id, creator_id, task_in)` — resolves default status, calculates end position, attaches labels, logs "created" activity
-  - `update_task(db, task, user_id, task_in)` — diffs changed fields, syncs labels, logs "updated" activity with old/new values
-  - `move_task(db, task, user_id, new_status_id, position)` — moves task between columns, sets/clears completed_at for terminal statuses, logs "moved" activity
+  - `create_task(db, project_id, board_id, creator_id, task_in)` — resolves default status, calculates end position, validates agent IDs, syncs assignees/watchers/labels, logs "created" activity, notifies assignees and watchers
+  - `update_task(db, task, user_id, task_in)` — diffs changed fields, syncs labels/assignees/watchers, validates agent assignees, logs "updated" activity, notifies assignees (assigned or updated) and watchers, commits and reloads relations
+  - `move_task(db, task, user_id, new_status_id, position)` — moves task between columns, sets/clears completed_at for terminal statuses, logs "moved" activity, notifies assignees and watchers
   - `bulk_update(db, project_id, user_id, task_ids, updates)` — apply updates to multiple tasks, logs activity per task
   - `bulk_move(db, project_id, user_id, task_ids, status_id)` — move multiple tasks to status with sequential positions, logs activity per task
 
@@ -139,11 +161,13 @@
   - `rebalance(db, status_id)` — re-space all tasks evenly in a column
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/notification_service.py`
-- **Purpose**: Notification creation, email stub, and webhook delivery with HMAC signing
+- **Purpose**: Preference-aware notification creation, instant email dispatch via Resend, and webhook delivery with HMAC signing
 - `NotificationService` — static methods for notification dispatch
-  - `create_notification(db, user_id, project_id, type, title, message, data)` — persist in-app notification
-  - `send_email(to, subject, body)` — logs email (SMTP not configured)
-  - `send_webhook(url, secret, event)` — POST JSON payload with optional HMAC-SHA256 signature
+  - `get_user_prefs(db, user_id)` — fetch and parse user's NotificationPreferences from JSON
+  - `should_notify(db, user_id, actor_id, notification_type, project_id)` — check self-notification, per-type, and muted-project preferences
+  - `create_notification(db, user_id, actor_id, project_id, type, title, message, data)` — persist notification after preference check, triggers instant email if opted in
+  - `_dispatch_email(to, title, message, notification_type)` — render Jinja2 template and fire-and-forget email via Resend if configured
+  - `send_webhook(url, secret, event)` — POST JSON payload with optional HMAC-SHA256 signature header
   - `notify_project_event(db, project_id, event_type, data)` — fans out event to all matching active webhooks
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/auth_service.py`
@@ -171,8 +195,18 @@
   - `create_board(db, project_id, user_id, board_in)` — creates board, generates slug, adds creator as admin member, optionally seeds default statuses
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/email_service.py`
-- **Purpose**: Email sending via Resend API with Jinja2 HTML templates.
+- **Purpose**: Email sending via Resend API with Jinja2 HTML templates
 - `email_configured()` — returns True if RESEND_API_KEY is set
-- `render_notification_email(title, message, notification_type)` — renders notification.html Jinja2 template
-- `_send_email(to, subject, html_body)` — async POST to Resend API with SSL via certifi
-- `fire_and_forget_email(to, subject, html_body)` — schedules email send as background task on running event loop
+- `render_notification_email(title, message, notification_type)` — renders notification.html Jinja2 template with app_name context
+- `_send_email(to, subject, html_body)` — async POST to Resend API with SSL via certifi, logs success/failure
+- `fire_and_forget_email(to, subject, html_body)` — schedules email send as background task on running event loop, warns if no loop
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/storage_service.py`
+- **Purpose**: File storage abstraction with local disk implementation
+- `StorageBackend` (Protocol) — interface defining save/delete/get_path methods
+- `LocalStorage` — local filesystem storage backend
+  - `__init__(base_dir)` — defaults to settings.UPLOAD_DIR
+  - `save(file, subdir)` — write UploadFile to disk with UUID filename, return (relative_path, file_size)
+  - `delete(file_path)` — remove file from disk if exists
+  - `get_path(file_path)` — resolve relative path to absolute Path
+- `storage` — module-level LocalStorage singleton

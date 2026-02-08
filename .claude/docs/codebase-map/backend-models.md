@@ -8,7 +8,7 @@
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/__init__.py`
 - **Purpose**: Registers all ORM models and exports them via `__all__`.
-- Exports: `ActivityLog`, `APIKey`, `Attachment`, `Board`, `BoardMember`, `Comment`, `Label`, `Notification`, `Project`, `ProjectMember`, `Status`, `Task`, `TaskDependency`, `TaskLabel`, `User`, `Webhook`
+- Exports: `ActivityLog`, `Agent`, `APIKey`, `Attachment`, `Board`, `BoardMember`, `Comment`, `Label`, `Notification`, `Project`, `ProjectMember`, `Status`, `Task`, `TaskAssignee`, `TaskDependency`, `TaskLabel`, `TaskWatcher`, `User`, `Webhook`
 
 ---
 
@@ -19,10 +19,10 @@
   - Relationships: `api_keys` -> APIKey, `owned_projects` -> Project, `project_memberships` -> ProjectMember, `board_memberships` -> BoardMember
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/project.py`
-- **Purpose**: Top-level project container that groups boards, tasks, statuses, labels, and members.
+- **Purpose**: Top-level project container that groups boards, tasks, statuses, labels, members, and agents.
 - `Project` — project workspace
-  - Key fields: `id` (UUID, PK), `name` (String(200)), `description` (Text, nullable), `slug` (String(200), unique, indexed), `owner_id` (UUID, FK -> users.id), `icon` (String(50), nullable), `color` (String(20), nullable), `is_archived` (Boolean, default False, indexed), `created_at` (DateTime), `updated_at` (DateTime, auto)
-  - Relationships: `owner` -> User, `members` -> ProjectMember, `statuses` -> Status, `labels` -> Label, `tasks` -> Task, `boards` -> Board
+  - Key fields: `id` (UUID, PK), `name` (String(200)), `description` (Text, nullable), `slug` (String(200), unique, indexed), `owner_id` (UUID, FK -> users.id, CASCADE), `icon` (String(50), nullable), `color` (String(20), nullable), `is_archived` (Boolean, default False, indexed), `created_at` (DateTime), `updated_at` (DateTime, auto)
+  - Relationships: `owner` -> User, `members` -> ProjectMember, `statuses` -> Status, `labels` -> Label, `tasks` -> Task, `boards` -> Board, `agents` -> Agent
   - Computed properties: `member_count` (int), `task_count` (int)
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/board.py`
@@ -41,11 +41,32 @@
   - Relationships: `board` -> Board, `user` -> User
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/task.py`
-- **Purpose**: Core task entity with priority, position, assignment, and hierarchy support.
+- **Purpose**: Core task entity with priority, position, multi-assignee, watchers, and hierarchy support.
 - `Task` — kanban task card
-  - Key fields: `id` (UUID, PK), `project_id` (UUID, FK -> projects.id), `board_id` (UUID, FK -> boards.id), `title` (String(500)), `description` (Text, nullable), `status_id` (UUID, FK -> statuses.id, RESTRICT), `priority` (String(20), default "none"), `assignee_id` (UUID, FK -> users.id, nullable), `creator_id` (UUID, FK -> users.id), `parent_id` (UUID, FK -> tasks.id, nullable, self-referential), `due_date` (DateTime, nullable), `position` (Float, default 0.0), `created_at` (DateTime), `updated_at` (DateTime, auto), `completed_at` (DateTime, nullable)
+  - Key fields: `id` (UUID, PK), `project_id` (UUID, FK -> projects.id, CASCADE), `board_id` (UUID, FK -> boards.id, CASCADE), `title` (String(500)), `description` (Text, nullable), `status_id` (UUID, FK -> statuses.id, RESTRICT), `priority` (String(20), default "none"), `creator_id` (UUID, FK -> users.id, CASCADE), `agent_creator_id` (UUID, FK -> agents.id, SET NULL, nullable), `parent_id` (UUID, FK -> tasks.id, SET NULL, nullable, self-referential), `due_date` (DateTime, nullable), `position` (Float, default 0.0), `created_at` (DateTime), `updated_at` (DateTime, auto), `completed_at` (DateTime, nullable)
   - Constraints: Index(`status_id`, `position`)
-  - Relationships: `project` -> Project, `board` -> Board, `status` -> Status, `assignee` -> User, `creator` -> User, `parent` -> Task (self), `children` -> Task (self), `labels` -> TaskLabel, `comments` -> Comment, `dependencies` -> TaskDependency, `dependents` -> TaskDependency
+  - Relationships: `project` -> Project, `board` -> Board, `status` -> Status, `creator` -> User, `agent_creator` -> Agent, `parent` -> Task (self), `children` -> Task (self), `labels` -> TaskLabel, `comments` -> Comment, `dependencies` -> TaskDependency, `dependents` -> TaskDependency, `attachments` -> Attachment, `watchers` -> TaskWatcher, `assignees` -> TaskAssignee
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/task_assignee.py`
+- **Purpose**: Many-to-many join table between tasks and assignees (users or agents).
+- `TaskAssignee` — task-assignee association
+  - Key fields: `id` (UUID, PK), `task_id` (UUID, FK -> tasks.id, CASCADE), `user_id` (UUID, FK -> users.id, CASCADE, nullable), `agent_id` (UUID, FK -> agents.id, CASCADE, nullable), `created_at` (DateTime)
+  - Constraints: UniqueConstraint(`task_id`, `user_id`), UniqueConstraint(`task_id`, `agent_id`)
+  - Relationships: `task` -> Task, `user` -> User, `agent` -> Agent
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/task_watcher.py`
+- **Purpose**: Many-to-many join table between tasks and watchers (users or agents).
+- `TaskWatcher` — task-watcher association
+  - Key fields: `id` (UUID, PK), `task_id` (UUID, FK -> tasks.id, CASCADE), `user_id` (UUID, FK -> users.id, CASCADE, nullable), `agent_id` (UUID, FK -> agents.id, CASCADE, nullable), `created_at` (DateTime)
+  - Constraints: UniqueConstraint(`task_id`, `user_id`), UniqueConstraint(`task_id`, `agent_id`)
+  - Relationships: `task` -> Task, `user` -> User, `agent` -> Agent
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/agent.py`
+- **Purpose**: Project-scoped agent entity representing an automated actor that can be assigned to tasks.
+- `Agent` — project agent
+  - Key fields: `id` (UUID, PK), `project_id` (UUID, FK -> projects.id, CASCADE), `name` (String(100)), `color` (String(7)), `is_active` (Boolean, default True), `created_by` (UUID, FK -> users.id, CASCADE), `created_at` (DateTime), `updated_at` (DateTime, auto)
+  - Constraints: UniqueConstraint(`project_id`, `name`)
+  - Relationships: `project` -> Project, `creator` -> User
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/status.py`
 - **Purpose**: Board column / workflow state for tasks.
@@ -74,11 +95,11 @@
   - Relationships: `task` -> Task, `depends_on` -> Task
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/comment.py`
-- **Purpose**: User comment on a task with edit tracking.
+- **Purpose**: User or agent comment on a task with edit tracking and attachments.
 - `Comment` — task comment
-  - Key fields: `id` (UUID, PK), `task_id` (UUID, FK -> tasks.id), `user_id` (UUID, FK -> users.id), `content` (Text), `is_edited` (Boolean, default False), `created_at` (DateTime), `updated_at` (DateTime, auto)
+  - Key fields: `id` (UUID, PK), `task_id` (UUID, FK -> tasks.id, CASCADE), `user_id` (UUID, FK -> users.id, CASCADE), `agent_creator_id` (UUID, FK -> agents.id, SET NULL, nullable), `content` (Text), `is_edited` (Boolean, default False), `created_at` (DateTime), `updated_at` (DateTime, auto)
   - Constraints: Index(`task_id`, `created_at`)
-  - Relationships: `task` -> Task, `user` -> User
+  - Relationships: `task` -> Task, `user` -> User, `agent_creator` -> Agent, `attachments` -> Attachment
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/api_key.py`
 - **Purpose**: Hashed API key for agent/programmatic access with scopes and expiry.
@@ -94,17 +115,17 @@
   - Relationships: `project` -> Project, `user` -> User
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/activity_log.py`
-- **Purpose**: Audit trail recording user actions on projects/tasks.
+- **Purpose**: Audit trail recording user/agent actions on projects/tasks.
 - `ActivityLog` — activity/audit log entry
-  - Key fields: `id` (UUID, PK), `project_id` (UUID, FK -> projects.id), `task_id` (UUID, FK -> tasks.id, nullable), `user_id` (UUID, FK -> users.id), `action` (String(50)), `entity_type` (String(50)), `changes` (JSON, nullable), `created_at` (DateTime)
+  - Key fields: `id` (UUID, PK), `project_id` (UUID, FK -> projects.id, CASCADE), `task_id` (UUID, FK -> tasks.id, SET NULL, nullable), `user_id` (UUID, FK -> users.id, CASCADE), `agent_id` (UUID, FK -> agents.id, SET NULL, nullable), `action` (String(50)), `entity_type` (String(50)), `changes` (JSON, nullable), `created_at` (DateTime)
   - Constraints: Index(`project_id`, `created_at`)
-  - Relationships: `project` -> Project, `task` -> Task, `user` -> User
+  - Relationships: `project` -> Project, `task` -> Task, `user` -> User, `agent` -> Agent
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/attachment.py`
-- **Purpose**: File attachment metadata linked to a task.
-- `Attachment` — task file attachment
-  - Key fields: `id` (UUID, PK), `task_id` (UUID, FK -> tasks.id), `user_id` (UUID, FK -> users.id), `filename` (String(500)), `file_path` (String(1000)), `file_size` (Integer), `mime_type` (String(100)), `created_at` (DateTime)
-  - Relationships: `task` -> Task, `user` -> User
+- **Purpose**: File attachment metadata linked to a task and optionally to a comment.
+- `Attachment` — task/comment file attachment
+  - Key fields: `id` (UUID, PK), `task_id` (UUID, FK -> tasks.id, CASCADE), `comment_id` (UUID, FK -> comments.id, CASCADE, nullable), `user_id` (UUID, FK -> users.id, CASCADE), `filename` (String(500)), `file_path` (String(1000)), `file_size` (Integer), `mime_type` (String(100)), `created_at` (DateTime)
+  - Relationships: `task` -> Task, `comment` -> Comment, `user` -> User
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/models/notification.py`
 - **Purpose**: In-app notification with read tracking and metadata.
@@ -125,7 +146,8 @@
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/__init__.py`
 - **Purpose**: Central re-export of all Pydantic schemas via `__all__`.
-- Exports all Create/Update/Response schemas for every entity plus base response wrappers and auth DTOs.
+- Exports all Create/Update/Response schemas for every entity plus base response wrappers, auth DTOs, and agent schemas.
+- Exports: `ResponseBase`, `PaginationMeta`, `PaginatedResponse`, `ErrorBody`, `ErrorDetail`, `ErrorResponse`, `UserCreate`, `UserUpdate`, `UserResponse`, `UserBrief`, `LoginRequest`, `TokenResponse`, `RefreshRequest`, `APIKeyCreate`, `APIKeyResponse`, `APIKeyCreatedResponse`, `BoardCreate`, `BoardUpdate`, `BoardResponse`, `BoardDetailResponse`, `BoardReorder`, `BoardMemberCreate`, `BoardMemberUpdate`, `BoardMemberResponse`, `ProjectCreate`, `ProjectUpdate`, `ProjectResponse`, `ProjectDetailResponse`, `ProjectMemberCreate`, `ProjectMemberUpdate`, `ProjectMemberResponse`, `StatusCreate`, `StatusUpdate`, `StatusResponse`, `StatusReorder`, `LabelCreate`, `LabelUpdate`, `LabelResponse`, `TaskCreate`, `TaskUpdate`, `TaskResponse`, `TaskMove`, `TaskReorder`, `BulkTaskUpdate`, `BulkTaskMove`, `BulkTaskDelete`, `AttachmentResponse`, `CommentCreate`, `CommentUpdate`, `CommentResponse`, `AgentCreate`, `AgentUpdate`, `AgentResponse`, `AgentBrief`, `ActivityLogResponse`, `NotificationMarkRead`, `NotificationResponse`, `WebhookCreate`, `WebhookUpdate`, `WebhookResponse`
 
 ---
 
@@ -165,7 +187,7 @@
   - Fields: `refresh_token` (str, required)
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/project.py`
-- **Purpose**: Project CRUD schemas with nested detail variant.
+- **Purpose**: Project CRUD schemas with nested detail variant including agents.
 - `ProjectCreate` — create project
   - Fields: `name` (str, required), `description` (str, optional), `slug` (str, optional), `icon` (str, optional), `color` (str, optional), `create_default_board` (bool, default True)
 - `ProjectUpdate` — update project
@@ -173,7 +195,7 @@
 - `ProjectResponse` — project summary
   - Fields: `id` (UUID), `name` (str), `description` (str, optional), `slug` (str), `owner` (UserBrief), `icon` (str, optional), `color` (str, optional), `is_archived` (bool), `member_count` (int), `task_count` (int), `created_at` (datetime), `updated_at` (datetime, optional)
 - `ProjectDetailResponse` — extends ProjectResponse with nested collections
-  - Fields: inherits ProjectResponse + `members` (list[ProjectMemberResponse]), `boards` (list), `labels` (list[LabelResponse])
+  - Fields: inherits ProjectResponse + `members` (list[ProjectMemberResponse]), `boards` (list[BoardResponse]), `labels` (list[LabelResponse]), `agents` (list[AgentResponse], default [])
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/board.py`
 - **Purpose**: Board CRUD and reorder schemas.
@@ -198,13 +220,18 @@
   - Fields: `id` (UUID), `user` (UserBrief), `role` (str), `joined_at` (datetime)
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/task.py`
-- **Purpose**: Task CRUD, move, reorder, and bulk operation schemas.
+- **Purpose**: Task CRUD, move, reorder, bulk ops, and dashboard schemas with multi-assignee/watcher support.
 - `TaskCreate` — create task
-  - Fields: `title` (str, required, min 1 / max 500), `description` (str, optional), `status_id` (UUID, optional), `priority` (Literal["none","low","medium","high","urgent"], default "none"), `assignee_id` (UUID, optional), `label_ids` (list[UUID], default []), `due_date` (datetime, optional), `parent_id` (UUID, optional)
+  - Fields: `title` (str, required, min 1 / max 500), `description` (str, optional), `status_id` (UUID, optional), `priority` (Literal["none","low","medium","high","urgent"], default "none"), `assignee_user_ids` (list[UUID], default []), `assignee_agent_ids` (list[UUID], default []), `agent_creator_id` (UUID, optional), `label_ids` (list[UUID], default []), `watcher_user_ids` (list[UUID], default []), `watcher_agent_ids` (list[UUID], default []), `due_date` (datetime, optional), `parent_id` (UUID, optional)
 - `TaskUpdate` — update task
-  - Fields: `title` (str, optional), `description` (str, optional), `status_id` (UUID, optional), `priority` (Literal[...], optional), `assignee_id` (UUID, optional), `label_ids` (list[UUID], optional), `due_date` (datetime, optional)
+  - Fields: `title` (str, optional), `description` (str, optional), `status_id` (UUID, optional), `priority` (Literal[...], optional), `assignee_user_ids` (list[UUID], optional), `assignee_agent_ids` (list[UUID], optional), `label_ids` (list[UUID], optional), `watcher_user_ids` (list[UUID], optional), `watcher_agent_ids` (list[UUID], optional), `due_date` (datetime, optional)
+- `AssigneeBrief` — nested assignee reference (user or agent)
+  - Fields: `id` (UUID), `user` (UserBrief, optional), `agent` (AgentBrief, optional)
+- `WatcherBrief` — nested watcher reference (user or agent)
+  - Fields: `id` (UUID), `user` (UserBrief, optional), `agent` (AgentBrief, optional)
 - `TaskResponse` — full task response
-  - Fields: `id` (UUID), `project_id` (UUID), `board_id` (UUID), `title` (str), `description` (str, optional), `status` (StatusResponse), `priority` (str), `assignee` (UserBrief, optional), `creator` (UserBrief), `labels` (list[LabelResponse]), `due_date` (datetime, optional), `position` (float), `parent_id` (UUID, optional), `comments_count` (int, default 0), `created_at` (datetime), `updated_at` (datetime, optional), `completed_at` (datetime, optional)
+  - Fields: `id` (UUID), `project_id` (UUID), `board_id` (UUID), `title` (str), `description` (str, optional), `status` (StatusResponse), `priority` (str), `assignees` (list[AssigneeBrief], default []), `creator` (UserBrief), `agent_creator` (AgentBrief, optional), `labels` (list[LabelResponse]), `attachments` (list[AttachmentResponse], default []), `watchers` (list[WatcherBrief], default []), `due_date` (datetime, optional), `position` (float), `parent_id` (UUID, optional), `comments_count` (int, default 0), `created_at` (datetime), `updated_at` (datetime, optional), `completed_at` (datetime, optional)
+  - Validators: `resolve_labels` (model_validator, before) — converts TaskLabel join objects to Label objects for serialization
 - `TaskMove` — move task to different status
   - Fields: `status_id` (UUID, required), `position` (float, optional)
 - `TaskReorder` — reorder task within column
@@ -243,13 +270,30 @@
   - Fields: `id` (UUID), `name` (str), `color` (str), `description` (str, optional), `task_count` (int, default 0), `created_at` (datetime)
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/comment.py`
-- **Purpose**: Comment CRUD schemas.
+- **Purpose**: Comment CRUD schemas with agent creator and attachment support.
 - `CommentCreate` — create comment
-  - Fields: `content` (str, required, min_length=1)
+  - Fields: `content` (str, required, min_length=1), `attachment_ids` (list[UUID], default []), `agent_creator_id` (UUID, optional)
 - `CommentUpdate` — edit comment
   - Fields: `content` (str, required, min_length=1)
 - `CommentResponse` — comment response
-  - Fields: `id` (UUID), `content` (str), `user` (UserBrief), `created_at` (datetime), `updated_at` (datetime, optional), `is_edited` (bool)
+  - Fields: `id` (UUID), `content` (str), `user` (UserBrief), `agent_creator` (AgentBrief, optional), `attachments` (list[AttachmentResponse], default []), `created_at` (datetime), `updated_at` (datetime, optional), `is_edited` (bool)
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/agent.py`
+- **Purpose**: Agent CRUD and brief reference schemas.
+- `AgentCreate` — create agent
+  - Fields: `name` (str, required, min_length=1, max_length=100), `color` (str, required, min_length=4, max_length=7)
+- `AgentUpdate` — update agent
+  - Fields: `name` (str, optional), `color` (str, optional), `is_active` (bool, optional)
+- `AgentBrief` — minimal agent reference (used in nested responses)
+  - Fields: `id` (UUID), `name` (str), `color` (str)
+- `AgentResponse` — full agent response (extends AgentBrief)
+  - Fields: inherits AgentBrief + `is_active` (bool), `created_at` (datetime), `updated_at` (datetime, optional)
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/attachment.py`
+- **Purpose**: Attachment response schema with computed download URL.
+- `AttachmentResponse` — attachment response
+  - Fields: `id` (UUID), `filename` (str), `file_size` (int), `mime_type` (str), `download_url` (str, default ""), `user` (UserBrief), `created_at` (datetime)
+  - Validators: `build_download_url` (model_validator, before) — generates `/api/v1/attachments/{id}/download` URL
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/api_key.py`
 - **Purpose**: API key creation and response schemas.
@@ -270,16 +314,18 @@
   - Fields: `id` (UUID), `user` (UserBrief), `role` (str), `joined_at` (datetime)
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/activity_log.py`
-- **Purpose**: Activity log response schema.
+- **Purpose**: Activity log response schema with agent support.
 - `ActivityLogResponse` — activity entry response
-  - Fields: `id` (UUID), `action` (str), `entity_type` (str), `changes` (dict), `user` (UserBrief), `task_id` (UUID, optional), `created_at` (datetime)
+  - Fields: `id` (UUID), `action` (str), `entity_type` (str), `changes` (dict), `user` (UserBrief), `agent` (AgentBrief, optional), `task_id` (UUID, optional), `created_at` (datetime)
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/notification.py`
-- **Purpose**: Notification response and bulk-read schemas.
+- **Purpose**: Notification response, bulk-read, and preference schemas.
 - `NotificationResponse` — notification response
   - Fields: `id` (UUID), `type` (str), `title` (str), `message` (str), `is_read` (bool), `data` (dict[str, Any], optional), `project_id` (UUID, optional), `created_at` (datetime)
 - `NotificationMarkRead` — mark notifications as read
   - Fields: `notification_ids` (list[UUID], optional), `mark_all` (bool, default False)
+- `NotificationPreferences` — user notification preference settings
+  - Fields: `task_assigned` (bool, True), `task_updated` (bool, True), `task_moved` (bool, True), `task_deleted` (bool, True), `task_comment` (bool, True), `self_notifications` (bool, True), `desktop_enabled` (bool, False), `muted_projects` (list[str], []), `email_enabled` (bool, False), `email_digest` (str, "off")
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/webhook.py`
 - **Purpose**: Webhook CRUD schemas.

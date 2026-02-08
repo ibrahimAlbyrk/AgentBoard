@@ -44,11 +44,13 @@
 - Key state/hooks used: useState, useNavigate, useForm, useAuthStore
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/pages/DashboardPage.tsx`
-- **Purpose**: Overview page showing stats cards (projects, tasks, in-progress, overdue), my-tasks section, and recent project grid.
+- **Purpose**: Overview page showing stats cards (projects, tasks, in-progress, overdue), my-tasks section, recent project grid, and project edit form.
 - `DashboardPage` (named export) — Route: `/dashboard`
-- Displays greeting with user name, 4 stat cards, `MyTasksSection`, up to 6 project cards
+- Displays greeting with user name, 4 stat cards (via `api.getDashboardStats()`), `MyTasksSection`, up to 6 `ProjectCard` components
+- Archive/unarchive and delete project actions inline
+- `ProjectForm` dialog for editing projects
 - Links to `/projects` for "View all"
-- Key state/hooks used: useNavigate, useAuthStore, useProjects
+- Key state/hooks used: useState, useNavigate, useQueryClient, useAuthStore, useProjects, useDeleteProject, useQuery (dashboard-stats), api client
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/pages/ProjectsPage.tsx`
 - **Purpose**: Full project list with search, sort (recent/name/tasks), archive toggle, create/edit/delete actions.
@@ -59,28 +61,34 @@
 - Key state/hooks used: useState, useMemo, useProjects, useDeleteProject, useQueryClient
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/pages/BoardPage.tsx`
-- **Purpose**: Main Kanban board view for a specific project board, with task creation and detail panel.
+- **Purpose**: Main Kanban board view for a specific project board, with task creation, detail panel, label manager, and filters.
 - `BoardPage` (named export) — Route: `/projects/:projectId/boards/:boardId`
-- Header shows project name/icon + board name, "New Task" button, and `TaskFilters`
-- Renders `KanbanBoard`, `TaskForm` dialog, `TaskDetailPanel` slide-over
+- Header shows project name/icon + board name, "Labels" button, "New Task" button, and `TaskFilters`
+- Renders `KanbanBoard`, `TaskForm` dialog, `TaskDetailPanel` slide-over, `LabelManager` dialog
 - Syncs project/board/tasks data into Zustand stores on load
-- Key state/hooks used: useState, useEffect, useRef, useParams, useProject, useBoard, useTasks, useWebSocket, useProjectStore, useBoardStore
+- Auto-opens task from `?task=` query param
+- Key state/hooks used: useState, useEffect, useRef, useParams, useSearchParams, useProject, useBoard, useTasks, useWebSocket, useProjectStore, useBoardStore
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/pages/BoardListPage.tsx`
-- **Purpose**: Lists all boards within a project with create/delete board functionality.
+- **Purpose**: Lists all boards within a project with create/edit/delete board functionality, plus agents strip and agent manager.
 - `BoardListPage` (named export) — Route: `/projects/:projectId`
+- Project header with name, icon, description; "Agents" button and "New Board" button
+- Agents strip section: shows active agents as pill chips, "Manage" link, empty state with "Add Agent" link
 - Grid of board cards with color accent, task/member counts, dropdown menu (edit/delete)
-- Create board dialog with name input and color picker (8 preset colors)
+- Create board dialog and edit board dialog with name input and color picker (8 preset colors)
+- `AgentManager` dialog for managing project agents
 - Helper: `hexToRgb` for CSS color interpolation
-- Key state/hooks used: useState, useNavigate, useParams, useProject, useCreateBoard, useDeleteBoard
+- Key state/hooks used: useState, useNavigate, useParams, useProject, useCreateBoard, useUpdateBoard, useDeleteBoard
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/pages/SettingsPage.tsx`
-- **Purpose**: User settings with tabs for Profile editing, API key management, and Notifications (placeholder).
+- **Purpose**: User settings with tabs for Profile editing, API key management, and Notification preferences.
 - `SettingsPage` (named export) — Route: `/settings`
 - Profile tab: edit full name, avatar URL; email/username read-only
 - API Keys tab: list, create (with copy-once dialog), delete API keys
-- Notifications tab: placeholder
-- Key state/hooks used: useState, useAuthStore, api client (direct calls)
+- Notifications tab: renders `NotificationSettings` sub-component
+- `NotificationSettings` — Event toggles (assigned, updated, moved, deleted, comment), self-notifications, desktop notifications (with browser permission request), per-project muting, email notifications
+- `ToggleRow` — Reusable row with label, description, and Switch toggle
+- Key state/hooks used: useState, useCallback, useAuthStore, useNotificationPreferences, useUpdateNotificationPreferences, useProjects, api client (direct calls)
 
 ---
 
@@ -100,13 +108,13 @@
 - Key state/hooks used: useState, useRef, useEffect, useLocation, useProjects, useAuthStore
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/layout/Header.tsx`
-- **Purpose**: Top header bar with mobile menu toggle, theme toggle, notification popover, and user dropdown.
+- **Purpose**: Top header bar with mobile menu toggle, theme toggle, notification popover with mark-read/clear-all, and user dropdown.
 - `Header` (named export) — Top navigation bar
 - Props: `onMenuClick` (() => void) — opens mobile sidebar
-- Notifications popover: list with mark-as-read, "mark all read" action
+- Notifications popover: list with mark-as-read per item, "Mark all read" action, "Clear" all action; clickable notifications navigate to board with `?task=` param
 - User dropdown: Profile link, Logout action
 - Helper: `timeAgo` for relative timestamps
-- Key state/hooks used: useNavigate, useAuthStore, useNotifications, useUnreadCount, useMarkRead
+- Key state/hooks used: useNavigate, useAuthStore, useNotifications, useUnreadCount, useMarkRead, useClearNotifications
 
 ---
 
@@ -131,11 +139,12 @@
 - Key state/hooks used: useDroppable (dnd-kit)
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/board/TaskCard.tsx`
-- **Purpose**: Visual task card displaying title, description, labels, due date, comment count, and assignee.
+- **Purpose**: Visual task card displaying title, description, labels, due date, comment count, and multi-assignee avatars.
 - `TaskCard` (named export) — Renders a single task card
 - Props: `task` (Task), `onClick` (() => void), `isDragOverlay` (boolean)
 - Priority-colored left border, up to 3 labels with overflow count
-- Overdue date highlighting, comment count badge, assignee avatar
+- Overdue date highlighting, comment count badge
+- Multi-assignee display: up to 3 stacked avatars (users + agents) with overflow count
 - Key state/hooks used: (none, presentational)
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/board/SortableTaskCard.tsx`
@@ -147,16 +156,16 @@
 - Key state/hooks used: useCallback, useSortable (dnd-kit), useIsFlying, registerCardRef
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/board/TaskDetailPanel.tsx`
-- **Purpose**: Floating modal panel for viewing/editing a task's properties, labels, description, comments, and activity.
+- **Purpose**: Floating modal panel for viewing/editing a task's full properties, labels, description, comments, attachments, and activity.
 - `TaskDetailPanel` (named export) — Full task detail overlay
 - Props: `task` (Task | null), `projectId` (string), `boardId` (string), `open` (boolean), `onClose` (() => void)
 - Animated with framer-motion (spring scale/opacity entrance, staggered children)
 - Inline-editable title and description
-- Property rows: status, priority, assignee (Select dropdowns), due date (date input)
-- Labels: toggle buttons for all project labels
-- Tabs: Comments (`TaskComments`) and Activity (`TaskActivity`)
-- Footer: created/updated timestamps
-- Helper: `PropertyRow` sub-component for consistent property row layout
+- Property rows: status, priority (Select dropdowns), assignees (`AssigneesPicker`), watchers (`WatchersPicker`), due date (date input with OVERDUE badge)
+- Labels: toggle buttons for all project labels, "Manage" link opens `LabelManager`
+- Tabs: Comments (`TaskComments`), Files (`TaskAttachments`), Activity (`TaskActivity`)
+- Footer: creator avatar (user or agent), created/updated timestamps
+- Sub-components: `PropertyRow` (consistent property row layout), `PersonPicker` (shared popover picker for users + agents), `AssigneesPicker`, `WatchersPicker`
 - Key state/hooks used: useState, useEffect, useRef, useProjectStore, useUpdateTask, AnimatePresence/motion (framer-motion)
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/board/TaskAnimationLayer.tsx`
@@ -173,26 +182,45 @@
 ## Task Components
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/tasks/TaskForm.tsx`
-- **Purpose**: Dialog form for creating a new task with title, description, status, priority, assignee, and due date.
+- **Purpose**: Dialog form for creating a new task with title, description, status, priority, multi-assignee picker, labels, due date, and file attachments.
 - `TaskForm` (named export) — Create task dialog
 - Props: `projectId` (string), `boardId` (string), `open` (boolean), `onClose` (() => void), `defaultStatusId` (string)
-- Zod-validated form (title required), Select dropdowns for status/priority/assignee
-- Key state/hooks used: useState, useForm, useProjectStore, useCreateTask
+- Zod-validated form (title required), Select dropdowns for status/priority
+- Multi-assignee Popover picker: members + active agents with checkmarks, avatar stack preview
+- Label toggle buttons for project labels
+- File attachments: pending file list with preview/remove, attach button, uploads after task creation via `api.uploadAttachment`
+- Key state/hooks used: useState, useRef, useCallback, useForm, useProjectStore, useCreateTask, api client
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/tasks/TaskComments.tsx`
-- **Purpose**: Comment thread with input area (Cmd+Enter to submit) and chronological comment list.
+- **Purpose**: Comment thread with input area (Cmd+Enter to submit), file attachment support (paste/upload), and chronological comment list with inline attachments.
 - `TaskComments` (named export) — Comment section for a task
 - Props: `projectId` (string), `boardId` (string), `taskId` (string)
-- Textarea with send button, list of comments with user avatar and relative timestamps
-- Key state/hooks used: useState, useComments, useCreateComment
+- Textarea with send button, paperclip file attach button, clipboard image paste support
+- Pending attachments preview strip before submit
+- Comment list: user/agent avatar, relative timestamps, edited indicator, inline image thumbnails + file download links
+- Lightbox overlay for image preview (Escape to close)
+- Key state/hooks used: useState, useRef, useCallback, useEffect, useComments, useCreateComment, useUploadAttachment
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/tasks/TaskActivity.tsx`
 - **Purpose**: Activity log timeline showing task creation, updates, and moves with formatted change descriptions.
 - `TaskActivity` (named export) — Activity feed for a task
 - Props: `projectId` (string), `taskId` (string)
 - Color-coded action icons (created=green, updated=blue, moved=amber)
-- Helper: `formatChanges` parses log changes into readable strings
+- User avatar and name per log entry, relative timestamps
+- Helper: `formatChanges` parses log changes into readable strings (handles assignee changes, status moves, field updates)
+- Sub-component: `ActionIcon` renders colored icon per action type
 - Key state/hooks used: useTaskActivity
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/tasks/TaskAttachments.tsx`
+- **Purpose**: File attachment manager with drag-and-drop upload zone, file list with image thumbnails, download/delete actions, and image lightbox.
+- `TaskAttachments` (named export) — Attachments tab for a task
+- Props: `projectId` (string), `boardId` (string), `taskId` (string)
+- Drag-and-drop upload zone (click or drag), max 10MB per file
+- File list: image thumbnail or file icon, filename, size, uploader avatar, relative timestamp
+- Actions: download link, delete button (only for own uploads)
+- Lightbox overlay for image preview (Escape to close)
+- Helper: `formatFileSize` formats bytes to human-readable string
+- Key state/hooks used: useState, useRef, useCallback, useEffect, useAttachments, useUploadAttachment, useDeleteAttachment, useAuthStore
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/tasks/TaskFilters.tsx`
 - **Purpose**: Filter bar for board tasks with debounced search, priority select, and assignee select.
@@ -222,6 +250,19 @@
 
 ---
 
+## Agent Components
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/agents/AgentManager.tsx`
+- **Purpose**: Dialog for managing project agents — list, create, edit, delete, and toggle active/inactive with color picker.
+- `AgentManager` (named export) — Agent CRUD management dialog
+- Props: `projectId` (string), `open` (boolean), `onClose` (() => void)
+- Agent list with colored avatar, active/inactive switch, edit/delete buttons (hover-reveal)
+- Add form: name input, 8 preset colors, live preview
+- Nested edit dialog: name input and color picker
+- Key state/hooks used: useState, useAgents, useCreateAgent, useUpdateAgent, useDeleteAgent
+
+---
+
 ## Label Components
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/labels/LabelManager.tsx`
@@ -238,7 +279,7 @@
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/dashboard/MyTasksSection.tsx`
 - **Purpose**: Dashboard section showing tasks assigned to current user, grouped by urgency (overdue, due soon, active) with an urgency banner.
 - `MyTasksSection` (named export) — My tasks dashboard widget
-- Sub-components: `UrgencyBanner` (overdue/due_today/due_this_week counts with segmented bar), `DashboardTaskRow` (clickable task row with priority, project chip, labels, due date), `TaskGroup` (collapsible group header with icon)
+- Sub-components: `UrgencyBanner` (overdue/due_today/due_this_week counts with segmented bar and "All clear" state), `DashboardTaskRow` (clickable task row with priority bar, title, priority badge, project chip, status dot, labels, due date, comment count), `TaskGroup` (collapsible group header with icon and count)
 - Navigates to board page with `?task=` query param on click
 - Key state/hooks used: useMemo, useNavigate, useMyTasks
 
