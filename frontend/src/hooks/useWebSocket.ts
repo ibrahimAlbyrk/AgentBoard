@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { wsManager } from '@/lib/websocket'
 import { useAuthStore } from '@/stores/authStore'
 import { useBoardStore } from '@/stores/boardStore'
@@ -16,6 +17,7 @@ export function markLocalMove(taskId: string) {
 export function useWebSocket(projectId: string, boardId: string) {
   const accessToken = useAuthStore((s) => s.accessToken)
   const { addTask, updateTask, relocateTask, removeTask } = useBoardStore()
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     if (!projectId || !boardId || !accessToken) return
@@ -62,16 +64,22 @@ export function useWebSocket(projectId: string, boardId: string) {
       }
     }
 
+    const handleNotification = () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    }
+
     wsManager.on('task.created', handleCreated)
     wsManager.on('task.updated', handleUpdated)
     wsManager.on('task.deleted', handleDeleted)
     wsManager.on('task.moved', handleMoved)
+    wsManager.on('notification.new', handleNotification)
 
     return () => {
       wsManager.off('task.created', handleCreated)
       wsManager.off('task.updated', handleUpdated)
       wsManager.off('task.deleted', handleDeleted)
       wsManager.off('task.moved', handleMoved)
+      wsManager.off('notification.new', handleNotification)
     }
-  }, [projectId, boardId, accessToken, addTask, updateTask, relocateTask, removeTask])
+  }, [projectId, boardId, accessToken, addTask, updateTask, relocateTask, removeTask, queryClient])
 }
