@@ -5,6 +5,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
+from app.models.attachment import Attachment
 from app.models.task import Task
 from app.models.task_label import TaskLabel
 from app.schemas.task import TaskCreate, TaskUpdate
@@ -16,6 +17,7 @@ _task_load_options = (
     joinedload(Task.assignee),
     joinedload(Task.creator),
     selectinload(Task.labels).joinedload(TaskLabel.label),
+    selectinload(Task.attachments).joinedload(Attachment.user),
 )
 
 

@@ -86,3 +86,6 @@ class Task(Base):
         back_populates="depends_on",
         cascade="all, delete-orphan",
     )
+    attachments = relationship(
+        "Attachment", back_populates="task", cascade="all, delete-orphan"
+    )

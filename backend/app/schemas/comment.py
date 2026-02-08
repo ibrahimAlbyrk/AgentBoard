@@ -3,11 +3,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .attachment import AttachmentResponse
 from .user import UserBrief
 
 
 class CommentCreate(BaseModel):
     content: str = Field(min_length=1)
+    attachment_ids: list[UUID] = []
 
 
 class CommentUpdate(BaseModel):
@@ -20,6 +22,7 @@ class CommentResponse(BaseModel):
     id: UUID
     content: str
     user: UserBrief
+    attachments: list[AttachmentResponse] = []
     created_at: datetime
     updated_at: datetime | None = None
     is_edited: bool

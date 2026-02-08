@@ -28,6 +28,7 @@ register_error_handlers(app)
 from app.api.v1 import (
     activity,
     api_keys,
+    attachments,
     auth,
     boards,
     comments,
@@ -55,6 +56,7 @@ for router_module in [
     labels,
     tasks,
     comments,
+    attachments,
     activity,
     notifications,
     search,
@@ -64,10 +66,16 @@ for router_module in [
     app.include_router(router_module.router, prefix="/api/v1")
 
 app.include_router(websocket.router, prefix="/api/v1")
+app.include_router(attachments.download_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
 async def startup():
+    from pathlib import Path
+
+    from app.core.config import settings
+
+    Path(settings.UPLOAD_DIR).mkdir(exist_ok=True)
     await init_db()
 
 

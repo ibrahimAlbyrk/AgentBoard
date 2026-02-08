@@ -1,4 +1,5 @@
 from .activity_log import ActivityLogResponse
+from .attachment import AttachmentResponse
 from .api_key import APIKeyCreate, APIKeyCreatedResponse, APIKeyResponse
 from .auth import LoginRequest, RefreshRequest, TokenResponse
 from .board import (
@@ -96,6 +97,7 @@ __all__ = [
     "BulkTaskUpdate",
     "BulkTaskMove",
     "BulkTaskDelete",
+    "AttachmentResponse",
     "CommentCreate",
     "CommentUpdate",
     "CommentResponse",

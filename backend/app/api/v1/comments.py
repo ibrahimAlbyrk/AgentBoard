@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import check_board_access, get_current_user
 from app.core.database import get_db
-from app.crud import crud_comment, crud_task
+from app.crud import crud_attachment, crud_comment, crud_task
 from app.models.board import Board
 from app.models.comment import Comment
 from app.models.user import User
@@ -71,6 +71,16 @@ async def create_comment(
     db.add(comment)
     await db.flush()
     await db.refresh(comment)
+
+    if comment_in.attachment_ids:
+        unlinked = await crud_attachment.get_unlinked_by_ids(
+            db, comment_in.attachment_ids, task_id, current_user.id
+        )
+        for att in unlinked:
+            att.comment_id = comment.id
+            db.add(att)
+        await db.flush()
+        await db.refresh(comment, ["attachments"])
 
     if task.assignee_id:
         commenter_name = current_user.full_name or current_user.username

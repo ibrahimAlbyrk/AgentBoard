@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .attachment import AttachmentResponse
 from .label import LabelResponse
 from .status import StatusResponse
 from .user import UserBrief
@@ -43,6 +44,7 @@ class TaskResponse(BaseModel):
     assignee: UserBrief | None = None
     creator: UserBrief
     labels: list[LabelResponse]
+    attachments: list[AttachmentResponse] = []
     due_date: datetime | None = None
     position: float
     parent_id: UUID | None = None

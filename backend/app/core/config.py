@@ -16,6 +16,9 @@ class Settings(BaseSettings):
         "http://localhost:5173",
     ]
 
+    UPLOAD_DIR: str = "uploads"
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+
     RESEND_API_KEY: str | None = None
     EMAIL_FROM: str = "AgentBoard <onboarding@resend.dev>"
 

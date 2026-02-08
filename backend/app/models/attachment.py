@@ -16,6 +16,9 @@ class Attachment(Base):
     task_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tasks.id", ondelete="CASCADE")
     )
+    comment_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("comments.id", ondelete="CASCADE"), nullable=True
+    )
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE")
     )
@@ -28,5 +31,6 @@ class Attachment(Base):
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
-    task = relationship("Task")
+    task = relationship("Task", back_populates="attachments")
+    comment = relationship("Comment", back_populates="attachments")
     user = relationship("User")

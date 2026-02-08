@@ -36,3 +36,6 @@ class Comment(Base):
 
     task = relationship("Task", back_populates="comments")
     user = relationship("User")
+    attachments = relationship(
+        "Attachment", back_populates="comment", cascade="all, delete-orphan"
+    )
