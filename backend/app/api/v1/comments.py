@@ -3,26 +3,26 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import check_project_access, get_current_user
+from app.api.deps import check_board_access, get_current_user
 from app.core.database import get_db
 from app.crud import crud_comment, crud_task
+from app.models.board import Board
 from app.models.comment import Comment
-from app.models.project import Project
 from app.models.user import User
 from app.schemas.base import PaginatedResponse, PaginationMeta, ResponseBase
 from app.schemas.comment import CommentCreate, CommentResponse, CommentUpdate
 
 router = APIRouter(
-    prefix="/projects/{project_id}/tasks/{task_id}/comments",
+    prefix="/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments",
     tags=["Comments"],
 )
 
 
 async def _get_task_or_404(
-    task_id: UUID, project: Project, db: AsyncSession
+    task_id: UUID, board: Board, db: AsyncSession
 ):
     task = await crud_task.get(db, task_id)
-    if not task or task.project_id != project.id:
+    if not task or task.board_id != board.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
@@ -35,9 +35,9 @@ async def list_comments(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    project: Project = Depends(check_project_access),
+    board: Board = Depends(check_board_access),
 ):
-    await _get_task_or_404(task_id, project, db)
+    await _get_task_or_404(task_id, board, db)
     skip = (page - 1) * per_page
     comments = await crud_comment.get_multi_by_task(db, task_id, skip=skip, limit=per_page)
     total = await crud_comment.count(db, filters={"task_id": task_id})
@@ -57,10 +57,10 @@ async def create_comment(
     task_id: UUID,
     comment_in: CommentCreate,
     db: AsyncSession = Depends(get_db),
-    project: Project = Depends(check_project_access),
+    board: Board = Depends(check_board_access),
     current_user: User = Depends(get_current_user),
 ):
-    await _get_task_or_404(task_id, project, db)
+    await _get_task_or_404(task_id, board, db)
     comment = Comment(
         task_id=task_id,
         user_id=current_user.id,
@@ -78,7 +78,7 @@ async def update_comment(
     comment_id: UUID,
     comment_in: CommentUpdate,
     db: AsyncSession = Depends(get_db),
-    project: Project = Depends(check_project_access),
+    board: Board = Depends(check_board_access),
     current_user: User = Depends(get_current_user),
 ):
     comment = await crud_comment.get(db, comment_id)
@@ -104,7 +104,7 @@ async def delete_comment(
     task_id: UUID,
     comment_id: UUID,
     db: AsyncSession = Depends(get_db),
-    project: Project = Depends(check_project_access),
+    board: Board = Depends(check_board_access),
     current_user: User = Depends(get_current_user),
 ):
     comment = await crud_comment.get(db, comment_id)

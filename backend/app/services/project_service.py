@@ -6,19 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.crud import crud_project
 from app.models.project import Project
 from app.models.project_member import ProjectMember
-from app.models.status import Status
+from app.schemas.board import BoardCreate
 from app.schemas.project import ProjectCreate
+from app.services.board_service import BoardService
 
 
 class ProjectService:
-    DEFAULT_STATUSES = [
-        {"name": "To Do", "slug": "to-do", "color": "#94A3B8", "position": 0, "is_default": True},
-        {"name": "In Progress", "slug": "in-progress", "color": "#3B82F6", "position": 1},
-        {"name": "In Review", "slug": "in-review", "color": "#8B5CF6", "position": 2},
-        {"name": "Testing", "slug": "testing", "color": "#F59E0B", "position": 3},
-        {"name": "Complete", "slug": "complete", "color": "#22C55E", "position": 4, "is_terminal": True},
-    ]
-
     @staticmethod
     async def create_project(
         db: AsyncSession, user_id: UUID, project_in: ProjectCreate
@@ -46,10 +39,14 @@ class ProjectService:
             role="admin",
         )
         db.add(member)
-
-        if project_in.create_default_statuses:
-            for s in ProjectService.DEFAULT_STATUSES:
-                db.add(Status(project_id=project.id, **s))
-
         await db.flush()
+
+        if project_in.create_default_board:
+            await BoardService.create_board(
+                db,
+                project.id,
+                user_id,
+                BoardCreate(name="Default"),
+            )
+
         return await crud_project.get(db, project.id)

@@ -35,6 +35,7 @@ class TaskResponse(BaseModel):
 
     id: UUID
     project_id: UUID
+    board_id: UUID
     title: str
     description: str | None = None
     status: StatusResponse

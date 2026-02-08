@@ -18,8 +18,8 @@ from app.core.database import Base
 class Status(Base):
     __tablename__ = "statuses"
     __table_args__ = (
-        UniqueConstraint("project_id", "slug"),
-        Index("ix_statuses_project_position", "project_id", "position"),
+        UniqueConstraint("board_id", "slug"),
+        Index("ix_statuses_board_position", "board_id", "position"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -27,6 +27,9 @@ class Status(Base):
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    board_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE")
     )
     name: Mapped[str] = mapped_column(String(100))
     slug: Mapped[str] = mapped_column(String(100))
@@ -45,4 +48,5 @@ class Status(Base):
     )
 
     project = relationship("Project", back_populates="statuses")
+    board = relationship("Board", back_populates="statuses")
     tasks = relationship("Task", back_populates="status")

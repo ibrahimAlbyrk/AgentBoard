@@ -23,6 +23,7 @@ class StatusResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    board_id: UUID
     name: str
     slug: str
     color: str | None = None

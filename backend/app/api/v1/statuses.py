@@ -4,25 +4,25 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from slugify import slugify
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import check_project_access
+from app.api.deps import check_board_access
 from app.core.database import get_db
 from app.crud import crud_status, crud_task
-from app.models.project import Project
+from app.models.board import Board
 from app.models.status import Status
 from app.schemas.base import ResponseBase
 from app.schemas.status import StatusCreate, StatusReorder, StatusResponse, StatusUpdate
 
 router = APIRouter(
-    prefix="/projects/{project_id}/statuses", tags=["Statuses"]
+    prefix="/projects/{project_id}/boards/{board_id}/statuses", tags=["Statuses"]
 )
 
 
 @router.get("/", response_model=ResponseBase[list[StatusResponse]])
 async def list_statuses(
     db: AsyncSession = Depends(get_db),
-    project: Project = Depends(check_project_access),
+    board: Board = Depends(check_board_access),
 ):
-    statuses = await crud_status.get_multi_by_project(db, project.id)
+    statuses = await crud_status.get_multi_by_board(db, board.id)
     return ResponseBase(
         data=[StatusResponse.model_validate(s) for s in statuses]
     )
@@ -32,14 +32,15 @@ async def list_statuses(
 async def create_status(
     status_in: StatusCreate,
     db: AsyncSession = Depends(get_db),
-    project: Project = Depends(check_project_access),
+    board: Board = Depends(check_board_access),
 ):
     position = status_in.position
     if position is None:
-        position = await crud_status.get_max_position(db, project.id) + 1
+        position = await crud_status.get_max_position_by_board(db, board.id) + 1
 
     new_status = Status(
-        project_id=project.id,
+        project_id=board.project_id,
+        board_id=board.id,
         name=status_in.name,
         slug=slugify(status_in.name),
         color=status_in.color,
@@ -58,10 +59,10 @@ async def update_status(
     status_id: UUID,
     status_in: StatusUpdate,
     db: AsyncSession = Depends(get_db),
-    project: Project = Depends(check_project_access),
+    board: Board = Depends(check_board_access),
 ):
     s = await crud_status.get(db, status_id)
-    if not s or s.project_id != project.id:
+    if not s or s.board_id != board.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Status not found"
         )
@@ -74,10 +75,10 @@ async def delete_status(
     status_id: UUID,
     move_tasks_to: UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    project: Project = Depends(check_project_access),
+    board: Board = Depends(check_board_access),
 ):
     s = await crud_status.get(db, status_id)
-    if not s or s.project_id != project.id:
+    if not s or s.board_id != board.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Status not found"
         )
@@ -98,15 +99,15 @@ async def delete_status(
 async def reorder_statuses(
     body: StatusReorder,
     db: AsyncSession = Depends(get_db),
-    project: Project = Depends(check_project_access),
+    board: Board = Depends(check_board_access),
 ):
     for i, sid in enumerate(body.status_ids):
         s = await crud_status.get(db, sid)
-        if s and s.project_id == project.id:
+        if s and s.board_id == board.id:
             s.position = i
             db.add(s)
     await db.flush()
-    statuses = await crud_status.get_multi_by_project(db, project.id)
+    statuses = await crud_status.get_multi_by_board(db, board.id)
     return ResponseBase(
         data=[StatusResponse.model_validate(s) for s in statuses]
     )

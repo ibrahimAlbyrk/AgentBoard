@@ -6,6 +6,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.board import Board
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.schemas.project import ProjectCreate, ProjectUpdate
@@ -20,7 +21,9 @@ class CRUDProject(CRUDBase[Project, ProjectCreate, ProjectUpdate]):
             .where(Project.id == id)
             .options(
                 selectinload(Project.members),
-                selectinload(Project.statuses),
+                selectinload(Project.boards).selectinload(Board.members),
+                selectinload(Project.boards).selectinload(Board.tasks),
+                selectinload(Project.boards).selectinload(Board.statuses),
                 selectinload(Project.labels),
                 selectinload(Project.tasks),
             )
@@ -66,6 +69,7 @@ class CRUDProject(CRUDBase[Project, ProjectCreate, ProjectUpdate]):
         if not include_archived:
             query = query.where(Project.is_archived == False)  # noqa: E712
         query = query.options(
+            selectinload(Project.owner),
             selectinload(Project.members),
             selectinload(Project.tasks),
         )

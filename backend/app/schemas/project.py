@@ -3,9 +3,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from .board import BoardResponse
 from .label import LabelResponse
 from .project_member import ProjectMemberResponse
-from .status import StatusResponse
 from .user import UserBrief
 
 
@@ -15,7 +15,7 @@ class ProjectCreate(BaseModel):
     slug: str | None = None
     icon: str | None = None
     color: str | None = None
-    create_default_statuses: bool = True
+    create_default_board: bool = True
 
 
 class ProjectUpdate(BaseModel):
@@ -44,5 +44,5 @@ class ProjectResponse(BaseModel):
 
 class ProjectDetailResponse(ProjectResponse):
     members: list[ProjectMemberResponse]
-    statuses: list[StatusResponse]
+    boards: list[BoardResponse]
     labels: list[LabelResponse]

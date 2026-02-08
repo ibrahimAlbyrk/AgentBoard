@@ -29,10 +29,10 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
         )
         return result.unique().scalar_one_or_none()
 
-    async def get_multi_by_project(
+    async def get_multi_by_board(
         self,
         db: AsyncSession,
-        project_id: UUID,
+        board_id: UUID,
         *,
         status_id: UUID | None = None,
         priority: str | None = None,
@@ -41,7 +41,7 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
         skip: int = 0,
         limit: int = 50,
     ) -> list[Task]:
-        query = select(Task).where(Task.project_id == project_id)
+        query = select(Task).where(Task.board_id == board_id)
 
         if status_id is not None:
             query = query.where(Task.status_id == status_id)

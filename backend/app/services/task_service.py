@@ -16,16 +16,17 @@ class TaskService:
     async def create_task(
         db: AsyncSession,
         project_id: UUID,
+        board_id: UUID,
         creator_id: UUID,
         task_in: TaskCreate,
     ) -> Task:
         status_id = task_in.status_id
         if not status_id:
-            default_status = await crud_status.get_default(db, project_id)
+            default_status = await crud_status.get_default_by_board(db, board_id)
             if not default_status:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No default status found for project",
+                    detail="No default status found for board",
                 )
             status_id = default_status.id
 
@@ -33,6 +34,7 @@ class TaskService:
 
         task = Task(
             project_id=project_id,
+            board_id=board_id,
             creator_id=creator_id,
             title=task_in.title,
             description=task_in.description,

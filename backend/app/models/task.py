@@ -26,6 +26,9 @@ class Task(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE")
     )
+    board_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE")
+    )
     title: Mapped[str] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text)
     status_id: Mapped[uuid.UUID] = mapped_column(
@@ -57,6 +60,7 @@ class Task(Base):
     )
 
     project = relationship("Project", back_populates="tasks")
+    board = relationship("Board", back_populates="tasks")
     status = relationship("Status", back_populates="tasks")
     assignee = relationship("User", foreign_keys=[assignee_id])
     creator = relationship("User", foreign_keys=[creator_id])
