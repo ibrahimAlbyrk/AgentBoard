@@ -62,7 +62,11 @@ async def create_comment(
     board: Board = Depends(check_board_access),
     current_user: User = Depends(get_current_user),
 ):
-    task = await _get_task_or_404(task_id, board, db)
+    task = await crud_task.get_with_relations(db, task_id)
+    if not task or task.board_id != board.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
 
     # Validate agent_creator_id if provided
     if comment_in.agent_creator_id:
@@ -93,12 +97,14 @@ async def create_comment(
         await db.flush()
         await db.refresh(comment, ["attachments"])
 
-    if task.assignee_id:
-        commenter_name = current_user.full_name or current_user.username
-        preview = comment_in.content[:80] + ("..." if len(comment_in.content) > 80 else "")
+    commenter_name = current_user.full_name or current_user.username
+    preview = comment_in.content[:80] + ("..." if len(comment_in.content) > 80 else "")
+    for assignee in task.assignees:
+        if not assignee.user_id:
+            continue
         notif = await NotificationService.create_notification(
             db,
-            user_id=task.assignee_id,
+            user_id=assignee.user_id,
             actor_id=current_user.id,
             project_id=board.project_id,
             type="task_comment",
@@ -107,7 +113,7 @@ async def create_comment(
             data={"task_id": str(task_id), "board_id": str(board.id)},
         )
         if notif:
-            await manager.broadcast_to_user(str(task.assignee_id), {
+            await manager.broadcast_to_user(str(assignee.user_id), {
                 "type": "notification.new",
             })
 

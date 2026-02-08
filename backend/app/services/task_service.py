@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud import crud_activity_log, crud_agent, crud_status, crud_task, crud_user
 from app.models.task import Task
+from app.models.task_assignee import TaskAssignee
 from app.models.task_label import TaskLabel
 from app.models.task_watcher import TaskWatcher
 from app.schemas.task import TaskCreate, TaskUpdate
@@ -18,8 +19,7 @@ FIELD_LABELS = {
     "description": "description",
     "priority": "priority",
     "status_id": "status",
-    "assignee_id": "assignee",
-    "agent_assignee_id": "agent assignee",
+    "assignees": "assignees",
     "due_date": "due date",
 }
 
@@ -37,6 +37,34 @@ def _describe_changes(changes: dict, label_changed: bool = False) -> str:
     if label_changed:
         parts.append("labels updated")
     return ", ".join(parts) if parts else "updated"
+
+
+def _get_assignee_user_ids(task: Task) -> set[UUID]:
+    return {a.user_id for a in task.assignees if a.user_id}
+
+
+async def _sync_assignees(
+    db: AsyncSession,
+    task_id: UUID,
+    user_ids: list[UUID],
+    agent_ids: list[UUID],
+) -> None:
+    """Replace all assignees on a task with the given user/agent IDs."""
+    from sqlalchemy import select
+
+    existing = await db.execute(
+        select(TaskAssignee).where(TaskAssignee.task_id == task_id)
+    )
+    for a in existing.scalars().all():
+        await db.delete(a)
+    await db.flush()
+
+    for uid in user_ids:
+        db.add(TaskAssignee(task_id=task_id, user_id=uid))
+    for aid in agent_ids:
+        db.add(TaskAssignee(task_id=task_id, agent_id=aid))
+    if user_ids or agent_ids:
+        await db.flush()
 
 
 async def _sync_watchers(
@@ -71,12 +99,13 @@ async def _notify_watchers(
     title: str,
     message: str,
 ) -> list[UUID]:
-    """Send notifications to all user-watchers (skipping assignee to avoid dups). Returns notified user IDs."""
+    """Send notifications to all user-watchers (skipping assignees to avoid dups). Returns notified user IDs."""
+    assignee_uids = _get_assignee_user_ids(task)
     notified: list[UUID] = []
     for w in task.watchers:
         if not w.user_id:
             continue
-        if w.user_id == task.assignee_id:
+        if w.user_id in assignee_uids:
             continue
         await NotificationService.create_notification(
             db,
@@ -89,6 +118,33 @@ async def _notify_watchers(
             data={"task_id": str(task.id), "board_id": str(task.board_id)},
         )
         notified.append(w.user_id)
+    return notified
+
+
+async def _notify_assignees(
+    db: AsyncSession,
+    task: Task,
+    actor_id: UUID,
+    notification_type: str,
+    title: str,
+    message: str,
+) -> list[UUID]:
+    """Notify all user-assignees. Returns notified user IDs."""
+    notified: list[UUID] = []
+    for a in task.assignees:
+        if not a.user_id:
+            continue
+        await NotificationService.create_notification(
+            db,
+            user_id=a.user_id,
+            actor_id=actor_id,
+            project_id=task.project_id,
+            type=notification_type,
+            title=title,
+            message=message,
+            data={"task_id": str(task.id), "board_id": str(task.board_id)},
+        )
+        notified.append(a.user_id)
     return notified
 
 
@@ -121,12 +177,12 @@ class TaskService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid or inactive agent_creator_id",
                 )
-        if task_in.agent_assignee_id:
-            agent = await crud_agent.get(db, task_in.agent_assignee_id)
+        for aid in task_in.assignee_agent_ids:
+            agent = await crud_agent.get(db, aid)
             if not agent or agent.project_id != project_id or not agent.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or inactive agent_assignee_id",
+                    detail="Invalid or inactive assignee agent",
                 )
 
         task = Task(
@@ -137,8 +193,6 @@ class TaskService:
             description=task_in.description,
             status_id=status_id,
             priority=task_in.priority,
-            assignee_id=task_in.assignee_id,
-            agent_assignee_id=task_in.agent_assignee_id,
             agent_creator_id=task_in.agent_creator_id,
             due_date=task_in.due_date,
             parent_id=task_in.parent_id,
@@ -146,6 +200,12 @@ class TaskService:
         )
         db.add(task)
         await db.flush()
+
+        # Sync assignees
+        if task_in.assignee_user_ids or task_in.assignee_agent_ids:
+            await _sync_assignees(
+                db, task.id, task_in.assignee_user_ids, task_in.assignee_agent_ids
+            )
 
         for label_id in task_in.label_ids:
             db.add(TaskLabel(task_id=task.id, label_id=label_id))
@@ -167,22 +227,18 @@ class TaskService:
             agent_id=task_in.agent_creator_id,
         )
 
-        if task_in.assignee_id:
+        # Reload to get relationships populated
+        task = await crud_task.get_with_relations(db, task.id)
+
+        if task and task.assignees:
             creator = await crud_user.get(db, creator_id)
             creator_name = (creator.full_name or creator.username) if creator else "Someone"
-            await NotificationService.create_notification(
-                db,
-                user_id=task_in.assignee_id,
-                actor_id=creator_id,
-                project_id=project_id,
-                type="task_assigned",
-                title="Task Assigned",
-                message=f'{creator_name} assigned you to "{task.title}"',
-                data={"task_id": str(task.id), "board_id": str(board_id)},
+            await _notify_assignees(
+                db, task, creator_id,
+                "task_assigned", "Task Assigned",
+                f'{creator_name} assigned you to "{task.title}"',
             )
 
-        # Reload to get watchers relationship populated
-        task = await crud_task.get_with_relations(db, task.id)
         if task and task.watchers:
             creator = await crud_user.get(db, creator_id)
             creator_name = (creator.full_name or creator.username) if creator else "Someone"
@@ -206,48 +262,13 @@ class TaskService:
         label_ids = update_data.pop("label_ids", None)
         watcher_user_ids = update_data.pop("watcher_user_ids", None)
         watcher_agent_ids = update_data.pop("watcher_agent_ids", None)
-
-        # Validate agent_assignee_id if being set
-        if "agent_assignee_id" in update_data and update_data["agent_assignee_id"]:
-            agent = await crud_agent.get(db, update_data["agent_assignee_id"])
-            if not agent or agent.project_id != task.project_id or not agent.is_active:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or inactive agent_assignee_id",
-                )
-            # Clear user assignee when setting agent assignee
-            if "assignee_id" not in update_data:
-                update_data["assignee_id"] = None
-
-        # Clear agent assignee when setting user assignee
-        if "assignee_id" in update_data and update_data["assignee_id"]:
-            if "agent_assignee_id" not in update_data:
-                update_data["agent_assignee_id"] = None
+        assignee_user_ids = update_data.pop("assignee_user_ids", None)
+        assignee_agent_ids = update_data.pop("assignee_agent_ids", None)
 
         for field, value in update_data.items():
             old_value = getattr(task, field, None)
             if old_value != value:
-                if field == "assignee_id":
-                    old_name = None
-                    new_name = None
-                    if old_value:
-                        old_user = await crud_user.get(db, old_value)
-                        old_name = old_user.full_name or old_user.username if old_user else None
-                    if value:
-                        new_user = await crud_user.get(db, value)
-                        new_name = new_user.full_name or new_user.username if new_user else None
-                    changes[field] = {"old": old_name, "new": new_name}
-                elif field == "agent_assignee_id":
-                    old_name = None
-                    new_name = None
-                    if old_value:
-                        old_agent = await crud_agent.get(db, old_value)
-                        old_name = old_agent.name if old_agent else None
-                    if value:
-                        new_agent = await crud_agent.get(db, value)
-                        new_name = new_agent.name if new_agent else None
-                    changes[field] = {"old": old_name, "new": new_name}
-                elif field == "status_id":
+                if field == "status_id":
                     old_s = await crud_status.get(db, old_value) if old_value else None
                     new_s = await crud_status.get(db, value) if value else None
                     changes[field] = {
@@ -274,6 +295,23 @@ class TaskService:
                 watcher_agent_ids or [],
             )
 
+        assignees_changed = assignee_user_ids is not None or assignee_agent_ids is not None
+        if assignees_changed:
+            # Validate agent IDs
+            for aid in (assignee_agent_ids or []):
+                agent = await crud_agent.get(db, aid)
+                if not agent or agent.project_id != task.project_id or not agent.is_active:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid or inactive assignee agent",
+                    )
+            await _sync_assignees(
+                db, task.id,
+                assignee_user_ids or [],
+                assignee_agent_ids or [],
+            )
+            changes["assignees"] = "assignees updated"
+
         if update_data:
             db.add(task)
             await db.flush()
@@ -290,44 +328,32 @@ class TaskService:
             )
 
         has_changes = bool(changes) or label_ids is not None
-        current_assignee = task.assignee_id
 
-        if has_changes and current_assignee:
+        # Reload to get fresh assignees/watchers
+        refreshed = await crud_task.get_with_relations(db, task.id)
+
+        if has_changes and refreshed:
             updater = await crud_user.get(db, user_id)
             updater_name = (updater.full_name or updater.username) if updater else "Someone"
 
-            if "assignee_id" in changes and current_assignee:
-                await NotificationService.create_notification(
-                    db,
-                    user_id=current_assignee,
-                    actor_id=user_id,
-                    project_id=task.project_id,
-                    type="task_assigned",
-                    title="Task Assigned",
-                    message=f'{updater_name} assigned you to "{task.title}"',
-                    data={"task_id": str(task.id), "board_id": str(task.board_id)},
+            if assignees_changed and refreshed.assignees:
+                await _notify_assignees(
+                    db, refreshed, user_id,
+                    "task_assigned", "Task Assigned",
+                    f'{updater_name} assigned you to "{task.title}"',
                 )
-            else:
-                non_assignee = {k: v for k, v in changes.items() if k != "assignee_id"}
-                detail = _describe_changes(non_assignee, label_ids is not None)
-                await NotificationService.create_notification(
-                    db,
-                    user_id=current_assignee,
-                    actor_id=user_id,
-                    project_id=task.project_id,
-                    type="task_updated",
-                    title="Task Updated",
-                    message=f'{updater_name} updated "{task.title}" — {detail}',
-                    data={"task_id": str(task.id), "board_id": str(task.board_id)},
+            elif refreshed.assignees:
+                detail = _describe_changes(
+                    {k: v for k, v in changes.items() if k != "assignees"},
+                    label_ids is not None,
+                )
+                await _notify_assignees(
+                    db, refreshed, user_id,
+                    "task_updated", "Task Updated",
+                    f'{updater_name} updated "{task.title}" — {detail}',
                 )
 
-        # Notify watchers of task changes
-        if has_changes:
-            # Reload watchers after potential sync
-            refreshed = await crud_task.get_with_relations(db, task.id)
-            if refreshed and refreshed.watchers:
-                updater = await crud_user.get(db, user_id)
-                updater_name = (updater.full_name or updater.username) if updater else "Someone"
+            if refreshed.watchers:
                 detail = _describe_changes(changes, label_ids is not None)
                 await _notify_watchers(
                     db, refreshed, user_id,
@@ -386,20 +412,16 @@ class TaskService:
         mover_name = (mover.full_name or mover.username) if mover else "Someone"
         new_status_name = new_status.name if new_status else "another status"
 
-        if task.assignee_id:
-            await NotificationService.create_notification(
-                db,
-                user_id=task.assignee_id,
-                actor_id=user_id,
-                project_id=task.project_id,
-                type="task_moved",
-                title="Task Moved",
-                message=f'{mover_name} moved "{task.title}" to {new_status_name}',
-                data={"task_id": str(task.id), "board_id": str(task.board_id)},
+        # Notify assignees of move
+        refreshed = await crud_task.get_with_relations(db, task.id)
+        if refreshed and refreshed.assignees:
+            await _notify_assignees(
+                db, refreshed, user_id,
+                "task_moved", "Task Moved",
+                f'{mover_name} moved "{task.title}" to {new_status_name}',
             )
 
         # Notify watchers of move
-        refreshed = await crud_task.get_with_relations(db, task.id)
         if refreshed and refreshed.watchers:
             await _notify_watchers(
                 db, refreshed, user_id,

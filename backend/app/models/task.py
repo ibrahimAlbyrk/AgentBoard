@@ -35,14 +35,8 @@ class Task(Base):
         ForeignKey("statuses.id", ondelete="RESTRICT")
     )
     priority: Mapped[str] = mapped_column(String(20), default="none")
-    assignee_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL")
-    )
     creator_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE")
-    )
-    agent_assignee_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("agents.id", ondelete="SET NULL")
     )
     agent_creator_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("agents.id", ondelete="SET NULL")
@@ -68,9 +62,7 @@ class Task(Base):
     project = relationship("Project", back_populates="tasks")
     board = relationship("Board", back_populates="tasks")
     status = relationship("Status", back_populates="tasks")
-    assignee = relationship("User", foreign_keys=[assignee_id])
     creator = relationship("User", foreign_keys=[creator_id])
-    agent_assignee = relationship("Agent", foreign_keys=[agent_assignee_id])
     agent_creator = relationship("Agent", foreign_keys=[agent_creator_id])
     parent = relationship(
         "Task", remote_side="Task.id", back_populates="children"
@@ -99,4 +91,7 @@ class Task(Base):
     )
     watchers = relationship(
         "TaskWatcher", back_populates="task", cascade="all, delete-orphan"
+    )
+    assignees = relationship(
+        "TaskAssignee", back_populates="task", cascade="all, delete-orphan"
     )

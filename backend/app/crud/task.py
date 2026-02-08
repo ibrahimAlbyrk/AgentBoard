@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from app.models.attachment import Attachment
 from app.models.task import Task
+from app.models.task_assignee import TaskAssignee
 from app.models.task_label import TaskLabel
 from app.models.task_watcher import TaskWatcher
 from app.schemas.task import TaskCreate, TaskUpdate
@@ -15,10 +16,12 @@ from .base import CRUDBase
 
 _task_load_options = (
     joinedload(Task.status),
-    joinedload(Task.assignee),
     joinedload(Task.creator),
-    joinedload(Task.agent_assignee),
     joinedload(Task.agent_creator),
+    selectinload(Task.assignees).options(
+        joinedload(TaskAssignee.user),
+        joinedload(TaskAssignee.agent),
+    ),
     selectinload(Task.labels).joinedload(TaskLabel.label),
     selectinload(Task.attachments).joinedload(Attachment.user),
     selectinload(Task.watchers).options(
@@ -58,7 +61,13 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
         if priority is not None:
             query = query.where(Task.priority == priority)
         if assignee_id is not None:
-            query = query.where(Task.assignee_id == assignee_id)
+            query = query.where(
+                Task.id.in_(
+                    select(TaskAssignee.task_id).where(
+                        TaskAssignee.user_id == assignee_id
+                    )
+                )
+            )
         if search:
             pattern = f"%{search}%"
             query = query.where(
@@ -153,11 +162,21 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
             filters.append(
                 or_(
                     Task.agent_creator_id == agent_id,
-                    Task.agent_assignee_id == agent_id,
+                    Task.id.in_(
+                        select(TaskAssignee.task_id).where(
+                            TaskAssignee.agent_id == agent_id
+                        )
+                    ),
                 )
             )
         else:
-            filters.append(Task.assignee_id == user_id)
+            filters.append(
+                Task.id.in_(
+                    select(TaskAssignee.task_id).where(
+                        TaskAssignee.user_id == user_id
+                    )
+                )
+            )
 
         query = (
             select(Task)

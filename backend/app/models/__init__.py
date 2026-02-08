@@ -11,6 +11,7 @@ from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.models.status import Status
 from app.models.task import Task
+from app.models.task_assignee import TaskAssignee
 from app.models.task_dependency import TaskDependency
 from app.models.task_label import TaskLabel
 from app.models.task_watcher import TaskWatcher
@@ -31,6 +32,7 @@ __all__ = [
     "ProjectMember",
     "Status",
     "Task",
+    "TaskAssignee",
     "TaskDependency",
     "TaskLabel",
     "TaskWatcher",

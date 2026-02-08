@@ -16,8 +16,8 @@ class TaskCreate(BaseModel):
     description: str | None = None
     status_id: UUID | None = None
     priority: Literal["none", "low", "medium", "high", "urgent"] = "none"
-    assignee_id: UUID | None = None
-    agent_assignee_id: UUID | None = None
+    assignee_user_ids: list[UUID] = []
+    assignee_agent_ids: list[UUID] = []
     agent_creator_id: UUID | None = None
     label_ids: list[UUID] = []
     watcher_user_ids: list[UUID] = []
@@ -25,30 +25,26 @@ class TaskCreate(BaseModel):
     due_date: datetime | None = None
     parent_id: UUID | None = None
 
-    @model_validator(mode="after")
-    def check_assignee_exclusive(self):
-        if self.assignee_id and self.agent_assignee_id:
-            raise ValueError("Cannot assign to both user and agent")
-        return self
-
 
 class TaskUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     status_id: UUID | None = None
     priority: Literal["none", "low", "medium", "high", "urgent"] | None = None
-    assignee_id: UUID | None = None
-    agent_assignee_id: UUID | None = None
+    assignee_user_ids: list[UUID] | None = None
+    assignee_agent_ids: list[UUID] | None = None
     label_ids: list[UUID] | None = None
     watcher_user_ids: list[UUID] | None = None
     watcher_agent_ids: list[UUID] | None = None
     due_date: datetime | None = None
 
-    @model_validator(mode="after")
-    def check_assignee_exclusive(self):
-        if self.assignee_id and self.agent_assignee_id:
-            raise ValueError("Cannot assign to both user and agent")
-        return self
+
+class AssigneeBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user: UserBrief | None = None
+    agent: AgentBrief | None = None
 
 
 class WatcherBrief(BaseModel):
@@ -69,8 +65,7 @@ class TaskResponse(BaseModel):
     description: str | None = None
     status: StatusResponse
     priority: str
-    assignee: UserBrief | None = None
-    agent_assignee: AgentBrief | None = None
+    assignees: list[AssigneeBrief] = []
     creator: UserBrief
     agent_creator: AgentBrief | None = None
     labels: list[LabelResponse]
