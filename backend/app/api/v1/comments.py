@@ -11,6 +11,8 @@ from app.models.comment import Comment
 from app.models.user import User
 from app.schemas.base import PaginatedResponse, PaginationMeta, ResponseBase
 from app.schemas.comment import CommentCreate, CommentResponse, CommentUpdate
+from app.services.notification_service import NotificationService
+from app.services.websocket_manager import manager
 
 router = APIRouter(
     prefix="/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments",
@@ -60,7 +62,7 @@ async def create_comment(
     board: Board = Depends(check_board_access),
     current_user: User = Depends(get_current_user),
 ):
-    await _get_task_or_404(task_id, board, db)
+    task = await _get_task_or_404(task_id, board, db)
     comment = Comment(
         task_id=task_id,
         user_id=current_user.id,
@@ -69,6 +71,23 @@ async def create_comment(
     db.add(comment)
     await db.flush()
     await db.refresh(comment)
+
+    if task.assignee_id:
+        commenter_name = current_user.full_name or current_user.username
+        preview = comment_in.content[:80] + ("..." if len(comment_in.content) > 80 else "")
+        await NotificationService.create_notification(
+            db,
+            user_id=task.assignee_id,
+            project_id=board.project_id,
+            type="task_comment",
+            title="New Comment",
+            message=f'{commenter_name} commented on "{task.title}": {preview}',
+            data={"task_id": str(task_id), "board_id": str(board.id)},
+        )
+        await manager.broadcast_to_user(str(task.assignee_id), {
+            "type": "notification.new",
+        })
+
     return ResponseBase(data=CommentResponse.model_validate(comment))
 
 

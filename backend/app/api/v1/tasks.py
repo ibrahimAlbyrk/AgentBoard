@@ -18,6 +18,7 @@ from app.schemas.task import (
     TaskResponse,
     TaskUpdate,
 )
+from app.services.notification_service import NotificationService
 from app.services.task_service import TaskService
 from app.services.websocket_manager import manager
 
@@ -78,6 +79,10 @@ async def create_task(
         "data": response.model_dump(mode="json"),
         "user": {"id": str(current_user.id), "username": current_user.username},
     })
+    if response.assignee:
+        await manager.broadcast_to_user(str(response.assignee.id), {
+            "type": "notification.new",
+        })
     return ResponseBase(data=response)
 
 
@@ -117,6 +122,10 @@ async def update_task(
         "data": response.model_dump(mode="json"),
         "user": {"id": str(current_user.id), "username": current_user.username},
     })
+    if response.assignee:
+        await manager.broadcast_to_user(str(response.assignee.id), {
+            "type": "notification.new",
+        })
     return ResponseBase(data=response)
 
 
@@ -125,12 +134,15 @@ async def delete_task(
     task_id: UUID,
     db: AsyncSession = Depends(get_db),
     board: Board = Depends(check_board_access),
+    current_user: User = Depends(get_current_user),
 ):
     task = await crud_task.get(db, task_id)
     if not task or task.board_id != board.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
+    task_title = task.title
+    assignee_id = task.assignee_id
     await crud_task.remove(db, id=task_id)
     await manager.broadcast_to_board(str(board.project_id), str(board.id), {
         "type": "task.deleted",
@@ -138,6 +150,20 @@ async def delete_task(
         "board_id": str(board.id),
         "data": {"task_id": str(task_id)},
     })
+    if assignee_id:
+        deleter_name = current_user.full_name or current_user.username
+        await NotificationService.create_notification(
+            db,
+            user_id=assignee_id,
+            project_id=board.project_id,
+            type="task_deleted",
+            title="Task Deleted",
+            message=f'{deleter_name} deleted "{task_title}"',
+            data={"task_id": str(task_id)},
+        )
+        await manager.broadcast_to_user(str(assignee_id), {
+            "type": "notification.new",
+        })
 
 
 @router.post("/{task_id}/move", response_model=ResponseBase[TaskResponse])
@@ -164,6 +190,10 @@ async def move_task(
         "data": response.model_dump(mode="json"),
         "user": {"id": str(current_user.id), "username": current_user.username},
     })
+    if response.assignee:
+        await manager.broadcast_to_user(str(response.assignee.id), {
+            "type": "notification.new",
+        })
     return ResponseBase(data=response)
 
 
@@ -178,6 +208,7 @@ async def bulk_update_tasks(
         db, board.project_id, current_user.id, body.task_ids, body.updates
     )
     responses = [TaskResponse.model_validate(t) for t in tasks]
+    notified_users: set[str] = set()
     for r in responses:
         await manager.broadcast_to_board(str(board.project_id), str(board.id), {
             "type": "task.updated",
@@ -186,6 +217,21 @@ async def bulk_update_tasks(
             "data": r.model_dump(mode="json"),
             "user": {"id": str(current_user.id), "username": current_user.username},
         })
+        if r.assignee:
+            uid = str(r.assignee.id)
+            updater_name = current_user.full_name or current_user.username
+            await NotificationService.create_notification(
+                db,
+                user_id=r.assignee.id,
+                project_id=board.project_id,
+                type="task_updated",
+                title="Task Updated",
+                message=f'{updater_name} updated "{r.title}"',
+                data={"task_id": str(r.id), "board_id": str(board.id)},
+            )
+            if uid not in notified_users:
+                notified_users.add(uid)
+                await manager.broadcast_to_user(uid, {"type": "notification.new"})
     return ResponseBase(data=responses)
 
 
@@ -200,6 +246,7 @@ async def bulk_move_tasks(
         db, board.project_id, current_user.id, body.task_ids, body.status_id
     )
     responses = [TaskResponse.model_validate(t) for t in tasks]
+    notified_users: set[str] = set()
     for r in responses:
         await manager.broadcast_to_board(str(board.project_id), str(board.id), {
             "type": "task.moved",
@@ -208,6 +255,21 @@ async def bulk_move_tasks(
             "data": r.model_dump(mode="json"),
             "user": {"id": str(current_user.id), "username": current_user.username},
         })
+        if r.assignee:
+            uid = str(r.assignee.id)
+            mover_name = current_user.full_name or current_user.username
+            await NotificationService.create_notification(
+                db,
+                user_id=r.assignee.id,
+                project_id=board.project_id,
+                type="task_moved",
+                title="Task Moved",
+                message=f'{mover_name} moved "{r.title}"',
+                data={"task_id": str(r.id), "board_id": str(board.id)},
+            )
+            if uid not in notified_users:
+                notified_users.add(uid)
+                await manager.broadcast_to_user(uid, {"type": "notification.new"})
     return ResponseBase(data=responses)
 
 
@@ -216,10 +278,14 @@ async def bulk_delete_tasks(
     body: BulkTaskDelete,
     db: AsyncSession = Depends(get_db),
     board: Board = Depends(check_board_access),
+    current_user: User = Depends(get_current_user),
 ):
+    notified_users: set[str] = set()
     for task_id in body.task_ids:
         task = await crud_task.get(db, task_id)
         if task and task.board_id == board.id:
+            task_title = task.title
+            assignee_id = task.assignee_id
             await crud_task.remove(db, id=task_id)
             await manager.broadcast_to_board(str(board.project_id), str(board.id), {
                 "type": "task.deleted",
@@ -227,3 +293,18 @@ async def bulk_delete_tasks(
                 "board_id": str(board.id),
                 "data": {"task_id": str(task_id)},
             })
+            if assignee_id:
+                uid = str(assignee_id)
+                deleter_name = current_user.full_name or current_user.username
+                await NotificationService.create_notification(
+                    db,
+                    user_id=assignee_id,
+                    project_id=board.project_id,
+                    type="task_deleted",
+                    title="Task Deleted",
+                    message=f'{deleter_name} deleted "{task_title}"',
+                    data={"task_id": str(task_id)},
+                )
+                if uid not in notified_users:
+                    notified_users.add(uid)
+                    await manager.broadcast_to_user(uid, {"type": "notification.new"})

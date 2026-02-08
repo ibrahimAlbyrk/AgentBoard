@@ -8,7 +8,33 @@ from app.crud import crud_activity_log, crud_status, crud_task, crud_user
 from app.models.task import Task
 from app.models.task_label import TaskLabel
 from app.schemas.task import TaskCreate, TaskUpdate
+from app.services.notification_service import NotificationService
 from app.services.position_service import PositionService
+
+
+FIELD_LABELS = {
+    "title": "title",
+    "description": "description",
+    "priority": "priority",
+    "status_id": "status",
+    "assignee_id": "assignee",
+    "due_date": "due date",
+}
+
+
+def _describe_changes(changes: dict, label_changed: bool = False) -> str:
+    parts = []
+    for field, diff in changes.items():
+        label = FIELD_LABELS.get(field, field)
+        if isinstance(diff, dict) and "old" in diff and "new" in diff:
+            old = diff["old"] or "none"
+            new = diff["new"] or "none"
+            parts.append(f"{label}: {old} → {new}")
+        else:
+            parts.append(f"{label} changed")
+    if label_changed:
+        parts.append("labels updated")
+    return ", ".join(parts) if parts else "updated"
 
 
 class TaskService:
@@ -61,6 +87,19 @@ class TaskService:
             task_id=task.id,
             changes={"title": task.title},
         )
+
+        if task_in.assignee_id:
+            creator = await crud_user.get(db, creator_id)
+            creator_name = (creator.full_name or creator.username) if creator else "Someone"
+            await NotificationService.create_notification(
+                db,
+                user_id=task_in.assignee_id,
+                project_id=project_id,
+                type="task_assigned",
+                title="Task Assigned",
+                message=f'{creator_name} assigned you to "{task.title}"',
+                data={"task_id": str(task.id), "board_id": str(board_id)},
+            )
 
         return await crud_task.get_with_relations(db, task.id)
 
@@ -122,6 +161,36 @@ class TaskService:
                 changes=changes,
             )
 
+        has_changes = bool(changes) or label_ids is not None
+        current_assignee = task.assignee_id
+
+        if has_changes and current_assignee:
+            updater = await crud_user.get(db, user_id)
+            updater_name = (updater.full_name or updater.username) if updater else "Someone"
+
+            if "assignee_id" in changes and current_assignee:
+                await NotificationService.create_notification(
+                    db,
+                    user_id=current_assignee,
+                    project_id=task.project_id,
+                    type="task_assigned",
+                    title="Task Assigned",
+                    message=f'{updater_name} assigned you to "{task.title}"',
+                    data={"task_id": str(task.id), "board_id": str(task.board_id)},
+                )
+            else:
+                non_assignee = {k: v for k, v in changes.items() if k != "assignee_id"}
+                detail = _describe_changes(non_assignee, label_ids is not None)
+                await NotificationService.create_notification(
+                    db,
+                    user_id=current_assignee,
+                    project_id=task.project_id,
+                    type="task_updated",
+                    title="Task Updated",
+                    message=f'{updater_name} updated "{task.title}" — {detail}',
+                    data={"task_id": str(task.id), "board_id": str(task.board_id)},
+                )
+
         task_id = task.id
         await db.commit()
         db.expunge(task)
@@ -168,6 +237,20 @@ class TaskService:
                 },
             },
         )
+
+        if task.assignee_id:
+            mover = await crud_user.get(db, user_id)
+            mover_name = (mover.full_name or mover.username) if mover else "Someone"
+            new_status_name = new_status.name if new_status else "another status"
+            await NotificationService.create_notification(
+                db,
+                user_id=task.assignee_id,
+                project_id=task.project_id,
+                type="task_moved",
+                title="Task Moved",
+                message=f'{mover_name} moved "{task.title}" to {new_status_name}',
+                data={"task_id": str(task.id), "board_id": str(task.board_id)},
+            )
 
         task_id = task.id
         await db.commit()
