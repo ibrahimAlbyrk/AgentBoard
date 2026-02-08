@@ -1,3 +1,4 @@
+export type * from './agent'
 export type * from './api'
 export type * from './board'
 export type * from './project'

@@ -1,3 +1,4 @@
+import type { Agent } from './agent'
 import type { UserBrief } from './user'
 
 export interface Project {
@@ -19,6 +20,7 @@ export interface ProjectDetail extends Project {
   members: ProjectMember[]
   boards: import('./board').Board[]
   labels: Label[]
+  agents: Agent[]
 }
 
 export interface ProjectMember {

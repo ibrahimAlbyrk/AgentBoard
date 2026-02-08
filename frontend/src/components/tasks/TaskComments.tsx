@@ -203,18 +203,29 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
         {comments.map((comment, index) => (
           <div key={comment.id}>
             <div className="flex gap-3 py-3">
-              <Avatar className="size-7 shrink-0">
-                <AvatarImage src={comment.user.avatar_url ?? undefined} />
-                <AvatarFallback className="text-[10px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
-                  {(comment.user.full_name ?? comment.user.username)
-                    .charAt(0)
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              {comment.agent_creator ? (
+                <span
+                  className="size-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                  style={{ backgroundColor: comment.agent_creator.color }}
+                >
+                  {comment.agent_creator.name.charAt(0).toUpperCase()}
+                </span>
+              ) : (
+                <Avatar className="size-7 shrink-0">
+                  <AvatarImage src={comment.user.avatar_url ?? undefined} />
+                  <AvatarFallback className="text-[10px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                    {(comment.user.full_name ?? comment.user.username)
+                      .charAt(0)
+                      .toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-foreground">
-                    {comment.user.full_name ?? comment.user.username}
+                    {comment.agent_creator
+                      ? comment.agent_creator.name
+                      : (comment.user.full_name ?? comment.user.username)}
                   </span>
                   <span className="text-xs text-[var(--text-tertiary)]">
                     {formatDistanceToNow(parseISO(comment.created_at), {

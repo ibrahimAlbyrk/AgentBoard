@@ -1,4 +1,7 @@
 import type {
+  Agent,
+  AgentCreate,
+  AgentUpdate,
   APIResponse,
   PaginatedResponse,
   TokenResponse,
@@ -305,6 +308,32 @@ class APIClient {
 
   async deleteLabel(projectId: string, labelId: string) {
     return this.request<void>(`/projects/${projectId}/labels/${labelId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // Agents
+  async listAgents(projectId: string, includeInactive = false) {
+    const qs = includeInactive ? '?include_inactive=true' : ''
+    return this.request<APIResponse<Agent[]>>(`/projects/${projectId}/agents${qs}`)
+  }
+
+  async createAgent(projectId: string, data: AgentCreate) {
+    return this.request<APIResponse<Agent>>(`/projects/${projectId}/agents`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateAgent(projectId: string, agentId: string, data: AgentUpdate) {
+    return this.request<APIResponse<Agent>>(`/projects/${projectId}/agents/${agentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteAgent(projectId: string, agentId: string) {
+    return this.request<void>(`/projects/${projectId}/agents/${agentId}`, {
       method: 'DELETE',
     })
   }

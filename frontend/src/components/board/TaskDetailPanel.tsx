@@ -92,7 +92,8 @@ const fadeUp = {
 }
 
 export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: TaskDetailPanelProps) {
-  const { statuses, members, labels } = useProjectStore()
+  const { statuses, members, labels, agents } = useProjectStore()
+  const activeAgents = agents.filter((a) => a.is_active)
   const updateTask = useUpdateTask(projectId, boardId)
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState('')
@@ -302,10 +303,22 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                   {/* Assignee */}
                   <PropertyRow icon={User} label="Assignee">
                     <Select
-                      value={displayTask.assignee?.id ?? 'unassigned'}
-                      onValueChange={(v) =>
-                        handleFieldUpdate({ assignee_id: v === 'unassigned' ? null : v })
+                      value={
+                        displayTask.assignee
+                          ? `user:${displayTask.assignee.id}`
+                          : displayTask.agent_assignee
+                            ? `agent:${displayTask.agent_assignee.id}`
+                            : 'unassigned'
                       }
+                      onValueChange={(v) => {
+                        if (v === 'unassigned') {
+                          handleFieldUpdate({ assignee_id: null, agent_assignee_id: null })
+                        } else if (v.startsWith('user:')) {
+                          handleFieldUpdate({ assignee_id: v.slice(5), agent_assignee_id: null })
+                        } else if (v.startsWith('agent:')) {
+                          handleFieldUpdate({ assignee_id: null, agent_assignee_id: v.slice(6) })
+                        }
+                      }}
                     >
                       <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0">
                         <SelectValue placeholder="Unassigned" />
@@ -315,7 +328,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                           <span className="text-[var(--text-tertiary)]">Unassigned</span>
                         </SelectItem>
                         {members.map((m) => (
-                          <SelectItem key={m.id} value={m.user.id}>
+                          <SelectItem key={m.id} value={`user:${m.user.id}`}>
                             <div className="flex items-center gap-2">
                               <Avatar className="size-5">
                                 <AvatarImage src={m.user.avatar_url || undefined} />
@@ -327,6 +340,21 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                             </div>
                           </SelectItem>
                         ))}
+                        {activeAgents.length > 0 && (
+                          <>
+                            <div className="px-2 py-1.5 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Agents</div>
+                            {activeAgents.map((a) => (
+                              <SelectItem key={a.id} value={`agent:${a.id}`}>
+                                <div className="flex items-center gap-2">
+                                  <span className="size-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ backgroundColor: a.color }}>
+                                    {a.name.charAt(0).toUpperCase()}
+                                  </span>
+                                  {a.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </PropertyRow>
@@ -501,15 +529,28 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
             {/* Footer timestamps */}
             <div className="px-6 py-3 border-t border-[var(--border-subtle)] flex items-center gap-4 text-[11px] text-[var(--text-tertiary)] shrink-0 bg-[var(--surface)] rounded-b-[20px]">
               <div className="flex items-center gap-1.5">
-                <Avatar className="size-4">
-                  <AvatarImage src={displayTask.creator.avatar_url || undefined} />
-                  <AvatarFallback className="text-[7px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
-                    {(displayTask.creator.full_name || displayTask.creator.username).charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span>
-                  Created by {displayTask.creator.full_name || displayTask.creator.username}
-                </span>
+                {displayTask.agent_creator ? (
+                  <>
+                    <span className="size-4 rounded-full flex items-center justify-center text-[7px] font-bold text-white shrink-0" style={{ backgroundColor: displayTask.agent_creator.color }}>
+                      {displayTask.agent_creator.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span>
+                      Created by {displayTask.agent_creator.name}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Avatar className="size-4">
+                      <AvatarImage src={displayTask.creator.avatar_url || undefined} />
+                      <AvatarFallback className="text-[7px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                        {(displayTask.creator.full_name || displayTask.creator.username).charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span>
+                      Created by {displayTask.creator.full_name || displayTask.creator.username}
+                    </span>
+                  </>
+                )}
                 <span className="text-[var(--border-strong)]">&middot;</span>
                 <span>{formatDistanceToNow(parseISO(displayTask.created_at), { addSuffix: true })}</span>
               </div>

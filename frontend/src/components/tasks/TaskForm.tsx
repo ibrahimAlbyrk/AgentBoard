@@ -60,7 +60,8 @@ const priorityOptions: { value: Priority; label: string; color: string }[] = [
 ]
 
 export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }: TaskFormProps) {
-  const { statuses, members, labels } = useProjectStore()
+  const { statuses, members, labels, agents } = useProjectStore()
+  const activeAgents = agents.filter((a) => a.is_active)
   const createTask = useCreateTask(projectId, boardId)
 
   const firstStatusId = defaultStatusId || statuses[0]?.id || ''
@@ -108,13 +109,18 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
 
   const onSubmit = async (data: FormData) => {
     try {
+      const isAgent = assigneeId.startsWith('agent:')
+      const isUser = assigneeId.startsWith('user:')
+      const rawId = assigneeId.replace(/^(user|agent):/, '')
+
       const res = await createTask.mutateAsync({
         title: data.title,
         description: data.description,
         status_id: statusId || firstStatusId,
         priority,
         due_date: data.due_date || undefined,
-        assignee_id: assigneeId || undefined,
+        assignee_id: isUser ? rawId : undefined,
+        agent_assignee_id: isAgent ? rawId : undefined,
         label_ids: selectedLabelIds.length > 0 ? selectedLabelIds : undefined,
       })
 
@@ -234,7 +240,7 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
                 <SelectContent>
                   <SelectItem value="none">Unassigned</SelectItem>
                   {members.map((m) => (
-                    <SelectItem key={m.id} value={m.user.id}>
+                    <SelectItem key={m.id} value={`user:${m.user.id}`}>
                       <div className="flex items-center gap-2">
                         <Avatar className="size-5">
                           <AvatarImage src={m.user.avatar_url || undefined} />
@@ -246,6 +252,21 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
                       </div>
                     </SelectItem>
                   ))}
+                  {activeAgents.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Agents</div>
+                      {activeAgents.map((a) => (
+                        <SelectItem key={a.id} value={`agent:${a.id}`}>
+                          <div className="flex items-center gap-2">
+                            <span className="size-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ backgroundColor: a.color }}>
+                              {a.name.charAt(0).toUpperCase()}
+                            </span>
+                            {a.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>

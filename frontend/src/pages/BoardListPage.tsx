@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, LayoutGrid, ListTodo, Users, Trash2, Pencil, MoreHorizontal, ArrowRight } from 'lucide-react'
+import { Plus, LayoutGrid, ListTodo, Users, Trash2, Pencil, MoreHorizontal, ArrowRight, Bot } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useProject } from '@/hooks/useProjects'
 import { useCreateBoard, useUpdateBoard, useDeleteBoard } from '@/hooks/useBoards'
+import { AgentManager } from '@/components/agents/AgentManager'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { Board } from '@/types'
@@ -38,6 +39,7 @@ export function BoardListPage() {
   const [editingBoard, setEditingBoard] = useState<Board | null>(null)
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState('#3B82F6')
+  const [showAgents, setShowAgents] = useState(false)
 
   if (isLoading) return <LoadingSpinner text="Loading project..." />
 
@@ -101,13 +103,23 @@ export function BoardListPage() {
             )}
           </div>
         </div>
-        <Button
-          onClick={() => setShowCreate(true)}
-          className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)]"
-        >
-          <Plus className="size-4" />
-          New Board
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowAgents(true)}
+            className="border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-foreground hover:bg-[var(--surface)]"
+          >
+            <Bot className="size-4" />
+            Agents
+          </Button>
+          <Button
+            onClick={() => setShowCreate(true)}
+            className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)]"
+          >
+            <Plus className="size-4" />
+            New Board
+          </Button>
+        </div>
       </div>
 
       {boards.length === 0 ? (
@@ -237,6 +249,12 @@ export function BoardListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AgentManager
+        projectId={projectId!}
+        open={showAgents}
+        onClose={() => setShowAgents(false)}
+      />
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="bg-[var(--elevated)] border-[var(--border-subtle)] sm:max-w-[420px]">

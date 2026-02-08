@@ -24,7 +24,7 @@ export function BoardPage() {
   const { data: tasksRes, isLoading: tasksLoading } = useTasks(projectId!, boardId!)
   useWebSocket(projectId!, boardId!)
 
-  const { setCurrentProject, setCurrentBoard, setStatuses, setLabels, setMembers, clearProject, statuses } =
+  const { setCurrentProject, setCurrentBoard, setStatuses, setLabels, setMembers, setAgents, clearProject, statuses } =
     useProjectStore()
   const { setTasksForStatus, clearBoard } = useBoardStore()
 
@@ -41,12 +41,13 @@ export function BoardPage() {
       setCurrentProject(project)
       setLabels(project.labels)
       setMembers(project.members)
+      setAgents(project.agents ?? [])
     }
     return () => {
       clearProject()
       clearBoard()
     }
-  }, [projectRes, setCurrentProject, setLabels, setMembers, clearProject, clearBoard])
+  }, [projectRes, setCurrentProject, setLabels, setMembers, setAgents, clearProject, clearBoard])
 
   useEffect(() => {
     if (boardRes?.data) {

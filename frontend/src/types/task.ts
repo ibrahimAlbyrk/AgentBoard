@@ -1,3 +1,4 @@
+import type { AgentBrief } from './agent'
 import type { Status, Label } from './project'
 import type { UserBrief } from './user'
 
@@ -22,7 +23,9 @@ export interface Task {
   status: Status
   priority: Priority
   assignee: UserBrief | null
+  agent_assignee: AgentBrief | null
   creator: UserBrief
+  agent_creator: AgentBrief | null
   labels: Label[]
   attachments: Attachment[]
   due_date: string | null
@@ -40,6 +43,8 @@ export interface TaskCreate {
   status_id?: string
   priority?: Priority
   assignee_id?: string
+  agent_assignee_id?: string
+  agent_creator_id?: string
   label_ids?: string[]
   due_date?: string
   parent_id?: string
@@ -50,7 +55,8 @@ export interface TaskUpdate {
   description?: string
   status_id?: string
   priority?: Priority
-  assignee_id?: string
+  assignee_id?: string | null
+  agent_assignee_id?: string | null
   label_ids?: string[]
   due_date?: string
 }
@@ -64,6 +70,7 @@ export interface Comment {
   id: string
   content: string
   user: UserBrief
+  agent_creator: AgentBrief | null
   attachments: Attachment[]
   created_at: string
   updated_at: string
