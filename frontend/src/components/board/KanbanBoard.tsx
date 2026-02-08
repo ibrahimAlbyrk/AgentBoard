@@ -54,60 +54,82 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
 
       const taskId = String(active.id)
       const overId = String(over.id)
+      const fromStatusId = activeTask.status.id
 
-      let targetStatusId: string
-      let targetIndex = 0
-
+      // Determine target column
+      let targetStatusId: string | undefined
       if (overId.startsWith('column-')) {
         targetStatusId = overId.replace('column-', '')
-        const columnTasks = tasksByStatus[targetStatusId] ?? []
-        targetIndex = columnTasks.length
       } else {
         for (const [statusId, tasks] of Object.entries(tasksByStatus)) {
-          const idx = tasks.findIndex((t) => t.id === overId)
-          if (idx !== -1) {
+          if (tasks.some((t) => t.id === overId)) {
             targetStatusId = statusId
-            targetIndex = idx
             break
           }
         }
-        if (!targetStatusId!) {
-          setActiveTask(null)
-          return
-        }
       }
-
-      const fromStatusId = activeTask.status.id
-      if (fromStatusId === targetStatusId && tasksByStatus[fromStatusId]?.findIndex(t => t.id === taskId) === targetIndex) {
+      if (!targetStatusId) {
         setActiveTask(null)
         return
       }
 
-      const targetTasks = tasksByStatus[targetStatusId] ?? []
-      let position: number
-      if (targetTasks.length === 0) {
-        position = 1024
-      } else if (targetIndex === 0) {
-        position = (targetTasks[0]?.position ?? 1024) / 2
-      } else if (targetIndex >= targetTasks.length) {
-        position = (targetTasks[targetTasks.length - 1]?.position ?? 0) + 1024
+      // Exclude the dragged task so position calc doesn't self-reference
+      const filtered = (tasksByStatus[targetStatusId] ?? []).filter(
+        (t) => t.id !== taskId,
+      )
+
+      // Determine insert index in the filtered array
+      let insertIdx: number
+      if (overId.startsWith('column-')) {
+        insertIdx = filtered.length
       } else {
-        const before = targetTasks[targetIndex - 1]?.position ?? 0
-        const after = targetTasks[targetIndex]?.position ?? before + 2048
+        const overIdx = filtered.findIndex((t) => t.id === overId)
+        if (overIdx === -1) {
+          insertIdx = filtered.length
+        } else if (fromStatusId === targetStatusId) {
+          // Same column: direction determines before/after
+          const origActive = (tasksByStatus[fromStatusId] ?? []).findIndex(
+            (t) => t.id === taskId,
+          )
+          const origOver = (tasksByStatus[fromStatusId] ?? []).findIndex(
+            (t) => t.id === overId,
+          )
+          // Moving down → insert after over task; moving up → insert before
+          insertIdx = origActive < origOver ? overIdx + 1 : overIdx
+        } else {
+          insertIdx = overIdx
+        }
+      }
+
+      // Calculate position from filtered array
+      let position: number
+      if (filtered.length === 0) {
+        position = 1024
+      } else if (insertIdx <= 0) {
+        position = (filtered[0]?.position ?? 1024) / 2
+      } else if (insertIdx >= filtered.length) {
+        position = (filtered[filtered.length - 1]?.position ?? 0) + 1024
+      } else {
+        const before = filtered[insertIdx - 1]?.position ?? 0
+        const after = filtered[insertIdx]?.position ?? before + 2048
         position = (before + after) / 2
+      }
+
+      // Animate back to position (works even if nothing changed)
+      const translated = active.rect.current.translated
+      if (translated) {
+        const fromRect = new DOMRect(translated.left, translated.top, translated.width, translated.height)
+        startFlight(taskId, activeTask, fromRect, true)
+      }
+
+      // No-op if nothing changed — just animate back, no mutation
+      if (fromStatusId === targetStatusId && activeTask.position === position) {
+        setActiveTask(null)
+        return
       }
 
       // Mark as local drag so WS echo won't re-animate
       markLocalMove(taskId)
-
-      // FLIP animation for cross-column moves: capture overlay position as "from"
-      if (fromStatusId !== targetStatusId) {
-        const translated = active.rect.current.translated
-        if (translated) {
-          const fromRect = new DOMRect(translated.left, translated.top, translated.width, translated.height)
-          startFlight(taskId, activeTask, fromRect, true)
-        }
-      }
 
       // Optimistic update + clear overlay
       useBoardStore.getState().moveTask(taskId, fromStatusId, targetStatusId, position)

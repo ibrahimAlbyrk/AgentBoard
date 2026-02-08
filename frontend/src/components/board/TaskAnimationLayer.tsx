@@ -94,14 +94,16 @@ function FlyingCard({ taskId, info }: { taskId: string; info: FlyingTaskInfo }) 
 
   const lifted = '0 25px 50px -12px rgba(0,0,0,0.4)'
   const flat = '0 1px 3px rgba(0,0,0,0.1)'
-  const elevated = info.elevated
+
+  const spring = { type: 'spring' as const, stiffness: 140, damping: 22 }
 
   // While waiting for target rect, show card at source position
   if (!toRect) {
     return (
       <div style={{
         position: 'fixed', left: from.x, top: from.y, width: from.width,
-        ...(elevated && { boxShadow: lifted, transform: 'scale(1.03)', borderRadius: 12 }),
+        boxShadow: lifted, transform: 'scale(1.03)', transformOrigin: 'top left',
+        borderRadius: 12,
       }}>
         <TaskCard task={info.task} onClick={() => {}} />
       </div>
@@ -110,28 +112,24 @@ function FlyingCard({ taskId, info }: { taskId: string; info: FlyingTaskInfo }) 
 
   return (
     <motion.div
-      style={{ position: 'fixed', left: 0, top: 0, width: from.width, borderRadius: 12 }}
+      style={{ position: 'fixed', left: 0, top: 0, width: toRect.width, transformOrigin: 'top left', borderRadius: 12 }}
       initial={{
         x: from.x,
         y: from.y,
-        scale: elevated ? 1.03 : 1,
-        boxShadow: elevated ? lifted : flat,
+        scale: 1.03,
+        boxShadow: lifted,
       }}
       animate={{
         x: toRect.x,
         y: toRect.y,
-        scale: elevated ? 1 : [1, 1.08, 1.08, 1],
-        boxShadow: elevated ? flat : [flat, lifted, lifted, flat],
+        scale: 1,
+        boxShadow: flat,
       }}
       transition={{
-        x: { type: 'spring', stiffness: 140, damping: 22 },
-        y: { type: 'spring', stiffness: 140, damping: 22 },
-        scale: elevated
-          ? { type: 'spring', stiffness: 140, damping: 22 }
-          : { duration: 0.6, times: [0, 0.18, 0.82, 1], ease: 'easeInOut' },
-        boxShadow: elevated
-          ? { type: 'spring', stiffness: 140, damping: 22 }
-          : { duration: 0.6, times: [0, 0.18, 0.82, 1], ease: 'easeInOut' },
+        x: spring,
+        y: spring,
+        scale: { type: 'spring', stiffness: 200, damping: 25 },
+        boxShadow: spring,
       }}
       onAnimationComplete={() => endFlight(taskId)}
     >
