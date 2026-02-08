@@ -69,7 +69,7 @@ export function ProjectForm({ open, onClose, project }: ProjectFormProps) {
         await createProject.mutateAsync(data)
         toast.success('Project created')
       }
-      reset()
+      reset({ name: '', description: '', icon: '', color: '#6366f1' })
       onClose()
     } catch {
       toast.error(isEditing ? 'Failed to update project' : 'Failed to create project')
