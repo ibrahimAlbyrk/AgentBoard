@@ -81,3 +81,18 @@ WebSocket via FastAPI + Redis pub/sub. Frontend hook: `useWebSocket`. Used for l
 ## Environment
 
 Config via `.env` files. Key vars: `DATABASE_URL`, `REDIS_URL`, `SECRET_KEY`, `CORS_ORIGINS`. See `.env.example` at root and `backend/.env.example`.
+
+## Codebase Map
+
+Auto-indexed codebase map at `.claude/docs/codebase-map/INDEX.md`. Contains structured maps of every source file, class, function, and API endpoint. Consult these maps BEFORE exploring the codebase — they provide instant lookup:
+
+| Map File | Contents |
+|----------|----------|
+| `backend-core.md` | App entry, config, database, security, middleware |
+| `backend-routes.md` | All API route handlers with HTTP methods and paths |
+| `backend-models.md` | SQLAlchemy models and Pydantic schemas with fields |
+| `backend-services.md` | Business logic services and CRUD operations |
+| `frontend-components.md` | App entry, React pages, layout, board, and task components |
+| `frontend-state.md` | Hooks, Zustand stores, types, and API client |
+
+**Usage**: When you need to find or modify code, read the relevant map file first. Run `/map-codebase` to update after structural changes.
