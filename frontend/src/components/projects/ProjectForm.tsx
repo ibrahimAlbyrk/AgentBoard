@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,7 +14,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useCreateProject } from '@/hooks/useProjects'
+import { useCreateProject, useUpdateProject } from '@/hooks/useProjects'
+import type { Project } from '@/types'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -27,10 +29,13 @@ type FormData = z.infer<typeof schema>
 interface ProjectFormProps {
   open: boolean
   onClose: () => void
+  project?: Project | null
 }
 
-export function ProjectForm({ open, onClose }: ProjectFormProps) {
+export function ProjectForm({ open, onClose, project }: ProjectFormProps) {
   const createProject = useCreateProject()
+  const updateProject = useUpdateProject()
+  const isEditing = !!project
 
   const {
     register,
@@ -42,22 +47,42 @@ export function ProjectForm({ open, onClose }: ProjectFormProps) {
     defaultValues: { color: '#6366f1' },
   })
 
+  useEffect(() => {
+    if (project) {
+      reset({
+        name: project.name,
+        description: project.description || '',
+        icon: project.icon || '',
+        color: project.color || '#6366f1',
+      })
+    } else {
+      reset({ name: '', description: '', icon: '', color: '#6366f1' })
+    }
+  }, [project, reset])
+
   const onSubmit = async (data: FormData) => {
     try {
-      await createProject.mutateAsync(data)
-      toast.success('Project created')
+      if (isEditing) {
+        await updateProject.mutateAsync({ projectId: project.id, data })
+        toast.success('Project updated')
+      } else {
+        await createProject.mutateAsync(data)
+        toast.success('Project created')
+      }
       reset()
       onClose()
     } catch {
-      toast.error('Failed to create project')
+      toast.error(isEditing ? 'Failed to update project' : 'Failed to create project')
     }
   }
+
+  const isPending = createProject.isPending || updateProject.isPending
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New Project</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Project' : 'New Project'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
@@ -106,8 +131,11 @@ export function ProjectForm({ open, onClose }: ProjectFormProps) {
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createProject.isPending} className="bg-primary text-primary-foreground hover:bg-primary/90">
-              {createProject.isPending ? 'Creating...' : 'Create Project'}
+            <Button type="submit" disabled={isPending} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              {isPending
+                ? isEditing ? 'Saving...' : 'Creating...'
+                : isEditing ? 'Save Changes' : 'Create Project'
+              }
             </Button>
           </DialogFooter>
         </form>
