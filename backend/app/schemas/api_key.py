@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 class APIKeyCreate(BaseModel):
     name: str
-    scopes: list[str]
+    scopes: list[str] = []
     expires_in_days: int | None = 365
 
 

@@ -40,7 +40,7 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid API key",
             )
-        if ak.expires_at and ak.expires_at < datetime.now(UTC):
+        if ak.expires_at and ak.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="API key expired",
