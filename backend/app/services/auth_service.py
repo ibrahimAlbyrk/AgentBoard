@@ -74,7 +74,12 @@ class AuthService:
                 detail="Invalid token type",
             )
         access_token = create_access_token(data={"sub": payload["sub"]})
-        return {"access_token": access_token, "token_type": "bearer"}
+        refresh_token = create_refresh_token(payload["sub"])
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+        }
 
     @staticmethod
     async def create_api_key(

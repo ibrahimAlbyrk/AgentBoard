@@ -97,7 +97,9 @@ class APIClient {
       if (stored) {
         const parsed = JSON.parse(stored)
         parsed.state.accessToken = data.access_token
-        parsed.state.refreshToken = data.refresh_token
+        if (data.refresh_token) {
+          parsed.state.refreshToken = data.refresh_token
+        }
         localStorage.setItem('agentboard-auth', JSON.stringify(parsed))
       }
 
