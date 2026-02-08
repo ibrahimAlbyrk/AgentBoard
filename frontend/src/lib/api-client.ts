@@ -437,6 +437,12 @@ class APIClient {
     })
   }
 
+  async clearNotifications() {
+    return this.request<{ deleted: number }>('/notifications/clear', {
+      method: 'DELETE',
+    })
+  }
+
   // Users
   async getMe() {
     return this.request<APIResponse<User>>('/users/me')

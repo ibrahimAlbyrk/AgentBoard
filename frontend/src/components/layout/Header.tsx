@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Bell, LogOut, User, Menu, Check, CheckCheck } from 'lucide-react'
+import { Bell, LogOut, User, Menu, Check, CheckCheck, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/popover'
 import { useAuthStore } from '@/stores/authStore'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
-import { useNotifications, useUnreadCount, useMarkRead } from '@/hooks/useNotifications'
+import { useNotifications, useUnreadCount, useMarkRead, useClearNotifications } from '@/hooks/useNotifications'
 import { cn } from '@/lib/utils'
 
 interface HeaderProps {
@@ -41,6 +41,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { data: notifications } = useNotifications()
   const { data: unreadData } = useUnreadCount()
   const markRead = useMarkRead()
+  const clearAll = useClearNotifications()
 
   const unreadCount = unreadData?.count ?? 0
   const items = notifications?.data ?? []
@@ -73,15 +74,26 @@ export function Header({ onMenuClick }: HeaderProps) {
           <PopoverContent align="end" className="w-80 p-0">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
               <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
-              {unreadCount > 0 && (
-                <button
-                  onClick={() => markRead.mutate({ all: true })}
-                  className="flex items-center gap-1 text-xs text-[var(--accent-solid)] hover:underline"
-                >
-                  <CheckCheck className="size-3" />
-                  Mark all read
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={() => markRead.mutate({ all: true })}
+                    className="flex items-center gap-1 text-xs text-[var(--accent-solid)] hover:underline cursor-pointer"
+                  >
+                    <CheckCheck className="size-3" />
+                    Mark all read
+                  </button>
+                )}
+                {items.length > 0 && (
+                  <button
+                    onClick={() => clearAll.mutate()}
+                    className="flex items-center gap-1 text-xs text-[var(--text-tertiary)] hover:text-destructive hover:underline cursor-pointer"
+                  >
+                    <Trash2 className="size-3" />
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="max-h-80 overflow-y-auto">

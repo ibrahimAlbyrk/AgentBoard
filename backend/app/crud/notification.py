@@ -69,5 +69,15 @@ class CRUDNotification(
         )
         await db.flush()
 
+    async def delete_all_by_user(
+        self, db: AsyncSession, user_id: UUID
+    ) -> int:
+        from sqlalchemy import delete
+        result = await db.execute(
+            delete(Notification).where(Notification.user_id == user_id)
+        )
+        await db.flush()
+        return result.rowcount
+
 
 crud_notification = CRUDNotification(Notification)

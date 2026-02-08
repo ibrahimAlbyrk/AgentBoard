@@ -26,3 +26,13 @@ export function useMarkRead() {
     },
   })
 }
+
+export function useClearNotifications() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.clearNotifications(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] })
+    },
+  })
+}

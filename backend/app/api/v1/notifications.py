@@ -5,8 +5,12 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.crud import crud_notification
 from app.models.user import User
-from app.schemas.base import PaginatedResponse, PaginationMeta
-from app.schemas.notification import NotificationMarkRead, NotificationResponse
+from app.schemas.base import PaginatedResponse, PaginationMeta, ResponseBase
+from app.schemas.notification import (
+    NotificationMarkRead,
+    NotificationPreferences,
+    NotificationResponse,
+)
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
@@ -58,3 +62,33 @@ async def mark_read(
             await crud_notification.mark_read(db, nid)
     await db.commit()
     return {"success": True}
+
+
+@router.delete("/clear")
+async def clear_all(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    count = await crud_notification.delete_all_by_user(db, current_user.id)
+    await db.commit()
+    return {"deleted": count}
+
+
+@router.get("/preferences", response_model=ResponseBase[NotificationPreferences])
+async def get_preferences(
+    current_user: User = Depends(get_current_user),
+):
+    prefs = current_user.notification_preferences or {}
+    return ResponseBase(data=NotificationPreferences(**prefs))
+
+
+@router.put("/preferences", response_model=ResponseBase[NotificationPreferences])
+async def update_preferences(
+    body: NotificationPreferences,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    current_user.notification_preferences = body.model_dump()
+    db.add(current_user)
+    await db.commit()
+    return ResponseBase(data=body)
