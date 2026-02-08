@@ -31,6 +31,18 @@ docker-compose up -d          # prod: PostgreSQL + Redis + app
 docker-compose -f docker-compose.dev.yml up -d  # dev
 ```
 
+### Seed Demo Data (from root)
+```bash
+# Create 3 realistic projects with ~290 tasks total
+python scripts/seed_demo_data.py --api-key <key>
+
+# Clean existing seeded projects and re-seed
+python scripts/seed_demo_data.py --api-key <key> --clean
+
+# Custom backend URL
+python scripts/seed_demo_data.py --api-key <key> --base-url http://host:port/api/v1
+```
+
 ## Architecture
 
 ### Backend (`backend/app/`)
