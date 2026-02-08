@@ -1,0 +1,25 @@
+# Codebase Map Index
+
+> Auto-generated codebase index. Use `/map-codebase` to update.
+> Last mapped: 2026-02-08 UTC
+
+## Quick Reference
+
+| Domain | Map File | Key Contents |
+|--------|----------|-------------|
+| Backend Core | [backend-core.md](backend-core.md) | App entry, config, DB, auth, middleware, deps |
+| Backend Routes | [backend-routes.md](backend-routes.md) | All 60+ API endpoints with methods and paths |
+| Backend Models | [backend-models.md](backend-models.md) | 16 ORM models, 31 Pydantic schemas |
+| Backend Services | [backend-services.md](backend-services.md) | 13 CRUD classes, 7 service modules |
+| Frontend Components | [frontend-components.md](frontend-components.md) | App entry, 7 pages, 16 components |
+| Frontend State | [frontend-state.md](frontend-state.md) | 11 hooks, 3 stores, 7 type files, 4 lib modules |
+
+## File Count
+- Backend: 82 files mapped
+- Frontend: 53 files mapped
+- Total: 135 files
+
+## How to Use
+- **Find a file**: Search this index or the relevant map file
+- **Find a function**: Open the domain-specific map and Ctrl+F
+- **Update after changes**: Run `/map-codebase`
