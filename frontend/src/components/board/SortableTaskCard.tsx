@@ -8,9 +8,10 @@ import type { Task } from '@/types'
 interface SortableTaskCardProps {
   task: Task
   onClick: () => void
+  hideWhileDragging?: boolean
 }
 
-export function SortableTaskCard({ task, onClick }: SortableTaskCardProps) {
+export function SortableTaskCard({ task, onClick, hideWhileDragging }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -30,10 +31,13 @@ export function SortableTaskCard({ task, onClick }: SortableTaskCardProps) {
     [setNodeRef, task.id],
   )
 
-  const style = {
+  const hidden = isDragging && hideWhileDragging
+
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : flying ? 0 : 1,
+    ...(flying && { opacity: 0 }),
+    ...(hidden && { height: 0, overflow: 'hidden', margin: 0, padding: 0 }),
   }
 
   return (
@@ -43,7 +47,11 @@ export function SortableTaskCard({ task, onClick }: SortableTaskCardProps) {
       {...attributes}
       {...listeners}
     >
-      <TaskCard task={task} onClick={onClick} isDragging={isDragging} />
+      {isDragging && !hidden ? (
+        <div className="h-[72px] rounded-xl border-2 border-dashed border-[var(--accent-solid)]/30 bg-[var(--accent-muted-bg)]/50" />
+      ) : hidden ? null : (
+        <TaskCard task={task} onClick={onClick} />
+      )}
     </div>
   )
 }

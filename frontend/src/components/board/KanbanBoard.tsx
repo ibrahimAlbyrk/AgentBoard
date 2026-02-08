@@ -233,6 +233,11 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
             onTaskClick={onTaskClick}
             onAddTask={() => onAddTask(status.id)}
             placeholderIdx={getPlaceholderIdx(status.id)}
+            hideDragSourceId={
+              activeTask && dragOverColumnId && dragOverColumnId !== activeTask.status.id && activeTask.status.id === status.id
+                ? activeTask.id
+                : undefined
+            }
           />
         ))}
       </div>

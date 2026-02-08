@@ -15,18 +15,17 @@ const priorityBorderColors: Record<string, string> = {
 interface TaskCardProps {
   task: Task
   onClick: () => void
-  isDragging?: boolean
   isDragOverlay?: boolean
 }
 
-export function TaskCard({ task, onClick, isDragging, isDragOverlay }: TaskCardProps) {
+export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
   const isOverdue = task.due_date && isPast(parseISO(task.due_date))
   const visibleLabels = task.labels.slice(0, 3)
   const extraCount = task.labels.length - 3
 
   return (
     <div
-      onClick={isDragging ? undefined : onClick}
+      onClick={onClick}
       style={{
         borderLeftColor: priorityBorderColors[task.priority] || 'transparent',
         ...(isDragOverlay && {
@@ -36,7 +35,6 @@ export function TaskCard({ task, onClick, isDragging, isDragOverlay }: TaskCardP
       className={cn(
         'bg-card border border-[var(--border-subtle)] border-l-[3px] rounded-xl p-3.5 cursor-pointer',
         !isDragOverlay && 'hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-4px_var(--glow)] hover:border-[var(--border-strong)] transition-all duration-200',
-        isDragging && 'opacity-40 cursor-grabbing',
       )}
     >
       <span className="text-[13px] font-medium text-foreground leading-snug line-clamp-2 block">
