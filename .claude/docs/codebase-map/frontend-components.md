@@ -44,9 +44,9 @@
 - Key state/hooks used: useState, useNavigate, useForm, useAuthStore
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/pages/DashboardPage.tsx`
-- **Purpose**: Overview page showing stats cards (projects, tasks, in-progress, overdue) and recent project grid.
+- **Purpose**: Overview page showing stats cards (projects, tasks, in-progress, overdue), my-tasks section, and recent project grid.
 - `DashboardPage` (named export) — Route: `/dashboard`
-- Displays greeting with user name, 4 stat cards, up to 6 project cards
+- Displays greeting with user name, 4 stat cards, `MyTasksSection`, up to 6 project cards
 - Links to `/projects` for "View all"
 - Key state/hooks used: useNavigate, useAuthStore, useProjects
 
@@ -230,6 +230,17 @@
 - Props: `projectId` (string), `open` (boolean), `onClose` (() => void)
 - Features: 16 preset colors + custom hex input, inline label preview, confirm-before-delete, animated list/form transition (framer-motion)
 - Key state/hooks used: useState, useLabels, useCreateLabel, useUpdateLabel, useDeleteLabel, useProjectStore, AnimatePresence/motion (framer-motion)
+
+---
+
+## Dashboard Components
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/dashboard/MyTasksSection.tsx`
+- **Purpose**: Dashboard section showing tasks assigned to current user, grouped by urgency (overdue, due soon, active) with an urgency banner.
+- `MyTasksSection` (named export) — My tasks dashboard widget
+- Sub-components: `UrgencyBanner` (overdue/due_today/due_this_week counts with segmented bar), `DashboardTaskRow` (clickable task row with priority, project chip, labels, due date), `TaskGroup` (collapsible group header with icon)
+- Navigates to board page with `?task=` query param on click
+- Key state/hooks used: useMemo, useNavigate, useMyTasks
 
 ---
 

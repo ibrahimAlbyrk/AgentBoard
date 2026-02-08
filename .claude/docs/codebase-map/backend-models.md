@@ -215,6 +215,12 @@
   - Fields: `task_ids` (list[UUID], required), `status_id` (UUID, required)
 - `BulkTaskDelete` — bulk delete tasks
   - Fields: `task_ids` (list[UUID], required)
+- `DashboardTaskResponse` — extends TaskResponse for dashboard
+  - Fields: inherits TaskResponse + `project_name` (str, default "")
+- `MyTasksSummary` — my-tasks summary counts
+  - Fields: `overdue_count` (int, 0), `due_today_count` (int, 0), `due_this_week_count` (int, 0), `total_assigned` (int, 0)
+- `MyTasksResponse` — my-tasks endpoint envelope
+  - Fields: `summary` (MyTasksSummary), `tasks` (list[DashboardTaskResponse])
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/status.py`
 - **Purpose**: Status (board column) CRUD and reorder schemas.
@@ -271,7 +277,7 @@
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/schemas/notification.py`
 - **Purpose**: Notification response and bulk-read schemas.
 - `NotificationResponse` — notification response
-  - Fields: `id` (UUID), `type` (str), `title` (str), `message` (str), `is_read` (bool), `data` (dict[str, Any], optional), `created_at` (datetime)
+  - Fields: `id` (UUID), `type` (str), `title` (str), `message` (str), `is_read` (bool), `data` (dict[str, Any], optional), `project_id` (UUID, optional), `created_at` (datetime)
 - `NotificationMarkRead` — mark notifications as read
   - Fields: `notification_ids` (list[UUID], optional), `mark_all` (bool, default False)
 

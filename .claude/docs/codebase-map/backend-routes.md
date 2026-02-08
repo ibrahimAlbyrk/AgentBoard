@@ -134,8 +134,9 @@ All routes are mounted under the `/api/v1` prefix in `main.py`.
 ---
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/dashboard.py`
-- **Purpose**: User-scoped dashboard statistics aggregated across all active projects (requires auth)
-- `GET /api/v1/dashboard/stats` → `get_dashboard_stats()` — Returns `in_progress` (tasks in non-default, non-terminal statuses) and `overdue` (tasks past due_date, not completed) counts across user's non-archived projects
+- **Purpose**: User-scoped dashboard statistics and my-tasks view aggregated across all active projects (requires auth)
+- `GET /api/v1/dashboard/stats` → `get_dashboard_stats()` — Returns `in_progress` and `overdue` task counts across user's non-archived projects
+- `GET /api/v1/dashboard/my-tasks` → `get_my_tasks()` — Returns summary (overdue/due_today/due_this_week/total_assigned counts) and up to 50 tasks assigned to current user across all active projects
 
 ---
 

@@ -56,6 +56,10 @@
 - `markLocalMove(taskId)` — exported function; registers a task ID as locally-moved to suppress WS echo for 2 seconds.
 - `useWebSocket(projectId, boardId)` — effect hook. Connects `wsManager` using auth token. Listens to events: `task.created` (adds task + shows toast), `task.updated` (in-place update or animated relocate if status changed), `task.deleted` (removes task), `task.moved` (animated relocate for remote moves, direct relocate for local moves). Cleans up listeners on unmount.
 
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/hooks/useMyTasks.ts`
+- **Purpose**: Query hook for dashboard my-tasks endpoint.
+- `useMyTasks()` — query key `['my-tasks']`. Fetches tasks assigned to current user via `api.getMyTasks()`.
+
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/hooks/useActivity.ts`
 - **Purpose**: Query hook for task activity logs.
 - `useTaskActivity(projectId, taskId)` — query key `['activity', projectId, taskId]`. Enabled when both IDs truthy.
@@ -131,6 +135,9 @@
 - `Comment` — `id`, `content`, `user: UserBrief`, `created_at`, `updated_at`, `is_edited`.
 - `TaskFilters` — `status_id?`, `priority?`, `assignee_id?`, `search?`, `page?`, `per_page?`.
 - `ActivityLog` — `id`, `action`, `entity_type`, `changes: Record<string, { old?, new? } | string>`, `user: UserBrief`, `task_id`, `created_at`.
+- `DashboardTask` — extends `Task` with `project_name: string`.
+- `MyTasksSummary` — `overdue_count`, `due_today_count`, `due_this_week_count`, `total_assigned`.
+- `MyTasksResponse` — `summary: MyTasksSummary`, `tasks: DashboardTask[]`.
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/types/board.ts`
 - **Purpose**: Board-related type definitions.
@@ -163,6 +170,7 @@
   - Stats: `getProjectStats(projectId)`
   - API Keys: `listApiKeys()`, `createApiKey(data)`, `deleteApiKey(keyId)`
   - Notifications: `listNotifications(params?)`, `getUnreadCount()`, `markNotificationsRead(ids?, markAll?)`
+  - Dashboard: `getMyTasks()`
   - Users: `getMe()`, `updateMe(data)`
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/lib/api.ts`

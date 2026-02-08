@@ -42,6 +42,7 @@
   - `bulk_update(db, task_ids, updates)` — apply same updates to multiple tasks
   - `count_by_status(db, project_id)` — task count grouped by status
   - `count_by_priority(db, project_id)` — task count grouped by priority
+  - `get_assigned_to_user(db, user_id, project_ids, limit)` — tasks assigned to user across given projects, ordered by due_date
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/status.py`
 - **Purpose**: Status column CRUD with board-scoped queries
@@ -168,3 +169,10 @@
 - `BoardService` — static methods for board business logic
   - `DEFAULT_STATUSES` — list of 5 default columns: To Do, In Progress, In Review, Testing, Complete
   - `create_board(db, project_id, user_id, board_in)` — creates board, generates slug, adds creator as admin member, optionally seeds default statuses
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/email_service.py`
+- **Purpose**: Email sending via Resend API with Jinja2 HTML templates.
+- `email_configured()` — returns True if RESEND_API_KEY is set
+- `render_notification_email(title, message, notification_type)` — renders notification.html Jinja2 template
+- `_send_email(to, subject, html_body)` — async POST to Resend API with SSL via certifi
+- `fire_and_forget_email(to, subject, html_body)` — schedules email send as background task on running event loop
