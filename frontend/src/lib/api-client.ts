@@ -443,6 +443,17 @@ class APIClient {
     })
   }
 
+  async getNotificationPreferences() {
+    return this.request<APIResponse<import('@/types/user').NotificationPreferences>>('/notifications/preferences')
+  }
+
+  async updateNotificationPreferences(prefs: import('@/types/user').NotificationPreferences) {
+    return this.request<APIResponse<import('@/types/user').NotificationPreferences>>('/notifications/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(prefs),
+    })
+  }
+
   // Users
   async getMe() {
     return this.request<APIResponse<User>>('/users/me')

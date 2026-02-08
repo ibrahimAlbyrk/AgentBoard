@@ -66,6 +66,15 @@ export function useWebSocket(projectId: string, boardId: string) {
 
     const handleNotification = () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] })
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const prefs = queryClient.getQueryData<import('@/types/user').NotificationPreferences>(
+          ['notification-preferences'],
+        )
+        if (prefs?.desktop_enabled) {
+          new Notification('AgentBoard', { body: 'You have a new notification', icon: '/favicon.ico' })
+        }
+      }
     }
 
     wsManager.on('task.created', handleCreated)

@@ -1,10 +1,18 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Copy, Plus, Trash2, Key } from 'lucide-react'
+import { Copy, Plus, Trash2, Key, Bell, BellOff, Monitor, Mail, VolumeX } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -15,6 +23,9 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api-client'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { useNotificationPreferences, useUpdateNotificationPreferences } from '@/hooks/useNotifications'
+import { useProjects } from '@/hooks/useProjects'
+import type { NotificationPreferences } from '@/types/user'
 
 interface ApiKeyEntry {
   id: string
@@ -266,17 +277,273 @@ export function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="notifications" className="mt-6">
-          <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
-            <div className="mb-4">
-              <h2 className="text-base font-semibold text-foreground">Notifications</h2>
-              <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">Configure your notification preferences</p>
-            </div>
-            <p className="text-[13px] text-[var(--text-tertiary)] text-center py-8">
-              Notification preferences coming soon
-            </p>
-          </div>
+          <NotificationSettings />
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+
+const DEFAULT_PREFS: NotificationPreferences = {
+  task_assigned: true,
+  task_updated: true,
+  task_moved: true,
+  task_deleted: true,
+  task_comment: true,
+  self_notifications: true,
+  desktop_enabled: false,
+  muted_projects: [],
+  email_enabled: false,
+  email_digest: 'off',
+}
+
+function NotificationSettings() {
+  const { data: prefs, isLoading } = useNotificationPreferences()
+  const updatePrefs = useUpdateNotificationPreferences()
+  const { data: projectsData } = useProjects({ per_page: 100 })
+  const projects = projectsData?.data ?? []
+
+  const current: NotificationPreferences = prefs ?? DEFAULT_PREFS
+
+  const toggle = useCallback(
+    (key: keyof NotificationPreferences) => {
+      const updated = { ...current, [key]: !current[key] }
+      updatePrefs.mutate(updated, {
+        onSuccess: () => toast.success('Preferences saved'),
+        onError: () => toast.error('Failed to save'),
+      })
+    },
+    [current, updatePrefs],
+  )
+
+  const setDigest = useCallback(
+    (value: string) => {
+      const updated = { ...current, email_digest: value as NotificationPreferences['email_digest'] }
+      updatePrefs.mutate(updated, {
+        onSuccess: () => toast.success('Preferences saved'),
+        onError: () => toast.error('Failed to save'),
+      })
+    },
+    [current, updatePrefs],
+  )
+
+  const toggleMuteProject = useCallback(
+    (projectId: string) => {
+      const muted = current.muted_projects.includes(projectId)
+        ? current.muted_projects.filter((id) => id !== projectId)
+        : [...current.muted_projects, projectId]
+      const updated = { ...current, muted_projects: muted }
+      updatePrefs.mutate(updated, {
+        onSuccess: () => toast.success('Preferences saved'),
+        onError: () => toast.error('Failed to save'),
+      })
+    },
+    [current, updatePrefs],
+  )
+
+  const requestDesktopPermission = useCallback(async () => {
+    if (!('Notification' in window)) {
+      toast.error('Browser does not support desktop notifications')
+      return
+    }
+    const permission = await Notification.requestPermission()
+    if (permission === 'granted') {
+      toggle('desktop_enabled')
+    } else {
+      toast.error('Notification permission denied')
+    }
+  }, [toggle])
+
+  if (isLoading) {
+    return (
+      <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-5 w-40 bg-foreground/10 rounded" />
+          <div className="h-4 w-64 bg-foreground/5 rounded" />
+          <div className="space-y-3 mt-6">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-12 bg-foreground/5 rounded-lg" />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Event Toggles */}
+      <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+        <div className="mb-5">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <Bell className="size-4" />
+            Event Notifications
+          </h2>
+          <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">Choose which events trigger notifications</p>
+        </div>
+        <div className="space-y-1">
+          <ToggleRow
+            label="Task Assignments"
+            description="When you are assigned to a task"
+            checked={current.task_assigned}
+            onToggle={() => toggle('task_assigned')}
+          />
+          <ToggleRow
+            label="Task Updates"
+            description="When a task you're assigned to is updated"
+            checked={current.task_updated}
+            onToggle={() => toggle('task_updated')}
+          />
+          <ToggleRow
+            label="Status Changes"
+            description="When a task you're assigned to is moved"
+            checked={current.task_moved}
+            onToggle={() => toggle('task_moved')}
+          />
+          <ToggleRow
+            label="Task Deletions"
+            description="When a task you're assigned to is deleted"
+            checked={current.task_deleted}
+            onToggle={() => toggle('task_deleted')}
+          />
+          <ToggleRow
+            label="Comments"
+            description="When someone comments on your task"
+            checked={current.task_comment}
+            onToggle={() => toggle('task_comment')}
+          />
+        </div>
+      </div>
+
+      {/* Self Notifications */}
+      <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+        <div className="mb-5">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <BellOff className="size-4" />
+            Self Notifications
+          </h2>
+          <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">Control notifications for your own actions</p>
+        </div>
+        <ToggleRow
+          label="Notify me about my own actions"
+          description="Receive notifications when you make changes to tasks assigned to you"
+          checked={current.self_notifications}
+          onToggle={() => toggle('self_notifications')}
+        />
+      </div>
+
+      {/* Desktop Notifications */}
+      <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+        <div className="mb-5">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <Monitor className="size-4" />
+            Desktop Notifications
+          </h2>
+          <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">Browser push notifications for real-time alerts</p>
+        </div>
+        <ToggleRow
+          label="Enable desktop notifications"
+          description={
+            current.desktop_enabled
+              ? 'You will receive browser push notifications'
+              : 'Click to enable browser notifications'
+          }
+          checked={current.desktop_enabled}
+          onToggle={() => {
+            if (current.desktop_enabled) {
+              toggle('desktop_enabled')
+            } else {
+              requestDesktopPermission()
+            }
+          }}
+        />
+      </div>
+
+      {/* Project Muting */}
+      <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+        <div className="mb-5">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <VolumeX className="size-4" />
+            Muted Projects
+          </h2>
+          <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">Mute notifications from specific projects</p>
+        </div>
+        {projects.length === 0 ? (
+          <p className="text-[13px] text-[var(--text-tertiary)] text-center py-4">No projects found</p>
+        ) : (
+          <div className="space-y-1">
+            {projects.map((project) => (
+              <ToggleRow
+                key={project.id}
+                label={project.name}
+                description={current.muted_projects.includes(project.id) ? 'Muted — no notifications' : 'Receiving notifications'}
+                checked={!current.muted_projects.includes(project.id)}
+                onToggle={() => toggleMuteProject(project.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Email Notifications */}
+      <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+        <div className="mb-5">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <Mail className="size-4" />
+            Email Notifications
+          </h2>
+          <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">Receive notifications via email</p>
+        </div>
+        <div className="space-y-4">
+          <ToggleRow
+            label="Enable email notifications"
+            description="Requires SMTP configuration on the server"
+            checked={current.email_enabled}
+            onToggle={() => toggle('email_enabled')}
+          />
+          {current.email_enabled && (
+            <div className="flex items-center justify-between py-3 px-4 bg-[var(--surface)] rounded-lg border border-[var(--border-subtle)]">
+              <div>
+                <p className="text-[13px] font-medium text-foreground">Email Digest Frequency</p>
+                <p className="text-[12px] text-[var(--text-tertiary)] mt-0.5">How often to receive email digests</p>
+              </div>
+              <Select value={current.email_digest} onValueChange={setDigest}>
+                <SelectTrigger className="w-32 h-8 text-[13px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="instant">Instant</SelectItem>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ToggleRow({
+  label,
+  description,
+  checked,
+  onToggle,
+}: {
+  label: string
+  description: string
+  checked: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-foreground/[0.03] transition-colors">
+      <div className="flex-1 min-w-0 mr-4">
+        <p className="text-[13px] font-medium text-foreground">{label}</p>
+        <p className="text-[12px] text-[var(--text-tertiary)] mt-0.5">{description}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onToggle} />
     </div>
   )
 }

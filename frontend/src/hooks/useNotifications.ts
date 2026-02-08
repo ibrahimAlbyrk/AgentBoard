@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
+import type { NotificationPreferences } from '@/types/user'
 
 export function useNotifications() {
   return useQuery({
@@ -33,6 +34,27 @@ export function useClearNotifications() {
     mutationFn: () => api.clearNotifications(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications'] })
+    },
+  })
+}
+
+export function useNotificationPreferences() {
+  return useQuery({
+    queryKey: ['notification-preferences'],
+    queryFn: async () => {
+      const res = await api.getNotificationPreferences()
+      return res.data
+    },
+  })
+}
+
+export function useUpdateNotificationPreferences() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (prefs: NotificationPreferences) =>
+      api.updateNotificationPreferences(prefs),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notification-preferences'] })
     },
   })
 }

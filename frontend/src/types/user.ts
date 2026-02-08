@@ -1,3 +1,16 @@
+export interface NotificationPreferences {
+  task_assigned: boolean
+  task_updated: boolean
+  task_moved: boolean
+  task_deleted: boolean
+  task_comment: boolean
+  self_notifications: boolean
+  desktop_enabled: boolean
+  muted_projects: string[]
+  email_enabled: boolean
+  email_digest: 'off' | 'instant' | 'daily' | 'weekly'
+}
+
 export interface User {
   id: string
   email: string
@@ -5,6 +18,7 @@ export interface User {
   full_name: string | null
   avatar_url: string | null
   role: string
+  notification_preferences: NotificationPreferences | null
   created_at: string
   last_login_at: string | null
 }
