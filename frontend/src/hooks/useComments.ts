@@ -12,7 +12,8 @@ export function useComments(projectId: string, boardId: string, taskId: string) 
 export function useCreateComment(projectId: string, boardId: string, taskId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { content: string; attachment_ids?: string[] }) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mutationFn: (data: { content: any; attachment_ids?: string[] }) =>
       api.createComment(projectId, boardId, taskId, data),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['comments', projectId, boardId, taskId] }),

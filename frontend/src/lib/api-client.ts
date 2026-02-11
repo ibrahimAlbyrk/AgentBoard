@@ -26,6 +26,19 @@ import type {
   LoginCredentials,
   RegisterData,
   MyTasksResponse,
+  Checklist,
+  ChecklistItem,
+  ChecklistItemCreate,
+  ChecklistItemUpdate,
+  ReactionSummary,
+  ToggleResult,
+  CustomFieldDefinition,
+  CustomFieldDefinitionCreate,
+  CustomFieldDefinitionUpdate,
+  CustomFieldValue,
+  CustomFieldValueSet,
+  MentionablesResponse,
+  ReferenceablesResponse,
 } from '@/types'
 
 const BASE_URL = '/api/v1'
@@ -408,14 +421,16 @@ class APIClient {
     return this.request<APIResponse<Comment[]>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments`)
   }
 
-  async createComment(projectId: string, boardId: string, taskId: string, data: { content: string; attachment_ids?: string[] }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async createComment(projectId: string, boardId: string, taskId: string, data: { content: any; attachment_ids?: string[] }) {
     return this.request<APIResponse<Comment>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments`, {
       method: 'POST',
       body: JSON.stringify(data),
     })
   }
 
-  async updateComment(projectId: string, boardId: string, taskId: string, commentId: string, data: { content: string }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async updateComment(projectId: string, boardId: string, taskId: string, commentId: string, data: { content: any }) {
     return this.request<APIResponse<Comment>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments/${commentId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -550,6 +565,172 @@ class APIClient {
       method: 'PATCH',
       body: JSON.stringify(data),
     })
+  }
+
+  // Checklists
+  async listChecklists(projectId: string, boardId: string, taskId: string) {
+    return this.request<APIResponse<Checklist[]>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/checklists`
+    )
+  }
+
+  async createChecklist(projectId: string, boardId: string, taskId: string, data: { title: string }) {
+    return this.request<APIResponse<Checklist>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/checklists`,
+      { method: 'POST', body: JSON.stringify(data) }
+    )
+  }
+
+  async updateChecklist(projectId: string, boardId: string, taskId: string, checklistId: string, data: { title?: string }) {
+    return this.request<APIResponse<Checklist>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/checklists/${checklistId}`,
+      { method: 'PATCH', body: JSON.stringify(data) }
+    )
+  }
+
+  async deleteChecklist(projectId: string, boardId: string, taskId: string, checklistId: string) {
+    return this.request<void>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/checklists/${checklistId}`,
+      { method: 'DELETE' }
+    )
+  }
+
+  async createChecklistItem(projectId: string, boardId: string, taskId: string, checklistId: string, data: ChecklistItemCreate) {
+    return this.request<APIResponse<ChecklistItem>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/checklists/${checklistId}/items`,
+      { method: 'POST', body: JSON.stringify(data) }
+    )
+  }
+
+  async updateChecklistItem(projectId: string, boardId: string, taskId: string, checklistId: string, itemId: string, data: ChecklistItemUpdate) {
+    return this.request<APIResponse<ChecklistItem>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/checklists/${checklistId}/items/${itemId}`,
+      { method: 'PATCH', body: JSON.stringify(data) }
+    )
+  }
+
+  async deleteChecklistItem(projectId: string, boardId: string, taskId: string, checklistId: string, itemId: string) {
+    return this.request<void>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/checklists/${checklistId}/items/${itemId}`,
+      { method: 'DELETE' }
+    )
+  }
+
+  async toggleChecklistItem(projectId: string, boardId: string, taskId: string, checklistId: string, itemId: string) {
+    return this.request<APIResponse<ChecklistItem>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/checklists/${checklistId}/items/${itemId}/toggle`,
+      { method: 'POST' }
+    )
+  }
+
+  async reorderChecklistItem(projectId: string, boardId: string, taskId: string, checklistId: string, itemId: string, position: number) {
+    return this.request<APIResponse<ChecklistItem>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/checklists/${checklistId}/items/${itemId}/reorder`,
+      { method: 'PATCH', body: JSON.stringify({ position }) }
+    )
+  }
+
+  // Reactions — Tasks
+  async getTaskReactions(projectId: string, boardId: string, taskId: string) {
+    return this.request<APIResponse<ReactionSummary>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/reactions`
+    )
+  }
+
+  async toggleTaskReaction(projectId: string, boardId: string, taskId: string, data: { emoji: string; agent_id?: string }) {
+    return this.request<APIResponse<ToggleResult>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/reactions/toggle`,
+      { method: 'POST', body: JSON.stringify(data) }
+    )
+  }
+
+  // Reactions — Comments
+  async getCommentReactions(projectId: string, boardId: string, taskId: string, commentId: string) {
+    return this.request<APIResponse<ReactionSummary>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments/${commentId}/reactions`
+    )
+  }
+
+  async toggleCommentReaction(projectId: string, boardId: string, taskId: string, commentId: string, data: { emoji: string; agent_id?: string }) {
+    return this.request<APIResponse<ToggleResult>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/comments/${commentId}/reactions/toggle`,
+      { method: 'POST', body: JSON.stringify(data) }
+    )
+  }
+
+  // Custom Fields
+  async listCustomFields(projectId: string, boardId: string) {
+    return this.request<APIResponse<CustomFieldDefinition[]>>(
+      `/projects/${projectId}/boards/${boardId}/custom-fields`
+    )
+  }
+
+  async createCustomField(projectId: string, boardId: string, data: CustomFieldDefinitionCreate) {
+    return this.request<APIResponse<CustomFieldDefinition>>(
+      `/projects/${projectId}/boards/${boardId}/custom-fields`,
+      { method: 'POST', body: JSON.stringify(data) }
+    )
+  }
+
+  async updateCustomField(projectId: string, boardId: string, fieldId: string, data: CustomFieldDefinitionUpdate) {
+    return this.request<APIResponse<CustomFieldDefinition>>(
+      `/projects/${projectId}/boards/${boardId}/custom-fields/${fieldId}`,
+      { method: 'PATCH', body: JSON.stringify(data) }
+    )
+  }
+
+  async deleteCustomField(projectId: string, boardId: string, fieldId: string) {
+    return this.request<void>(
+      `/projects/${projectId}/boards/${boardId}/custom-fields/${fieldId}`,
+      { method: 'DELETE' }
+    )
+  }
+
+  async reorderCustomFields(projectId: string, boardId: string, fieldIds: string[]) {
+    return this.request<APIResponse<CustomFieldDefinition[]>>(
+      `/projects/${projectId}/boards/${boardId}/custom-fields/reorder`,
+      { method: 'POST', body: JSON.stringify({ field_ids: fieldIds }) }
+    )
+  }
+
+  async setFieldValue(projectId: string, boardId: string, taskId: string, fieldId: string, data: CustomFieldValueSet) {
+    return this.request<APIResponse<CustomFieldValue>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/field-values/${fieldId}`,
+      { method: 'PUT', body: JSON.stringify(data) }
+    )
+  }
+
+  async bulkSetFieldValues(projectId: string, boardId: string, taskId: string, values: CustomFieldValueSet[]) {
+    return this.request<APIResponse<CustomFieldValue[]>>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/field-values`,
+      { method: 'PUT', body: JSON.stringify({ values }) }
+    )
+  }
+
+  async clearFieldValue(projectId: string, boardId: string, taskId: string, fieldId: string) {
+    return this.request<void>(
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/field-values/${fieldId}`,
+      { method: 'DELETE' }
+    )
+  }
+
+  // Mentionables / Referenceables
+  async getMentionables(projectId: string, q?: string) {
+    const params = new URLSearchParams()
+    if (q) params.set('q', q)
+    const qs = params.toString()
+    return this.request<APIResponse<MentionablesResponse>>(
+      `/projects/${projectId}/mentionables${qs ? `?${qs}` : ''}`
+    )
+  }
+
+  async getReferenceables(projectId: string, q?: string) {
+    const params = new URLSearchParams()
+    if (q) params.set('q', q)
+    const qs = params.toString()
+    return this.request<APIResponse<ReferenceablesResponse>>(
+      `/projects/${projectId}/referenceables${qs ? `?${qs}` : ''}`
+    )
   }
 }
 

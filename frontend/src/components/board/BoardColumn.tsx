@@ -12,13 +12,14 @@ interface BoardColumnProps {
   onAddTask: () => void
   placeholderIdx?: number
   hideDragSourceId?: string
+  compact?: boolean
 }
 
 const dropPlaceholder = (
   <div className="h-[72px] rounded-xl border-2 border-dashed border-[var(--accent-solid)]/30 bg-[var(--accent-muted-bg)]/50" />
 )
 
-export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, hideDragSourceId }: BoardColumnProps) {
+export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, hideDragSourceId, compact }: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status.id}` })
 
   return (
@@ -61,6 +62,7 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
                 task={task}
                 onClick={() => onTaskClick(task)}
                 hideWhileDragging={task.id === hideDragSourceId}
+                compact={compact}
               />
             </Fragment>
           ))}

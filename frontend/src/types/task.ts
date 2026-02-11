@@ -1,8 +1,13 @@
 import type { AgentBrief } from './agent'
+import type { CustomFieldValue } from './custom-field'
+import type { TiptapDoc } from './editor'
 import type { Status, Label } from './project'
+import type { ReactionSummary } from './reaction'
 import type { UserBrief } from './user'
 
 export type Priority = 'none' | 'low' | 'medium' | 'high' | 'urgent'
+export type CoverType = 'image' | 'color' | 'gradient'
+export type CoverSize = 'full' | 'half'
 
 export interface Attachment {
   id: string
@@ -26,12 +31,54 @@ export interface WatcherBrief {
   agent: AgentBrief | null
 }
 
+export interface ChecklistItem {
+  id: string
+  checklist_id: string
+  title: string
+  is_completed: boolean
+  position: number
+  assignee: UserBrief | null
+  due_date: string | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Checklist {
+  id: string
+  task_id: string
+  title: string
+  position: number
+  items: ChecklistItem[]
+  created_at: string
+  updated_at: string
+}
+
+export interface ChecklistProgress {
+  total: number
+  completed: number
+}
+
+export interface ChecklistItemCreate {
+  title: string
+  assignee_id?: string
+  due_date?: string
+}
+
+export interface ChecklistItemUpdate {
+  title?: string
+  is_completed?: boolean
+  assignee_id?: string | null
+  due_date?: string | null
+}
+
 export interface Task {
   id: string
   project_id: string
   board_id: string
   title: string
-  description: string | null
+  description: TiptapDoc | string | null
+  description_text: string | null
   status: Status
   priority: Priority
   assignees: AssigneeBrief[]
@@ -44,6 +91,13 @@ export interface Task {
   position: number
   parent_id: string | null
   comments_count: number
+  checklist_progress: ChecklistProgress
+  cover_type: CoverType | null
+  cover_value: string | null
+  cover_size: CoverSize | null
+  cover_image_url: string | null
+  custom_field_values: CustomFieldValue[]
+  reactions?: ReactionSummary
   created_at: string
   updated_at: string
   completed_at: string | null
@@ -51,7 +105,7 @@ export interface Task {
 
 export interface TaskCreate {
   title: string
-  description?: string
+  description?: TiptapDoc | string
   status_id?: string
   priority?: Priority
   assignee_user_ids?: string[]
@@ -66,7 +120,7 @@ export interface TaskCreate {
 
 export interface TaskUpdate {
   title?: string
-  description?: string
+  description?: TiptapDoc | string
   status_id?: string
   priority?: Priority
   assignee_user_ids?: string[]
@@ -75,6 +129,9 @@ export interface TaskUpdate {
   watcher_user_ids?: string[]
   watcher_agent_ids?: string[]
   due_date?: string
+  cover_type?: CoverType | null
+  cover_value?: string | null
+  cover_size?: CoverSize | null
 }
 
 export interface TaskMove {
@@ -84,10 +141,12 @@ export interface TaskMove {
 
 export interface Comment {
   id: string
-  content: string
+  content: TiptapDoc | string
+  content_text: string
   user: UserBrief
   agent_creator: AgentBrief | null
   attachments: Attachment[]
+  reactions?: ReactionSummary
   created_at: string
   updated_at: string
   is_edited: boolean

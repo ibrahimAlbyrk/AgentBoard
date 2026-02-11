@@ -2,11 +2,13 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { Send, Paperclip, X, File, Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useComments, useCreateComment } from '@/hooks/useComments'
 import { useUploadAttachment } from '@/hooks/useAttachments'
-import type { Attachment } from '@/types'
+import { ReactionBar } from '@/components/reactions/ReactionBar'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
+import { RichTextRenderer } from '@/components/editor/RichTextRenderer'
+import type { Attachment, TiptapDoc } from '@/types'
 import { toast } from 'sonner'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -27,7 +29,7 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
   const { data: commentsRes, isLoading } = useComments(projectId, boardId, taskId)
   const createComment = useCreateComment(projectId, boardId, taskId)
   const uploadAttachment = useUploadAttachment(projectId, boardId, taskId)
-  const [content, setContent] = useState('')
+  const [content, setContent] = useState<TiptapDoc | null>(null)
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([])
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -54,35 +56,23 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
     })
   }, [uploadAttachment])
 
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items
-    if (!items) return
-    for (const item of items) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault()
-        const file = item.getAsFile()
-        if (file) handleUploadFile(file)
-        break
-      }
-    }
-  }, [handleUploadFile])
-
   const removePending = (id: string) => {
     setPendingAttachments((prev) => prev.filter((a) => a.id !== id))
   }
 
+  const hasContent = content && content.content && content.content.length > 0
   const handleSubmit = () => {
-    if (!content.trim() && pendingAttachments.length === 0) return
+    if (!hasContent && pendingAttachments.length === 0) return
     createComment.mutate(
       {
-        content: content.trim() || ' ',
+        content: content || ' ',
         attachment_ids: pendingAttachments.length > 0
           ? pendingAttachments.map((a) => a.id)
           : undefined,
       },
       {
         onSuccess: () => {
-          setContent('')
+          setContent(null)
           setPendingAttachments([])
         },
       },
@@ -107,16 +97,14 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
   return (
     <div className="space-y-4">
       {/* Comment input */}
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-xl p-3 focus-within:border-[var(--border-strong)] transition-colors">
-        <Textarea
+      <div className="space-y-2">
+        <RichTextEditor
+          projectId={projectId}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
-          onPaste={handlePaste}
-          placeholder="Write a comment... (paste images from clipboard)"
-          className="min-h-[60px] border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:shadow-none resize-none text-sm"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit()
-          }}
+          onChange={(doc) => setContent(doc)}
+          onSubmit={handleSubmit}
+          variant="compact"
+          placeholder="Write a comment... (Cmd+Enter to send)"
         />
 
         {/* Pending attachments */}
@@ -148,7 +136,7 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
           </div>
         )}
 
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -178,7 +166,7 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
           <Button
             size="sm"
             onClick={handleSubmit}
-            disabled={(!content.trim() && pendingAttachments.length === 0) || createComment.isPending}
+            disabled={(!hasContent && pendingAttachments.length === 0) || createComment.isPending}
             className="bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 text-xs gap-1.5"
           >
             <Send className="size-3" />
@@ -236,7 +224,9 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
                     <span className="text-[10px] text-[var(--text-tertiary)]">(edited)</span>
                   )}
                 </div>
-                <p className="text-sm text-foreground mt-1">{comment.content}</p>
+                <div className="mt-1">
+                  <RichTextRenderer content={comment.content} className="text-sm" />
+                </div>
 
                 {/* Comment attachments */}
                 {comment.attachments?.length > 0 && (
@@ -270,6 +260,18 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
                     )}
                   </div>
                 )}
+
+                {/* Comment reactions */}
+                <div className="mt-2">
+                  <ReactionBar
+                    entityType="comment"
+                    projectId={projectId}
+                    boardId={boardId}
+                    taskId={taskId}
+                    commentId={comment.id}
+                    compact
+                  />
+                </div>
               </div>
             </div>
             {index < comments.length - 1 && (

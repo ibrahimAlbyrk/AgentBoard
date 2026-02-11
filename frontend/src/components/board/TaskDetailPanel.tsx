@@ -19,6 +19,8 @@ import {
   Eye,
   Plus,
   Check,
+  ImageIcon,
+  Trash2,
 } from 'lucide-react'
 import {
   Select,
@@ -28,17 +30,25 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useProjectStore } from '@/stores/projectStore'
 import { useUpdateTask } from '@/hooks/useTasks'
+import { useCustomFieldDefinitions } from '@/hooks/useCustomFields'
+import { CustomFieldsSection } from '@/components/board/CustomFieldsSection'
 import { TaskComments } from '@/components/tasks/TaskComments'
 import { TaskActivity } from '@/components/tasks/TaskActivity'
 import { TaskAttachments } from '@/components/tasks/TaskAttachments'
+import { ChecklistSection } from '@/components/tasks/ChecklistSection'
 import { LabelManager } from '@/components/labels/LabelManager'
-import type { Task, Priority, AssigneeBrief, WatcherBrief, ProjectMember, Agent } from '@/types'
+import { VoteButton } from '@/components/reactions/VoteButton'
+import { ReactionBar } from '@/components/reactions/ReactionBar'
+import { CoverPicker } from '@/components/tasks/CoverPicker'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
+import { RichTextRenderer } from '@/components/editor/RichTextRenderer'
+import { GRADIENT_PRESETS } from '@/lib/cover-presets'
+import type { Task, Priority, AssigneeBrief, WatcherBrief, ProjectMember, Agent, TiptapDoc } from '@/types'
 
 const priorities: { value: Priority; label: string; color: string; icon: typeof Flag }[] = [
   { value: 'none', label: 'None', color: 'var(--priority-none)', icon: Flag },
@@ -99,11 +109,14 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   const { statuses, members, labels, agents } = useProjectStore()
   const activeAgents = agents.filter((a) => a.is_active)
   const updateTask = useUpdateTask(projectId, boardId)
+  const { data: customFieldsRes } = useCustomFieldDefinitions(projectId, boardId)
+  const customFieldDefinitions = customFieldsRes?.data ?? []
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState('')
   const [editingDesc, setEditingDesc] = useState(false)
-  const [desc, setDesc] = useState('')
+  const [descDoc, setDescDoc] = useState<TiptapDoc | null>(null)
   const [showLabelManager, setShowLabelManager] = useState(false)
+  const [showCoverPicker, setShowCoverPicker] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Keep last task in memory so exit animation can render with stale data
@@ -139,9 +152,8 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
 
   const handleDescSave = () => {
     if (!displayTask) return
-    const trimmed = desc.trim()
-    if (trimmed !== (displayTask.description ?? '')) {
-      updateTask.mutate({ taskId: displayTask.id, data: { description: trimmed || undefined } })
+    if (descDoc) {
+      updateTask.mutate({ taskId: displayTask.id, data: { description: descDoc } })
     }
     setEditingDesc(false)
   }
@@ -149,6 +161,14 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   const handleFieldUpdate = (data: Record<string, unknown>) => {
     if (!displayTask) return
     updateTask.mutate({ taskId: displayTask.id, data })
+  }
+
+  const handleRemoveCover = () => {
+    if (!displayTask) return
+    updateTask.mutate({
+      taskId: displayTask.id,
+      data: { cover_type: null, cover_value: null, cover_size: null },
+    })
   }
 
   const currentPriority = priorities.find((p) => p.value === displayTask.priority) ?? priorities[0]
@@ -193,9 +213,56 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
               className="h-[3px] w-full shrink-0 transition-colors duration-300"
               style={{
                 backgroundColor: priorityBg[displayTask.priority],
-                borderRadius: '20px 20px 0 0',
+                borderRadius: displayTask.cover_type && displayTask.cover_value ? undefined : '20px 20px 0 0',
               }}
             />
+
+            {/* Cover area */}
+            {displayTask.cover_type && displayTask.cover_value ? (
+              <div className="relative group shrink-0" style={{ height: 180 }}>
+                {displayTask.cover_type === 'image' && displayTask.cover_image_url && (
+                  <img
+                    src={displayTask.cover_image_url}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                )}
+                {displayTask.cover_type === 'color' && (
+                  <div
+                    className="w-full h-full"
+                    style={{ backgroundColor: displayTask.cover_value }}
+                  />
+                )}
+                {displayTask.cover_type === 'gradient' && (
+                  <div
+                    className="w-full h-full"
+                    style={{ background: GRADIENT_PRESETS[displayTask.cover_value] }}
+                  />
+                )}
+
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end justify-end gap-2 p-3 opacity-0 group-hover:opacity-100">
+                  <CoverPicker
+                    task={displayTask}
+                    projectId={projectId}
+                    boardId={boardId}
+                    open={showCoverPicker}
+                    onOpenChange={setShowCoverPicker}
+                  >
+                    <button className="flex items-center gap-1.5 bg-black/60 backdrop-blur-sm text-white text-xs rounded-lg px-3 py-1.5 hover:bg-black/80 transition-colors">
+                      <ImageIcon className="size-3.5" />
+                      Change Cover
+                    </button>
+                  </CoverPicker>
+                  <button
+                    onClick={handleRemoveCover}
+                    className="flex items-center gap-1.5 bg-black/60 backdrop-blur-sm text-white text-xs rounded-lg px-3 py-1.5 hover:bg-black/80 transition-colors"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             {/* Top bar */}
             <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--border-subtle)]">
@@ -247,6 +314,19 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                       {displayTask.title}
                     </h2>
                   )}
+                </motion.div>
+
+                {/* Vote + Reactions */}
+                <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3">
+                  <VoteButton projectId={projectId} boardId={boardId} taskId={displayTask.id} />
+                </motion.div>
+                <motion.div variants={fadeUp} className="mb-6">
+                  <ReactionBar
+                    entityType="task"
+                    projectId={projectId}
+                    boardId={boardId}
+                    taskId={displayTask.id}
+                  />
                 </motion.div>
 
                 {/* Property rows */}
@@ -356,6 +436,31 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                       )}
                     </div>
                   </PropertyRow>
+
+                  {/* Cover (only show row when no cover) */}
+                  {!displayTask.cover_type && (
+                    <PropertyRow icon={ImageIcon} label="Cover">
+                      <CoverPicker
+                        task={displayTask}
+                        projectId={projectId}
+                        boardId={boardId}
+                        open={showCoverPicker}
+                        onOpenChange={setShowCoverPicker}
+                      >
+                        <button className="text-sm text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] transition-colors">
+                          Add cover...
+                        </button>
+                      </CoverPicker>
+                    </PropertyRow>
+                  )}
+
+                  {/* Custom Fields */}
+                  <CustomFieldsSection
+                    task={displayTask}
+                    projectId={projectId}
+                    boardId={boardId}
+                    definitions={customFieldDefinitions}
+                  />
                 </motion.div>
 
                 {/* Labels */}
@@ -428,29 +533,26 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                     </span>
                   </div>
                   {editingDesc ? (
-                    <Textarea
-                      autoFocus
-                      value={desc}
-                      onChange={(e) => setDesc(e.target.value)}
-                      onBlur={handleDescSave}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          setEditingDesc(false)
-                        }
-                      }}
-                      placeholder="Describe this task..."
-                      className="min-h-[120px] bg-[var(--surface)] border-[var(--border-subtle)] focus:border-[var(--accent-solid)] focus:ring-2 focus:ring-[var(--ring)] rounded-xl resize-y text-sm leading-relaxed transition-all"
-                    />
+                    <div onBlur={handleDescSave}>
+                      <RichTextEditor
+                        projectId={projectId}
+                        value={typeof displayTask.description === 'string' ? displayTask.description : (displayTask.description as TiptapDoc | null)}
+                        onChange={(doc) => setDescDoc(doc)}
+                        variant="full"
+                        placeholder="Describe this task..."
+                        autoFocus
+                      />
+                    </div>
                   ) : (
                     <div
                       onClick={() => {
-                        setDesc(displayTask.description ?? '')
+                        setDescDoc(null)
                         setEditingDesc(true)
                       }}
                       className="min-h-[60px] px-4 py-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] cursor-pointer hover:border-[var(--border-strong)] transition-colors text-sm leading-relaxed group"
                     >
                       {displayTask.description ? (
-                        <p className="text-foreground whitespace-pre-wrap">{displayTask.description}</p>
+                        <RichTextRenderer content={displayTask.description} />
                       ) : (
                         <p className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors">
                           Click to add a description...
@@ -459,6 +561,13 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                     </div>
                   )}
                 </motion.div>
+
+                {/* Checklists */}
+                <ChecklistSection
+                  projectId={projectId}
+                  boardId={boardId}
+                  taskId={displayTask.id}
+                />
 
                 {/* Tabs: Comments / Activity */}
                 <motion.div variants={fadeUp}>

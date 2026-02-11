@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Plus, Tag } from 'lucide-react'
+import { Plus, Tag, LayoutList, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useProject } from '@/hooks/useProjects'
 import { useBoard } from '@/hooks/useBoards'
 import { useTasks } from '@/hooks/useTasks'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { useCardDisplayMode } from '@/hooks/useCardDisplayMode'
 import { useProjectStore } from '@/stores/projectStore'
 import { useBoardStore } from '@/stores/boardStore'
 import { KanbanBoard } from '@/components/board/KanbanBoard'
@@ -28,6 +30,7 @@ export function BoardPage() {
     useProjectStore()
   const { setTasksForStatus, clearBoard } = useBoardStore()
 
+  const { mode: cardMode, setMode: setCardMode } = useCardDisplayMode()
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [showLabelManager, setShowLabelManager] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -118,6 +121,32 @@ export function BoardPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] p-0.5">
+              <button
+                onClick={() => setCardMode('compact')}
+                className={cn(
+                  'size-7 rounded-md flex items-center justify-center transition-all duration-150',
+                  cardMode === 'compact'
+                    ? 'bg-[var(--accent-solid)] text-white shadow-sm'
+                    : 'text-[var(--text-tertiary)] hover:text-foreground'
+                )}
+                title="Compact view"
+              >
+                <LayoutList className="size-3.5" />
+              </button>
+              <button
+                onClick={() => setCardMode('detailed')}
+                className={cn(
+                  'size-7 rounded-md flex items-center justify-center transition-all duration-150',
+                  cardMode === 'detailed'
+                    ? 'bg-[var(--accent-solid)] text-white shadow-sm'
+                    : 'text-[var(--text-tertiary)] hover:text-foreground'
+                )}
+                title="Detailed view"
+              >
+                <LayoutGrid className="size-3.5" />
+              </button>
+            </div>
             <Button
               variant="outline"
               onClick={() => setShowLabelManager(true)}
@@ -142,6 +171,7 @@ export function BoardPage() {
         <KanbanBoard
           onTaskClick={setSelectedTask}
           onAddTask={handleAddTask}
+          compact={cardMode === 'compact'}
         />
       </div>
 

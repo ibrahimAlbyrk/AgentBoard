@@ -9,3 +9,8 @@ export interface WSEvent {
 export interface WSTaskEvent extends WSEvent {
   type: 'task.created' | 'task.updated' | 'task.deleted' | 'task.moved'
 }
+
+export interface WSChecklistEvent extends WSEvent {
+  type: 'checklist.updated'
+  data: { task_id: string }
+}

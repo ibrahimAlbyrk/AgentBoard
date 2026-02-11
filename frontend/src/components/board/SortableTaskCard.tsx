@@ -9,9 +9,10 @@ interface SortableTaskCardProps {
   task: Task
   onClick: () => void
   hideWhileDragging?: boolean
+  compact?: boolean
 }
 
-export function SortableTaskCard({ task, onClick, hideWhileDragging }: SortableTaskCardProps) {
+export function SortableTaskCard({ task, onClick, hideWhileDragging, compact }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -50,7 +51,7 @@ export function SortableTaskCard({ task, onClick, hideWhileDragging }: SortableT
       {isDragging && !hidden ? (
         <div className="h-[72px] rounded-xl border-2 border-dashed border-[var(--accent-solid)]/30 bg-[var(--accent-muted-bg)]/50" />
       ) : hidden ? null : (
-        <TaskCard task={task} onClick={onClick} />
+        <TaskCard task={task} onClick={onClick} compact={compact} />
       )}
     </div>
   )

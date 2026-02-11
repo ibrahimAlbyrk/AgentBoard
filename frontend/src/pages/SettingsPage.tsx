@@ -284,6 +284,8 @@ const DEFAULT_PREFS: NotificationPreferences = {
   task_moved: true,
   task_deleted: true,
   task_comment: true,
+  task_reaction: true,
+  mentioned: true,
   self_notifications: true,
   desktop_enabled: false,
   muted_projects: [],
@@ -395,6 +397,18 @@ function NotificationSettings() {
             description="When someone comments on your task"
             checked={current.task_comment}
             onToggle={() => toggle('task_comment')}
+          />
+          <ToggleRow
+            label="Reactions"
+            description="When someone reacts to your task or comment"
+            checked={current.task_reaction}
+            onToggle={() => toggle('task_reaction')}
+          />
+          <ToggleRow
+            label="Mentions"
+            description="When someone @mentions you in a description or comment"
+            checked={current.mentioned}
+            onToggle={() => toggle('mentioned')}
           />
         </div>
       </div>

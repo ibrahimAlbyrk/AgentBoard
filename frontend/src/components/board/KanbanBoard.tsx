@@ -89,9 +89,10 @@ const kanbanCollision: CollisionDetection = (args) => {
 interface KanbanBoardProps {
   onTaskClick: (task: Task) => void
   onAddTask: (statusId: string) => void
+  compact?: boolean
 }
 
-export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
+export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProps) {
   const { statuses, currentProject, currentBoard } = useProjectStore()
   const { tasksByStatus, getFilteredTasks } = useBoardStore()
   const moveTask = useMoveTask(currentProject?.id ?? '', currentBoard?.id ?? '')
@@ -320,6 +321,7 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
                 ? activeTask.id
                 : undefined
             }
+            compact={compact}
           />
         ))}
       </div>
@@ -338,7 +340,7 @@ export function KanbanBoard({ onTaskClick, onAddTask }: KanbanBoardProps) {
               boxShadow: `${-tilt.y * 0.5}px ${tilt.x * 0.5 + 12}px 40px -8px rgba(0,0,0,0.35)`,
               borderRadius: 12,
             }}>
-              <TaskCard task={activeTask} onClick={() => {}} isDragOverlay />
+              <TaskCard task={activeTask} onClick={() => {}} isDragOverlay compact={compact} />
             </div>
           </div>
         )}

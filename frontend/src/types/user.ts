@@ -4,6 +4,8 @@ export interface NotificationPreferences {
   task_moved: boolean
   task_deleted: boolean
   task_comment: boolean
+  task_reaction: boolean
+  mentioned: boolean
   self_notifications: boolean
   desktop_enabled: boolean
   muted_projects: string[]
