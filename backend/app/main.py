@@ -32,12 +32,16 @@ from app.api.v1 import (
     attachments,
     auth,
     boards,
+    checklists,
     comments,
+    custom_fields,
     dashboard,
     labels,
     members,
+    mentionables,
     notifications,
     projects,
+    reactions,
     search,
     stats,
     statuses,
@@ -58,17 +62,22 @@ for router_module in [
     labels,
     tasks,
     comments,
+    checklists,
     attachments,
     activity,
     notifications,
     search,
     stats,
+    custom_fields,
+    mentionables,
     dashboard,
 ]:
     app.include_router(router_module.router, prefix="/api/v1")
 
 app.include_router(websocket.router, prefix="/api/v1")
 app.include_router(attachments.download_router, prefix="/api/v1")
+app.include_router(reactions.task_router, prefix="/api/v1")
+app.include_router(reactions.comment_router, prefix="/api/v1")
 
 
 @app.on_event("startup")

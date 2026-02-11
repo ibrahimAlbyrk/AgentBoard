@@ -6,6 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.models.attachment import Attachment
+from app.models.checklist import Checklist
+from app.models.checklist_item import ChecklistItem
+from app.models.custom_field_value import CustomFieldValue
 from app.models.task import Task
 from app.models.task_assignee import TaskAssignee
 from app.models.task_label import TaskLabel
@@ -28,6 +31,8 @@ _task_load_options = (
         joinedload(TaskWatcher.user),
         joinedload(TaskWatcher.agent),
     ),
+    selectinload(Task.checklists).selectinload(Checklist.items).selectinload(ChecklistItem.assignee),
+    selectinload(Task.custom_field_values),
 )
 
 
@@ -73,7 +78,7 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
             query = query.where(
                 or_(
                     Task.title.ilike(pattern),
-                    Task.description.ilike(pattern),
+                    Task.description_text.ilike(pattern),
                 )
             )
 

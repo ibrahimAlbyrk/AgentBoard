@@ -6,6 +6,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
+    JSON,
     String,
     Text,
 )
@@ -30,7 +31,8 @@ class Task(Base):
         ForeignKey("boards.id", ondelete="CASCADE")
     )
     title: Mapped[str] = mapped_column(String(500))
-    description: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[dict | None] = mapped_column(JSON)
+    description_text: Mapped[str | None] = mapped_column(Text)
     status_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("statuses.id", ondelete="RESTRICT")
     )
@@ -58,6 +60,10 @@ class Task(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+
+    cover_type: Mapped[str | None] = mapped_column(String(20))
+    cover_value: Mapped[str | None] = mapped_column(String(500))
+    cover_size: Mapped[str | None] = mapped_column(String(10))
 
     project = relationship("Project", back_populates="tasks")
     board = relationship("Board", back_populates="tasks")
@@ -94,4 +100,15 @@ class Task(Base):
     )
     assignees = relationship(
         "TaskAssignee", back_populates="task", cascade="all, delete-orphan"
+    )
+    checklists = relationship(
+        "Checklist",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="Checklist.position",
+    )
+    custom_field_values = relationship(
+        "CustomFieldValue",
+        back_populates="task",
+        cascade="all, delete-orphan",
     )

@@ -29,6 +29,8 @@ class NotificationPreferences(BaseModel):
     task_moved: bool = True
     task_deleted: bool = True
     task_comment: bool = True
+    task_reaction: bool = True
+    mentioned: bool = True
     self_notifications: bool = True
     desktop_enabled: bool = False
     muted_projects: list[str] = []

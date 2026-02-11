@@ -103,6 +103,16 @@ async def delete_attachment(
             detail="Can only delete own attachments",
         )
     await storage.delete(attachment.file_path)
+
+    # Clear cover if this attachment was used as a task's cover image
+    if attachment.task_id:
+        task = await crud_task.get(db, attachment.task_id)
+        if task and task.cover_type == "image" and task.cover_value == str(attachment_id):
+            task.cover_type = None
+            task.cover_value = None
+            task.cover_size = None
+            db.add(task)
+
     await crud_attachment.remove(db, id=attachment_id)
 
 

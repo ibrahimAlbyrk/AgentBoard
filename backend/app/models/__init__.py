@@ -1,5 +1,9 @@
 from app.models.activity_log import ActivityLog
 from app.models.agent import Agent
+from app.models.checklist import Checklist
+from app.models.checklist_item import ChecklistItem
+from app.models.custom_field import CustomFieldDefinition
+from app.models.custom_field_value import CustomFieldValue
 from app.models.api_key import APIKey
 from app.models.attachment import Attachment
 from app.models.board import Board
@@ -9,6 +13,7 @@ from app.models.label import Label
 from app.models.notification import Notification
 from app.models.project import Project
 from app.models.project_member import ProjectMember
+from app.models.reaction import Reaction
 from app.models.status import Status
 from app.models.task import Task
 from app.models.task_assignee import TaskAssignee
@@ -22,6 +27,10 @@ __all__ = [
     "ActivityLog",
     "Agent",
     "APIKey",
+    "Checklist",
+    "ChecklistItem",
+    "CustomFieldDefinition",
+    "CustomFieldValue",
     "Attachment",
     "Board",
     "BoardMember",
@@ -30,6 +39,7 @@ __all__ = [
     "Notification",
     "Project",
     "ProjectMember",
+    "Reaction",
     "Status",
     "Task",
     "TaskAssignee",

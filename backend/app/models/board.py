@@ -54,6 +54,11 @@ class Board(Base):
     tasks = relationship(
         "Task", back_populates="board", cascade="all, delete-orphan"
     )
+    custom_field_definitions = relationship(
+        "CustomFieldDefinition",
+        back_populates="board",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def member_count(self) -> int:

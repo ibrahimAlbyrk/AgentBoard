@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -25,7 +25,8 @@ class Comment(Base):
     agent_creator_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("agents.id", ondelete="SET NULL")
     )
-    content: Mapped[str] = mapped_column(Text)
+    content: Mapped[dict] = mapped_column(JSON)
+    content_text: Mapped[str] = mapped_column(Text, default="")
     is_edited: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_at: Mapped[datetime] = mapped_column(

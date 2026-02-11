@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import check_board_access, get_current_user
 from app.core.database import get_db
-from app.crud import crud_task
+from app.crud import crud_reaction, crud_task
 from app.models.board import Board
 from app.models.user import User
 from app.schemas.base import PaginatedResponse, PaginationMeta, ResponseBase
@@ -19,6 +19,7 @@ from app.schemas.task import (
     TaskUpdate,
 )
 from app.services.notification_service import NotificationService
+from app.services.reaction_service import ReactionService
 from app.services.task_service import TaskService
 from app.services.websocket_manager import manager
 
@@ -37,6 +38,7 @@ async def list_tasks(
     per_page: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     board: Board = Depends(check_board_access),
+    current_user: User = Depends(get_current_user),
 ):
     skip = (page - 1) * per_page
     tasks = await crud_task.get_multi_by_board(
@@ -50,8 +52,19 @@ async def list_tasks(
         limit=per_page,
     )
     total = await crud_task.count(db, filters={"board_id": board.id})
+
+    task_ids = [t.id for t in tasks]
+    reaction_summaries = await crud_reaction.get_summaries_batch(
+        db, "task", task_ids, current_user_id=current_user.id
+    )
+    responses = []
+    for t in tasks:
+        resp = TaskResponse.model_validate(t)
+        resp.reactions = reaction_summaries.get(t.id)
+        responses.append(resp)
+
     return PaginatedResponse(
-        data=[TaskResponse.model_validate(t) for t in tasks],
+        data=responses,
         pagination=PaginationMeta(
             page=page,
             per_page=per_page,
@@ -100,13 +113,18 @@ async def get_task(
     task_id: UUID,
     db: AsyncSession = Depends(get_db),
     board: Board = Depends(check_board_access),
+    current_user: User = Depends(get_current_user),
 ):
     task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
-    return ResponseBase(data=TaskResponse.model_validate(task))
+    resp = TaskResponse.model_validate(task)
+    resp.reactions = await crud_reaction.get_summary(
+        db, "task", task_id, current_user_id=current_user.id
+    )
+    return ResponseBase(data=resp)
 
 
 @router.patch("/{task_id}", response_model=ResponseBase[TaskResponse])
@@ -157,6 +175,7 @@ async def delete_task(
     task_title = task.title
     assignee_user_ids = [a.user_id for a in task.assignees if a.user_id]
     watcher_user_ids = [w.user_id for w in task.watchers if w.user_id]
+    await ReactionService.delete_reactions_for_entity(db, "task", task_id)
     await crud_task.remove(db, id=task_id)
     await manager.broadcast_to_board(str(board.project_id), str(board.id), {
         "type": "task.deleted",

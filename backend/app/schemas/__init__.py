@@ -23,9 +23,38 @@ from .base import (
     PaginationMeta,
     ResponseBase,
 )
+from .checklist import (
+    ChecklistCreate,
+    ChecklistItemCreate,
+    ChecklistItemReorder,
+    ChecklistItemResponse,
+    ChecklistItemUpdate,
+    ChecklistProgress,
+    ChecklistReorder,
+    ChecklistResponse,
+    ChecklistUpdate,
+)
 from .comment import CommentCreate, CommentResponse, CommentUpdate
+from .custom_field import (
+    BulkFieldValueSet,
+    CustomFieldDefinitionCreate,
+    CustomFieldDefinitionResponse,
+    CustomFieldDefinitionUpdate,
+    CustomFieldReorder,
+    CustomFieldValueResponse,
+    CustomFieldValueSet,
+    SelectOption,
+)
 from .label import LabelCreate, LabelResponse, LabelUpdate
 from .notification import NotificationMarkRead, NotificationResponse
+from .reaction import (
+    ReactionCreate,
+    ReactionGroup,
+    ReactionSummary,
+    ReactionToggle,
+    ReactorBrief,
+    ToggleResult,
+)
 from .project import (
     ProjectCreate,
     ProjectDetailResponse,
@@ -99,6 +128,15 @@ __all__ = [
     "BulkTaskMove",
     "BulkTaskDelete",
     "AttachmentResponse",
+    "ChecklistCreate",
+    "ChecklistUpdate",
+    "ChecklistResponse",
+    "ChecklistReorder",
+    "ChecklistItemCreate",
+    "ChecklistItemUpdate",
+    "ChecklistItemResponse",
+    "ChecklistItemReorder",
+    "ChecklistProgress",
     "CommentCreate",
     "CommentUpdate",
     "CommentResponse",
@@ -109,7 +147,21 @@ __all__ = [
     "ActivityLogResponse",
     "NotificationMarkRead",
     "NotificationResponse",
+    "ReactionCreate",
+    "ReactionGroup",
+    "ReactionSummary",
+    "ReactionToggle",
+    "ReactorBrief",
+    "ToggleResult",
     "WebhookCreate",
     "WebhookUpdate",
     "WebhookResponse",
+    "CustomFieldDefinitionCreate",
+    "CustomFieldDefinitionUpdate",
+    "CustomFieldDefinitionResponse",
+    "CustomFieldReorder",
+    "CustomFieldValueSet",
+    "CustomFieldValueResponse",
+    "BulkFieldValueSet",
+    "SelectOption",
 ]

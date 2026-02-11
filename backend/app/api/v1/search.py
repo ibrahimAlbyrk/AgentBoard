@@ -50,7 +50,10 @@ async def global_search(
 
     if type is None or type == "task":
         query = select(Task).where(
-            Task.title.ilike(f"%{q}%"),
+            or_(
+                Task.title.ilike(f"%{q}%"),
+                Task.description_text.ilike(f"%{q}%"),
+            ),
         )
         if project_id:
             query = query.where(Task.project_id == project_id)

@@ -1,18 +1,35 @@
+import re
 from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud import crud_activity_log, crud_agent, crud_status, crud_task, crud_user
+from app.crud import crud_activity_log, crud_agent, crud_attachment, crud_status, crud_task, crud_user
 from app.models.task import Task
 from app.models.task_assignee import TaskAssignee
 from app.models.task_label import TaskLabel
 from app.models.task_watcher import TaskWatcher
 from app.schemas.task import TaskCreate, TaskUpdate
+from app.services.content_service import extract_mentions, extract_plain_text, normalize_content
 from app.services.notification_service import NotificationService
 from app.services.position_service import PositionService
 
+
+GRADIENT_PRESETS = {
+    "sunset":   "linear-gradient(135deg, #f97316, #ec4899)",
+    "ocean":    "linear-gradient(135deg, #06b6d4, #3b82f6)",
+    "forest":   "linear-gradient(135deg, #22c55e, #14b8a6)",
+    "lavender": "linear-gradient(135deg, #a78bfa, #818cf8)",
+    "rose":     "linear-gradient(135deg, #fb7185, #f472b6)",
+    "ember":    "linear-gradient(135deg, #ef4444, #f97316)",
+    "slate":    "linear-gradient(135deg, #64748b, #475569)",
+    "midnight": "linear-gradient(135deg, #1e3a5f, #312e81)",
+    "aurora":   "linear-gradient(135deg, #22d3ee, #a78bfa)",
+    "golden":   "linear-gradient(135deg, #f59e0b, #eab308)",
+    "storm":    "linear-gradient(135deg, #6366f1, #8b5cf6)",
+    "mint":     "linear-gradient(135deg, #34d399, #6ee7b7)",
+}
 
 FIELD_LABELS = {
     "title": "title",
@@ -21,6 +38,7 @@ FIELD_LABELS = {
     "status_id": "status",
     "assignees": "assignees",
     "due_date": "due date",
+    "cover": "cover",
 }
 
 
@@ -185,12 +203,17 @@ class TaskService:
                     detail="Invalid or inactive assignee agent",
                 )
 
+        # Normalize description to Tiptap JSON + plain text
+        desc_doc = normalize_content(task_in.description) if task_in.description is not None else None
+        desc_text = extract_plain_text(desc_doc) if desc_doc else None
+
         task = Task(
             project_id=project_id,
             board_id=board_id,
             creator_id=creator_id,
             title=task_in.title,
-            description=task_in.description,
+            description=desc_doc,
+            description_text=desc_text,
             status_id=status_id,
             priority=task_in.priority,
             agent_creator_id=task_in.agent_creator_id,
@@ -248,6 +271,26 @@ class TaskService:
                 f'{creator_name} created "{task.title}" (you\'re watching)',
             )
 
+        # Notify @mentioned users in description
+        if desc_doc and task:
+            user_mentions = extract_mentions(desc_doc, {"user"})
+            creator = await crud_user.get(db, creator_id)
+            creator_name = (creator.full_name or creator.username) if creator else "Someone"
+            for m in user_mentions:
+                uid = UUID(m["id"])
+                if uid == creator_id:
+                    continue
+                await NotificationService.create_notification(
+                    db,
+                    user_id=uid,
+                    actor_id=creator_id,
+                    project_id=project_id,
+                    type="mentioned",
+                    title="Mentioned in Task",
+                    message=f'{creator_name} mentioned you in "{task.title}"',
+                    data={"task_id": str(task.id), "board_id": str(task.board_id)},
+                )
+
         return task
 
     @staticmethod
@@ -264,6 +307,65 @@ class TaskService:
         watcher_agent_ids = update_data.pop("watcher_agent_ids", None)
         assignee_user_ids = update_data.pop("assignee_user_ids", None)
         assignee_agent_ids = update_data.pop("assignee_agent_ids", None)
+
+        # Cover validation
+        if "cover_type" in update_data:
+            ct = update_data.get("cover_type")
+            cv = update_data.get("cover_value")
+            if ct == "image" and cv:
+                att = await crud_attachment.get(db, UUID(cv))
+                if not att or att.task_id != task.id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid attachment for cover",
+                    )
+                if not att.mime_type.startswith("image/"):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Attachment is not an image",
+                    )
+            elif ct == "color" and cv:
+                if not re.match(r"^#[0-9A-Fa-f]{6}$", cv):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid hex color",
+                    )
+            elif ct == "gradient" and cv:
+                if cv not in GRADIENT_PRESETS:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid gradient preset",
+                    )
+            elif ct is None:
+                update_data["cover_value"] = None
+                update_data["cover_size"] = None
+
+            # Track cover change for activity log
+            old_cover = task.cover_type
+            if ct != old_cover:
+                changes["cover"] = "cover removed" if ct is None else "cover updated"
+
+        # Track old description mentions for diff
+        old_mention_ids: set[str] = set()
+        newly_mentioned_ids: set[str] = set()
+
+        # Normalize description if present in update
+        if "description" in update_data:
+            raw_desc = update_data.pop("description")
+            old_mention_ids = {
+                m["id"] for m in extract_mentions(task.description, {"user"})
+            } if task.description else set()
+            desc_doc = normalize_content(raw_desc)
+            desc_text = extract_plain_text(desc_doc) if desc_doc else None
+            if task.description != desc_doc:
+                changes["description"] = "description updated"
+                task.description = desc_doc
+                task.description_text = desc_text
+                # Compute new mentions
+                new_mention_ids = {
+                    m["id"] for m in extract_mentions(desc_doc, {"user"})
+                } if desc_doc else set()
+                newly_mentioned_ids = new_mention_ids - old_mention_ids
 
         for field, value in update_data.items():
             old_value = getattr(task, field, None)
@@ -359,6 +461,25 @@ class TaskService:
                     db, refreshed, user_id,
                     "task_updated", "Watching: Task Updated",
                     f'{updater_name} updated "{task.title}" — {detail}',
+                )
+
+        # Notify newly @mentioned users
+        if newly_mentioned_ids:
+            mention_updater = await crud_user.get(db, user_id)
+            mention_updater_name = (mention_updater.full_name or mention_updater.username) if mention_updater else "Someone"
+            for uid_str in newly_mentioned_ids:
+                uid = UUID(uid_str)
+                if uid == user_id:
+                    continue
+                await NotificationService.create_notification(
+                    db,
+                    user_id=uid,
+                    actor_id=user_id,
+                    project_id=task.project_id,
+                    type="mentioned",
+                    title="Mentioned in Task",
+                    message=f'{mention_updater_name} mentioned you in "{task.title}"',
+                    data={"task_id": str(task.id), "board_id": str(task.board_id)},
                 )
 
         task_id = task.id
