@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -9,6 +9,7 @@ import {
   type DragEndEvent,
   type DragOverEvent,
   type DragMoveEvent,
+  MeasuringStrategy,
   PointerSensor,
   useSensor,
   useSensors,
@@ -22,9 +23,33 @@ import { TaskCard } from './TaskCard'
 import { TaskAnimationLayer, startFlight, getCardRect } from './TaskAnimationLayer'
 import type { Task } from '@/types'
 
+/** Helper: is a droppable rect horizontally inside a column rect? */
+const isInColumn = (
+  id: string | number,
+  r: { left: number; width: number },
+  colRect: { left: number; right: number },
+) => {
+  if (String(id).startsWith('column-')) return false
+  const cx = r.left + r.width / 2
+  return cx >= colRect.left && cx <= colRect.right
+}
+
+/** Find the column droppable whose horizontal band contains the pointer. */
+const findColumnAtPointer = (args: Parameters<CollisionDetection>[0]) => {
+  const px = args.pointerCoordinates?.x ?? 0
+  for (const [id, rect] of args.droppableRects.entries()) {
+    if (String(id).startsWith('column-') && px >= rect.left && px <= rect.right) {
+      return { id, rect }
+    }
+  }
+  return null
+}
+
 /**
  * Custom collision detection for Kanban cross-column drags.
- * pointerWithin finds the column, then closestCenter finds the nearest task inside it.
+ * 1. pointerWithin for direct task hit
+ * 2. Find column by horizontal band (works even above/below the droppable zone)
+ * 3. closestCenter scoped to tasks inside that column
  */
 const kanbanCollision: CollisionDetection = (args) => {
   const withinCollisions = pointerWithin(args)
@@ -35,23 +60,23 @@ const kanbanCollision: CollisionDetection = (args) => {
   )
   if (directTask) return [directTask]
 
-  // Pointer inside a column but between/below task cards
-  const column = withinCollisions.find((c) =>
+  // Find the column — first try pointerWithin, then fall back to horizontal band lookup.
+  // The fallback handles the case when the pointer is above/below the droppable zone
+  // (e.g. in the column header area) where pointerWithin wouldn't match.
+  const withinColumn = withinCollisions.find((c) =>
     String(c.id).startsWith('column-'),
   )
-  if (column) {
-    const columnRect = args.droppableRects.get(column.id)
-    if (columnRect) {
-      const inColumn = (id: string | number, r: { left: number; width: number }) => {
-        if (String(id).startsWith('column-')) return false
-        const cx = r.left + r.width / 2
-        return cx >= columnRect.left && cx <= columnRect.right
-      }
+  const col = withinColumn
+    ? { id: withinColumn.id, rect: args.droppableRects.get(withinColumn.id)! }
+    : findColumnAtPointer(args)
 
+  if (col) {
+    const columnRect = col.rect
+    if (columnRect) {
       const allClosest = closestCenter(args)
       const nearestInColumn = allClosest.find((c) => {
         const r = args.droppableRects.get(c.id)
-        return r ? inColumn(c.id, r) : false
+        return r ? isInColumn(c.id, r, columnRect) : false
       })
 
       if (nearestInColumn) {
@@ -63,24 +88,22 @@ const kanbanCollision: CollisionDetection = (args) => {
           const hasLowerTask = allClosest.some((c) => {
             if (c.id === nearestInColumn.id) return false
             const r = args.droppableRects.get(c.id)
-            return r ? inColumn(c.id, r) && r.top > nearestRect.top : false
+            return r ? isInColumn(c.id, r, columnRect) && r.top > nearestRect.top : false
           })
 
           if (!hasLowerTask) {
-            // Same-column: keep returning task for SortableContext swap animations
             const activeRect = args.droppableRects.get(args.active.id)
-            if (activeRect && inColumn(args.active.id, activeRect)) {
+            if (activeRect && isInColumn(args.active.id, activeRect, columnRect)) {
               return [nearestInColumn]
             }
-            // Cross-column: return column → dragOverItemId=null → placeholder at bottom
-            return [column]
+            return [{ id: col.id, data: { droppableContainer: undefined } }]
           }
         }
 
         return [nearestInColumn]
       }
     }
-    return [column]
+    return [{ id: col.id, data: { droppableContainer: undefined } }]
   }
 
   return closestCenter(args)
@@ -107,6 +130,11 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
+
+  // Re-measure droppables while dragging so variable-height cards stay accurate
+  const measuring = useMemo(() => ({
+    droppable: { strategy: MeasuringStrategy.Always },
+  }), [])
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const taskId = String(event.active.id)
@@ -169,8 +197,9 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
       setDragOverColumnId(targetColumnId)
       setDragOverItemId(overItemId)
 
-      // Cross-column: determine above/below for placeholder positioning
-      if (overItemId && targetColumnId !== activeTask.status.id) {
+      // Determine above/below using dragged card center vs over card center.
+      // Used for both same-column and cross-column to keep placeholder + position calc consistent.
+      if (overItemId) {
         const translated = active.rect.current.translated
         if (translated) {
           const activeCenterY = translated.top + translated.height / 2
@@ -227,7 +256,9 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
         (t) => t.id !== taskId,
       )
 
-      // Determine insert index in the filtered array
+      // Determine insert index in the filtered array.
+      // Use pointer-based insertAfterRef for both same-column and cross-column
+      // instead of original-index heuristic which breaks with variable-height cards.
       let insertIdx: number
       if (overId.startsWith('column-')) {
         insertIdx = filtered.length
@@ -235,16 +266,6 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
         const overIdx = filtered.findIndex((t) => t.id === overId)
         if (overIdx === -1) {
           insertIdx = filtered.length
-        } else if (fromStatusId === targetStatusId) {
-          // Same column: direction determines before/after
-          const origActive = (tasksByStatus[fromStatusId] ?? []).findIndex(
-            (t) => t.id === taskId,
-          )
-          const origOver = (tasksByStatus[fromStatusId] ?? []).findIndex(
-            (t) => t.id === overId,
-          )
-          // Moving down → insert after over task; moving up → insert before
-          insertIdx = origActive < origOver ? overIdx + 1 : overIdx
         } else {
           insertIdx = insertAfterRef.current ? overIdx + 1 : overIdx
         }
@@ -309,6 +330,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
     <DndContext
       sensors={sensors}
       collisionDetection={kanbanCollision}
+      measuring={measuring}
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragOver={handleDragOver}

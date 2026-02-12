@@ -26,6 +26,8 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
+  defaultAnimateLayoutChanges,
+  type AnimateLayoutChanges,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -426,6 +428,13 @@ function ChecklistBlock({
 }
 
 
+const checklistAnimateLayoutChanges: AnimateLayoutChanges = (args) => {
+  const { isSorting, wasDragging } = args
+  if (isSorting || wasDragging) return false
+  return defaultAnimateLayoutChanges(args)
+}
+
+
 /* -- ChecklistItemRow -- */
 
 function ChecklistItemRow({
@@ -464,7 +473,7 @@ function ChecklistItemRow({
     transform,
     transition,
     isDragging: _isDragging,
-  } = useSortable({ id: item.id })
+  } = useSortable({ id: item.id, animateLayoutChanges: checklistAnimateLayoutChanges })
 
   const style: React.CSSProperties = isOverlay
     ? {
