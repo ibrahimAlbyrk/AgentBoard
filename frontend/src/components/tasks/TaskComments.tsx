@@ -9,7 +9,7 @@ import { ReactionBar } from '@/components/reactions/ReactionBar'
 import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { RichTextRenderer } from '@/components/editor/RichTextRenderer'
 import type { Attachment, TiptapDoc } from '@/types'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 

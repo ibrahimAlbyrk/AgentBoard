@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAttachments, useUploadAttachment, useDeleteAttachment } from '@/hooks/useAttachments'
 import { useAuthStore } from '@/stores/authStore'
 import type { Attachment } from '@/types'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -52,7 +52,7 @@ export function TaskAttachments({ projectId, boardId, taskId }: TaskAttachmentsP
 
   const handleDelete = (attachment: Attachment) => {
     deleteAttachment.mutate(attachment.id, {
-      onError: () => toast.error('Failed to delete attachment'),
+      onError: (err: unknown) => toast.error(err),
     })
   }
 

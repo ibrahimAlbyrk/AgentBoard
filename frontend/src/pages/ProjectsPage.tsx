@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { FolderKanban, Plus, Search, SlidersHorizontal, Archive, ArchiveRestore } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -77,8 +77,8 @@ export function ProjectsPage() {
         toast.success(`"${project.name}" archived`)
       }
       qc.invalidateQueries({ queryKey: ['projects'] })
-    } catch {
-      toast.error('Failed to update project')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -87,8 +87,8 @@ export function ProjectsPage() {
     try {
       await deleteProject.mutateAsync(project.id)
       toast.success(`"${project.name}" deleted`)
-    } catch {
-      toast.error('Failed to delete project')
+    } catch (err) {
+      toast.error(err)
     }
   }
 

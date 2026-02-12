@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Pencil, Trash2, X, Check, Tag, Palette } from 'lucide-react'
+import { usePanelLayer } from '@/contexts/PanelStackContext'
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ interface LabelManagerProps {
 }
 
 export function LabelManager({ projectId, open, onClose }: LabelManagerProps) {
+  usePanelLayer('label-manager', open)
   const { data: labelsRes } = useLabels(projectId)
   const createLabel = useCreateLabel(projectId)
   const updateLabel = useUpdateLabel(projectId)
@@ -69,8 +71,8 @@ export function LabelManager({ projectId, open, onClose }: LabelManagerProps) {
       }
       toast.success('Label created')
       resetForm()
-    } catch {
-      toast.error('Failed to create label')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -94,8 +96,8 @@ export function LabelManager({ projectId, open, onClose }: LabelManagerProps) {
       )
       toast.success('Label updated')
       resetForm()
-    } catch {
-      toast.error('Failed to update label')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -105,8 +107,8 @@ export function LabelManager({ projectId, open, onClose }: LabelManagerProps) {
       setLabels(labels.filter((l) => l.id !== id))
       toast.success('Label deleted')
       setDeletingId(null)
-    } catch {
-      toast.error('Failed to delete label')
+    } catch (err) {
+      toast.error(err)
     }
   }
 

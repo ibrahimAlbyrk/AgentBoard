@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import {
   Dialog,
   DialogContent,
@@ -71,8 +71,8 @@ export function ProjectForm({ open, onClose, project }: ProjectFormProps) {
       }
       reset({ name: '', description: '', icon: '', color: '#6366f1' })
       onClose()
-    } catch {
-      toast.error(isEditing ? 'Failed to update project' : 'Failed to create project')
+    } catch (err) {
+      toast.error(err)
     }
   }
 

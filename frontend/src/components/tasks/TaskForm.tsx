@@ -2,8 +2,9 @@ import { useState, useRef, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { Tag, Paperclip, X, File as FileIcon, Loader2, Check, Users } from 'lucide-react'
+import { usePanelLayer } from '@/contexts/PanelStackContext'
 import {
   Dialog,
   DialogContent,
@@ -61,6 +62,7 @@ const priorityOptions: { value: Priority; label: string; color: string }[] = [
 ]
 
 export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }: TaskFormProps) {
+  usePanelLayer('task-form', open)
   const { statuses, members, labels, agents } = useProjectStore()
   const activeAgents = agents.filter((a) => a.is_active)
   const createTask = useCreateTask(projectId, boardId)
@@ -155,9 +157,9 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
       setSelectedLabelIds([])
       setPendingFiles([])
       onClose()
-    } catch {
+    } catch (err) {
       setUploading(false)
-      toast.error('Failed to create task')
+      toast.error(err)
     }
   }
 

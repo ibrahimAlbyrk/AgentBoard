@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { Plus, Pencil, Trash2, Check, X, Bot } from 'lucide-react'
 import {
   Dialog,
@@ -52,8 +52,8 @@ export function AgentManager({ projectId, open, onClose }: AgentManagerProps) {
       await createAgent.mutateAsync({ name: name.trim(), color })
       toast.success('Agent created')
       resetAdd()
-    } catch {
-      toast.error('Failed to create agent')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -72,8 +72,8 @@ export function AgentManager({ projectId, open, onClose }: AgentManagerProps) {
       })
       toast.success('Agent updated')
       setEditingAgent(null)
-    } catch {
-      toast.error('Failed to update agent')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -83,8 +83,8 @@ export function AgentManager({ projectId, open, onClose }: AgentManagerProps) {
         agentId: agent.id,
         data: { is_active: !agent.is_active },
       })
-    } catch {
-      toast.error('Failed to update agent')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -93,8 +93,8 @@ export function AgentManager({ projectId, open, onClose }: AgentManagerProps) {
     try {
       await deleteAgent.mutateAsync(agent.id)
       toast.success('Agent deleted')
-    } catch {
-      toast.error('Failed to delete agent')
+    } catch (err) {
+      toast.error(err)
     }
   }
 

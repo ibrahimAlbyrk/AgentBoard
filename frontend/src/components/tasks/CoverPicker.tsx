@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { Upload, Loader2, ImageIcon } from 'lucide-react'
+import { usePanelLayer } from '@/contexts/PanelStackContext'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
@@ -7,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { GRADIENT_PRESETS, COLOR_PRESETS } from '@/lib/cover-presets'
 import { useUploadAttachment } from '@/hooks/useAttachments'
 import { useUpdateTask } from '@/hooks/useTasks'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import type { Task, Attachment, CoverType, CoverSize } from '@/types'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -22,6 +23,7 @@ interface CoverPickerProps {
 }
 
 export function CoverPicker({ task, projectId, boardId, children, open, onOpenChange }: CoverPickerProps) {
+  usePanelLayer('cover-picker', open)
   const uploadAttachment = useUploadAttachment(projectId, boardId, task.id)
   const updateTask = useUpdateTask(projectId, boardId)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -81,7 +83,7 @@ export function CoverPicker({ task, projectId, boardId, children, open, onOpenCh
           },
         })
       },
-      onError: () => toast.error('Failed to upload image'),
+      onError: (err: unknown) => toast.error(err),
     })
   }, [uploadAttachment, updateTask, task.id, task.cover_size])
 

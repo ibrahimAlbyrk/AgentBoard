@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatDistanceToNow, parseISO, isPast, isToday } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -48,6 +48,7 @@ import { CoverPicker } from '@/components/tasks/CoverPicker'
 import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { RichTextRenderer } from '@/components/editor/RichTextRenderer'
 import { GRADIENT_PRESETS } from '@/lib/cover-presets'
+import { usePanelEsc } from '@/contexts/PanelStackContext'
 import type { Task, Priority, AssigneeBrief, WatcherBrief, ProjectMember, Agent, TiptapDoc } from '@/types'
 
 const priorities: { value: Priority; label: string; color: string; icon: typeof Flag }[] = [
@@ -131,14 +132,8 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
     }
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [open, onClose])
+  const stableOnClose = useCallback(() => onClose(), [onClose])
+  usePanelEsc('task-detail', open, stableOnClose)
 
   if (!displayTask) return null
 
@@ -759,7 +754,7 @@ function PersonPicker({
           <div className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
             <span className="text-xs font-semibold text-[var(--text-secondary)]">{label}</span>
           </div>
-          <div className="max-h-56 overflow-y-auto py-1">
+          <div className="max-h-56 overflow-y-auto py-1 px-1">
             {/* Members */}
             {members.map((m) => {
               const active = itemUserIds.has(m.user.id)
@@ -767,7 +762,7 @@ function PersonPicker({
                 <button
                   key={m.user.id}
                   onClick={() => toggle('user', m.user.id)}
-                  className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-[var(--surface)] transition-colors text-left"
+                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg mx-auto hover:bg-[var(--accent-muted-bg)] active:bg-[var(--accent-muted-bg)]/80 cursor-pointer transition-colors duration-150 text-left"
                 >
                   <Avatar className="size-5">
                     <AvatarImage src={m.user.avatar_url || undefined} />
@@ -797,7 +792,7 @@ function PersonPicker({
                     <button
                       key={a.id}
                       onClick={() => toggle('agent', a.id)}
-                      className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-[var(--surface)] transition-colors text-left"
+                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg mx-auto hover:bg-[var(--accent-muted-bg)] active:bg-[var(--accent-muted-bg)]/80 cursor-pointer transition-colors duration-150 text-left"
                     >
                       <span
                         className="size-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"

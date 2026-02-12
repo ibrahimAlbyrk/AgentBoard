@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { ArrowRight } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,7 +32,7 @@ export function LoginPage() {
       await login({ email: data.email, password: data.password })
       navigate('/dashboard')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Login failed')
+      toast.error(err)
     } finally {
       setLoading(false)
     }

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { Copy, Plus, Trash2, Key, Bell, BellOff, Monitor, Mail, VolumeX } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -48,8 +48,8 @@ export function SettingsPage() {
       const res = await api.listApiKeys()
       setApiKeys(res.data)
       setKeysLoaded(true)
-    } catch {
-      toast.error('Failed to load API keys')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -59,8 +59,8 @@ export function SettingsPage() {
       const res = await api.updateMe({ full_name: fullName, avatar_url: avatarUrl || undefined })
       setUser(res.data)
       toast.success('Profile updated')
-    } catch {
-      toast.error('Failed to update profile')
+    } catch (err) {
+      toast.error(err)
     } finally {
       setSaving(false)
     }
@@ -74,8 +74,8 @@ export function SettingsPage() {
       setCreatedKey(res.data.key)
       setApiKeys((prev) => [...prev, { ...res.data, key_prefix: res.data.key.slice(0, 8), last_used: null, created_at: new Date().toISOString() }])
       setNewKeyName('')
-    } catch {
-      toast.error('Failed to create API key')
+    } catch (err) {
+      toast.error(err)
     } finally {
       setCreatingKey(false)
     }
@@ -86,8 +86,8 @@ export function SettingsPage() {
       await api.deleteApiKey(id)
       setApiKeys((prev) => prev.filter((k) => k.id !== id))
       toast.success('API key deleted')
-    } catch {
-      toast.error('Failed to delete API key')
+    } catch (err) {
+      toast.error(err)
     }
   }
 

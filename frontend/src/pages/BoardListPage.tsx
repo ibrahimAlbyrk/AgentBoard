@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Plus, LayoutGrid, ListTodo, Users, Trash2, Pencil, MoreHorizontal, ArrowRight, Bot, Settings } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -57,8 +57,8 @@ export function BoardListPage() {
       toast.success('Board created')
       setBoardName('')
       setShowCreate(false)
-    } catch {
-      toast.error('Failed to create board')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -74,8 +74,8 @@ export function BoardListPage() {
       await updateBoard.mutateAsync({ boardId: editingBoard.id, data: { name: editName, color: editColor } })
       toast.success('Board updated')
       setEditingBoard(null)
-    } catch {
-      toast.error('Failed to update board')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -84,8 +84,8 @@ export function BoardListPage() {
     try {
       await deleteBoard.mutateAsync(board.id)
       toast.success('Board deleted')
-    } catch {
-      toast.error('Failed to delete board')
+    } catch (err) {
+      toast.error(err)
     }
   }
 

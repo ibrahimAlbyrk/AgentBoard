@@ -381,3 +381,70 @@
     0 0 0 1px var(--border-strong),
     0 0 24px -8px var(--glow);
 }
+
+/* ===== Toast Styling ===== */
+.agentboard-toast {
+  --toast-shadow: 0 4px 20px -4px rgba(0,0,0,0.15), 0 0 0 1px var(--border-subtle);
+  box-shadow: var(--toast-shadow) !important;
+  padding: 12px 14px !important;
+  border: none !important;
+}
+.dark .agentboard-toast {
+  --toast-shadow: 0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+.agentboard-toast-title {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  letter-spacing: -0.01em !important;
+}
+.agentboard-toast-description {
+  font-size: 12px !important;
+  opacity: 0.7 !important;
+  line-height: 1.4 !important;
+  margin-top: 2px !important;
+}
+.agentboard-toast-icon {
+  margin-right: 2px !important;
+}
+
+/* Success: subtle green left accent */
+.agentboard-toast--success {
+  background: var(--elevated) !important;
+  color: var(--foreground) !important;
+  border-left: 3px solid #22c55e !important;
+}
+.agentboard-toast--success .agentboard-toast-icon {
+  color: #22c55e !important;
+}
+
+/* Error: subtle red left accent, slightly longer display */
+.agentboard-toast--error {
+  background: var(--elevated) !important;
+  color: var(--foreground) !important;
+  border-left: 3px solid #ef4444 !important;
+}
+.agentboard-toast--error .agentboard-toast-icon {
+  color: #ef4444 !important;
+}
+
+/* Warning: subtle amber left accent */
+.agentboard-toast--warning {
+  background: var(--elevated) !important;
+  color: var(--foreground) !important;
+  border-left: 3px solid #eab308 !important;
+}
+.agentboard-toast--warning .agentboard-toast-icon {
+  color: #eab308 !important;
+}
+
+/* Info: subtle blue left accent */
+.agentboard-toast--info {
+  background: var(--elevated) !important;
+  color: var(--foreground) !important;
+  border-left: 3px solid #3b82f6 !important;
+}
+.agentboard-toast--info .agentboard-toast-icon {
+  color: #3b82f6 !important;
+}

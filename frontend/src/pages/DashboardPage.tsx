@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FolderKanban, CheckSquare, Clock, AlertTriangle, ArrowRight } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { useAuthStore } from '@/stores/authStore'
 import { useProjects, useDeleteProject } from '@/hooks/useProjects'
 import { api } from '@/lib/api-client'
@@ -40,8 +40,8 @@ export function DashboardPage() {
         toast.success(`"${project.name}" archived`)
       }
       qc.invalidateQueries({ queryKey: ['projects'] })
-    } catch {
-      toast.error('Failed to update project')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -50,8 +50,8 @@ export function DashboardPage() {
     try {
       await deleteProject.mutateAsync(project.id)
       toast.success(`"${project.name}" deleted`)
-    } catch {
-      toast.error('Failed to delete project')
+    } catch (err) {
+      toast.error(err)
     }
   }
 

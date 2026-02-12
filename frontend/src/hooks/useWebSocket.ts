@@ -4,7 +4,7 @@ import { wsManager } from '@/lib/websocket'
 import { useAuthStore } from '@/stores/authStore'
 import { useBoardStore } from '@/stores/boardStore'
 import { getCardRect, startFlight } from '@/components/board/TaskAnimationLayer'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import type { Task } from '@/types'
 
 // Track tasks moved via local drag-drop to skip their WS echo

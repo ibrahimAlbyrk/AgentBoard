@@ -175,9 +175,9 @@ class APIClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
-        error: { code: 'UNKNOWN', message: response.statusText },
+        error: { code: 'AUTH_FAILED', message: 'Login failed' },
       }))
-      throw new Error(error.error?.message || 'Login failed')
+      throw error
     }
 
     const raw = await response.json()

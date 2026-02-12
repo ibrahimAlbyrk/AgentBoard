@@ -6,6 +6,7 @@ import { ThemeProvider } from 'next-themes'
 import App from './App'
 import '@/styles/globals.css'
 import { Toaster } from '@/components/ui/sonner'
+import { PanelStackProvider } from '@/contexts/PanelStackContext'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,8 +19,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <App />
-          <Toaster richColors position="top-right" />
+          <PanelStackProvider>
+            <App />
+          </PanelStackProvider>
+          <Toaster position="top-right" />
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>

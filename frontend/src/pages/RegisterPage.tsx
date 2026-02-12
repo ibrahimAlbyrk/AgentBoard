@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { ArrowRight } from 'lucide-react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -45,7 +45,7 @@ export function RegisterPage() {
       })
       navigate('/dashboard')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Registration failed')
+      toast.error(err)
     } finally {
       setLoading(false)
     }

@@ -1,3 +1,4 @@
+import { usePanelLayer } from '@/contexts/PanelStackContext'
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ export function ConfirmDialog({
   open,
   onOpenChange,
 }: ConfirmDialogProps) {
+  usePanelLayer('confirm-dialog', open)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>

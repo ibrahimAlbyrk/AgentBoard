@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/lib/toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus,
@@ -33,6 +33,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { usePanelLayer } from '@/contexts/PanelStackContext'
 import {
   Dialog,
   DialogContent,
@@ -97,6 +98,7 @@ interface CustomFieldManagerProps {
 }
 
 export function CustomFieldManager({ projectId, boardId, open, onClose }: CustomFieldManagerProps) {
+  usePanelLayer('custom-field-manager', open)
   const { data: fieldsRes } = useCustomFieldDefinitions(projectId, boardId)
   const createField = useCreateCustomField(projectId, boardId)
   const updateField = useUpdateCustomField(projectId, boardId)
@@ -130,24 +132,38 @@ export function CustomFieldManager({ projectId, boardId, open, onClose }: Custom
 
   const needsOptions = fieldType === 'select' || fieldType === 'multi_select'
 
+  const fillBlankOptionLabels = (opts: SelectOption[]): SelectOption[] => {
+    let maxNum = 0
+    for (const o of opts) {
+      const m = o.label.match(/^Option\s+(\d+)$/i)
+      if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10))
+    }
+    return opts.map((o) => {
+      if (o.label.trim()) return o
+      maxNum += 1
+      return { ...o, label: `Option ${maxNum}` }
+    })
+  }
+
   const handleCreate = async () => {
     if (!name.trim()) return
     if (needsOptions && options.length === 0) {
       toast.error('Add at least one option')
       return
     }
+    const finalOptions = needsOptions ? fillBlankOptionLabels(options) : undefined
     try {
       await createField.mutateAsync({
         name: name.trim(),
         field_type: fieldType,
         description: description.trim() || undefined,
-        options: needsOptions ? options : undefined,
+        options: finalOptions,
         is_required: isRequired,
       })
       toast.success('Field created')
       resetForm()
-    } catch {
-      toast.error('Failed to create field')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -157,20 +173,21 @@ export function CustomFieldManager({ projectId, boardId, open, onClose }: Custom
       toast.error('Add at least one option')
       return
     }
+    const finalOptions = needsOptions ? fillBlankOptionLabels(options) : undefined
     try {
       await updateField.mutateAsync({
         fieldId: editingField.id,
         data: {
           name: name.trim(),
           description: description.trim() || undefined,
-          options: needsOptions ? options : undefined,
+          options: finalOptions,
           is_required: isRequired,
         },
       })
       toast.success('Field updated')
       resetForm()
-    } catch {
-      toast.error('Failed to update field')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -179,8 +196,8 @@ export function CustomFieldManager({ projectId, boardId, open, onClose }: Custom
       await deleteField.mutateAsync(id)
       toast.success('Field deleted')
       setDeletingId(null)
-    } catch {
-      toast.error('Failed to delete field')
+    } catch (err) {
+      toast.error(err)
     }
   }
 
@@ -199,12 +216,21 @@ export function CustomFieldManager({ projectId, boardId, open, onClose }: Custom
     setMode('create')
   }
 
+  const getNextOptionName = () => {
+    let maxNum = 0
+    for (const opt of options) {
+      const match = opt.label.match(/^Option\s+(\d+)$/i)
+      if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10))
+    }
+    return `Option ${maxNum + 1}`
+  }
+
   const addOption = () => {
     setOptions([
       ...options,
       {
         id: crypto.randomUUID(),
-        label: '',
+        label: getNextOptionName(),
         color: PRESET_COLORS[options.length % PRESET_COLORS.length],
       },
     ])
