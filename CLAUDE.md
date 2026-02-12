@@ -8,6 +8,12 @@ AgentBoard — full-stack Kanban task management system with agent-friendly REST
 
 ## Commands
 
+### Quick Start/Stop (from root)
+```bash
+./scripts/start.sh    # start backend (:8000) + frontend (:3000) in background
+./scripts/stop.sh     # stop both
+```
+
 ### Backend (run from `backend/`)
 ```bash
 source .venv/bin/activate

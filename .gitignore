@@ -54,6 +54,9 @@ coverage/
 # Uploads
 uploads/
 
+# PIDs
+.pids/
+
 # Misc
 *.bak
 *.tmp
