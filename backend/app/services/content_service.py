@@ -29,13 +29,30 @@ def normalize_content(value: str | dict | None) -> dict | None:
         doc_content = value.get("content", [])
         if not doc_content:
             return None
-        # Check if all paragraphs are empty
-        plain = extract_plain_text(value)
-        if not plain.strip():
-            return None
-        return value
+        # Check if doc has any meaningful content (text, mentions, references, images, etc.)
+        if _has_meaningful_content(value):
+            return value
+        return None
 
     raise ValueError("Content must be a string or Tiptap JSON dict")
+
+
+_MEANINGFUL_NODE_TYPES = {"text", "mention", "reference", "image", "taskItem", "table"}
+
+
+def _has_meaningful_content(doc: dict) -> bool:
+    """Check if a Tiptap doc has any meaningful nodes (text, mentions, references, images, etc.)."""
+    def walk(node: dict) -> bool:
+        if node.get("type") in _MEANINGFUL_NODE_TYPES:
+            # For text nodes, require non-whitespace content
+            if node.get("type") == "text":
+                return bool(node.get("text", "").strip())
+            return True
+        for child in node.get("content", []):
+            if walk(child):
+                return True
+        return False
+    return walk(doc)
 
 
 def extract_plain_text(doc: dict | None) -> str:
@@ -52,6 +69,10 @@ def extract_plain_text(doc: dict | None) -> str:
             label = node.get("attrs", {}).get("label", "")
             if label:
                 parts.append(f"@{label}")
+        elif ntype == "reference":
+            label = node.get("attrs", {}).get("label", "")
+            if label:
+                parts.append(f"#{label}")
         elif ntype == "hardBreak":
             parts.append("\n")
         for child in node.get("content", []):
