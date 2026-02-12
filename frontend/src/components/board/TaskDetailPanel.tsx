@@ -692,7 +692,6 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
               {activeSection && (
                 <motion.div
                   key={activeSection}
-                  layout
                   variants={sidePanelVariants}
                   initial="hidden"
                   animate="visible"
