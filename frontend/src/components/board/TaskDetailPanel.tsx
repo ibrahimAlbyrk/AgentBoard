@@ -124,20 +124,20 @@ const barSlide = {
 }
 
 const sidePanelVariants = {
-  hidden: { opacity: 0, x: -20, scale: 0.97, filter: 'blur(4px)' },
+  hidden: { opacity: 0, x: 40, scale: 0.96, filter: 'blur(6px)' },
   visible: {
     opacity: 1,
     x: 0,
     scale: 1,
     filter: 'blur(0px)',
-    transition: { type: 'spring' as const, damping: 32, stiffness: 240, mass: 0.8 },
+    transition: { type: 'spring' as const, damping: 34, stiffness: 260, mass: 0.7 },
   },
   exit: {
     opacity: 0,
-    x: -12,
-    scale: 0.98,
-    filter: 'blur(2px)',
-    transition: { duration: 0.25, ease: [0.4, 0, 0.7, 1] as const },
+    x: 30,
+    scale: 0.97,
+    filter: 'blur(4px)',
+    transition: { duration: 0.3, ease: [0.32, 0, 0.67, 0] as const },
   },
 }
 
@@ -188,6 +188,13 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   const closeSidePanel = useCallback(() => {
     setActiveSection(null)
   }, [])
+
+  // Close modal — do NOT clear activeSection here.
+  // The side panel must stay in the tree during outer exit so its exit animation plays.
+  // The useEffect above clears activeSection after unmount.
+  const handleFullClose = useCallback(() => {
+    onClose()
+  }, [onClose])
 
   const stableOnClose = useCallback(() => {
     // ESC: close side panel first, then task panel
@@ -248,13 +255,20 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
             animate="visible"
             exit="exit"
             transition={{ duration: 0.25 }}
-            onClick={onClose}
+            onClick={handleFullClose}
           />
 
-          {/* Container — task panel always centered, side panel positioned absolutely */}
-          <div className="relative z-10 flex flex-col items-center max-h-[min(78vh,760px)]">
-            {/* Task Detail Island + Side Panel wrapper */}
-            <div className="relative flex flex-col items-center">
+          {/* Wrapper: vertical stack — panels row + floating bar */}
+          <div className="relative z-10 flex flex-col items-center">
+            {/* Container — both panels in flex row, layout animation smoothly recenters */}
+            <motion.div
+              layout="position"
+              transition={{ type: 'spring', damping: 36, stiffness: 280, mass: 0.8 }}
+              exit={{ opacity: 0, scale: 0.97, y: 14, transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } }}
+              className="flex items-start gap-3 max-h-[min(78vh,760px)]"
+            >
+              {/* Task Detail Island */}
+              <div className="relative flex flex-col items-center">
               <motion.div
                 ref={panelRef}
                 className="relative w-[520px] max-h-[min(78vh,760px)] flex flex-col bg-[var(--elevated)] overflow-hidden"
@@ -338,7 +352,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                     <span>{displayTask.status.name}</span>
                   </div>
                   <button
-                    onClick={onClose}
+                    onClick={handleFullClose}
                     className="size-8 rounded-xl flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--surface)] transition-all duration-150"
                   >
                     <X className="size-4" />
@@ -671,87 +685,19 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                 </div>
               </motion.div>
 
-              {/* Floating Action Bar — OUTSIDE and BELOW the task panel */}
-              <motion.div
-                variants={barSlide}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="mt-2 flex justify-center"
-              >
-                <div
-                  className="inline-flex items-center gap-0.5 px-1 py-1 rounded-xl"
-                  style={{
-                    backgroundColor: 'color-mix(in srgb, var(--elevated) 88%, transparent)',
-                    backdropFilter: 'blur(20px) saturate(1.8)',
-                    WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
-                    boxShadow: [
-                      '0 4px 24px -6px rgba(0,0,0,0.25)',
-                      '0 0 0 1px color-mix(in srgb, var(--border-subtle) 60%, transparent)',
-                      'inset 0 1px 0 0 rgba(255,255,255,0.06)',
-                    ].join(', '),
-                  }}
-                >
-                  {floatingBarItems.map((item) => {
-                    const isActive = activeSection === item.key
-                    const count =
-                      item.key === 'comments'
-                        ? displayTask.comments_count
-                        : item.key === 'attachments'
-                          ? (displayTask.attachments?.length ?? 0)
-                          : 0
-                    return (
-                      <button
-                        key={item.key}
-                        onClick={() => toggleSection(item.key)}
-                        className={`
-                          relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                          transition-all duration-200 cursor-pointer select-none
-                          ${isActive
-                            ? 'text-[var(--accent-solid)] bg-[var(--accent-solid)]/10'
-                            : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover,var(--surface))]'
-                          }
-                        `}
-                      >
-                        <item.icon className="size-3.5" strokeWidth={isActive ? 2.5 : 2} />
-                        <span>{item.label}</span>
-                        {count > 0 && (
-                          <span
-                            className={`
-                              text-[10px] min-w-[18px] text-center px-1 py-0.5 rounded-md font-semibold leading-none
-                              ${isActive
-                                ? 'bg-[var(--accent-solid)] text-white'
-                                : 'bg-[var(--surface)] text-[var(--text-tertiary)]'
-                              }
-                            `}
-                          >
-                            {count}
-                          </span>
-                        )}
-                        {isActive && (
-                          <motion.div
-                            layoutId="floating-bar-indicator"
-                            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-[var(--accent-solid)]"
-                            transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-                          />
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </motion.div>
             </div>
 
-            {/* Side Panel — absolutely positioned to the right, never shifts task panel */}
-            <AnimatePresence mode="wait">
+            {/* Side Panel — popLayout: exiting panel leaves flow immediately so layout animates smoothly */}
+            <AnimatePresence mode="popLayout">
               {activeSection && (
                 <motion.div
                   key={activeSection}
+                  layout
                   variants={sidePanelVariants}
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="absolute left-[calc(100%+12px)] top-0 w-[380px] max-h-[min(78vh,760px)] flex flex-col bg-[var(--elevated)] overflow-hidden"
+                  className="w-[380px] max-h-[min(78vh,760px)] flex flex-col bg-[var(--elevated)] overflow-hidden shrink-0"
                   style={{
                     borderRadius: '20px',
                     boxShadow: [
@@ -811,6 +757,77 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                 </motion.div>
               )}
             </AnimatePresence>
+          </motion.div>
+
+            {/* Floating Action Bar — OUTSIDE layout container, always centered */}
+            <motion.div
+              variants={barSlide}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="mt-2 flex justify-center"
+            >
+              <div
+                className="inline-flex items-center gap-0.5 px-1 py-1 rounded-xl"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--elevated) 88%, transparent)',
+                  backdropFilter: 'blur(20px) saturate(1.8)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
+                  boxShadow: [
+                    '0 4px 24px -6px rgba(0,0,0,0.25)',
+                    '0 0 0 1px color-mix(in srgb, var(--border-subtle) 60%, transparent)',
+                    'inset 0 1px 0 0 rgba(255,255,255,0.06)',
+                  ].join(', '),
+                }}
+              >
+                {floatingBarItems.map((item) => {
+                  const isActive = activeSection === item.key
+                  const count =
+                    item.key === 'comments'
+                      ? displayTask.comments_count
+                      : item.key === 'attachments'
+                        ? (displayTask.attachments?.length ?? 0)
+                        : 0
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => toggleSection(item.key)}
+                      className={`
+                        relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                        transition-all duration-200 cursor-pointer select-none
+                        ${isActive
+                          ? 'text-[var(--accent-solid)] bg-[var(--accent-solid)]/10'
+                          : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover,var(--surface))]'
+                        }
+                      `}
+                    >
+                      <item.icon className="size-3.5" strokeWidth={isActive ? 2.5 : 2} />
+                      <span>{item.label}</span>
+                      {count > 0 && (
+                        <span
+                          className={`
+                            text-[10px] min-w-[18px] text-center px-1 py-0.5 rounded-md font-semibold leading-none
+                            ${isActive
+                              ? 'bg-[var(--accent-solid)] text-white'
+                              : 'bg-[var(--surface)] text-[var(--text-tertiary)]'
+                            }
+                          `}
+                        >
+                          {count}
+                        </span>
+                      )}
+                      {isActive && (
+                        <motion.div
+                          layoutId="floating-bar-indicator"
+                          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-[var(--accent-solid)]"
+                          transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+                        />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </motion.div>
           </div>
         </div>
       )}
