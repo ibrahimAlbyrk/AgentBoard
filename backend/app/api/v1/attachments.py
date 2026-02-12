@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import check_board_access, get_current_user
 from app.core.config import settings
+from app.core.errors import NotFoundError, PermissionError_, ValidationError
 from app.core.database import get_db
 from app.crud import crud_attachment, crud_task
 from app.models.attachment import Attachment
@@ -24,9 +25,7 @@ router = APIRouter(
 async def _get_task_or_404(task_id: UUID, board: Board, db: AsyncSession):
     task = await crud_task.get(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
     return task
 
 
@@ -42,10 +41,7 @@ async def upload_attachment(
 
     content = await file.read()
     if len(content) > settings.MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File too large. Maximum size is {settings.MAX_FILE_SIZE // (1024 * 1024)}MB",
-        )
+        raise ValidationError(f"File too large. Maximum size is {settings.MAX_FILE_SIZE // (1024 * 1024)}MB")
     await file.seek(0)
 
     file_path, file_size = await storage.save(file, str(task_id))
@@ -94,14 +90,9 @@ async def delete_attachment(
 ):
     attachment = await crud_attachment.get(db, attachment_id)
     if not attachment or attachment.task_id != task_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found"
-        )
+        raise NotFoundError("Attachment not found")
     if attachment.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Can only delete own attachments",
-        )
+        raise PermissionError_("You can only delete your own attachments")
     await storage.delete(attachment.file_path)
 
     # Clear cover if this attachment was used as a task's cover image
@@ -127,14 +118,10 @@ async def download_attachment(
 ):
     attachment = await crud_attachment.get(db, attachment_id)
     if not attachment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found"
-        )
+        raise NotFoundError("Attachment not found")
     file_path = storage.get_path(attachment.file_path)
     if not file_path.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk"
-        )
+        raise NotFoundError("File not found on server")
     return FileResponse(
         path=str(file_path),
         filename=attachment.filename,

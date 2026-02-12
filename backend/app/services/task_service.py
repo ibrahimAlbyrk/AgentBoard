@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import NotFoundError, ValidationError
 from app.crud import crud_activity_log, crud_agent, crud_attachment, crud_status, crud_task, crud_user
 from app.models.task import Task
 from app.models.task_assignee import TaskAssignee
@@ -179,11 +180,13 @@ class TaskService:
         if not status_id:
             default_status = await crud_status.get_default_by_board(db, board_id)
             if not default_status:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No default status found for board",
-                )
+                raise NotFoundError("No default status found for this board")
             status_id = default_status.id
+        else:
+            # Validate status belongs to this board
+            target_status = await crud_status.get(db, status_id)
+            if not target_status or target_status.board_id != board_id:
+                raise NotFoundError("Status not found in this board")
 
         position = await PositionService.get_end_position(db, status_id)
 
@@ -191,17 +194,11 @@ class TaskService:
         if task_in.agent_creator_id:
             agent = await crud_agent.get(db, task_in.agent_creator_id)
             if not agent or agent.project_id != project_id or not agent.is_active:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or inactive agent_creator_id",
-                )
+                raise ValidationError("Invalid or inactive agent creator")
         for aid in task_in.assignee_agent_ids:
             agent = await crud_agent.get(db, aid)
             if not agent or agent.project_id != project_id or not agent.is_active:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid or inactive assignee agent",
-                )
+                raise ValidationError("Invalid or inactive assignee agent")
 
         # Normalize description to Tiptap JSON + plain text
         desc_doc = normalize_content(task_in.description) if task_in.description is not None else None
@@ -315,27 +312,15 @@ class TaskService:
             if ct == "image" and cv:
                 att = await crud_attachment.get(db, UUID(cv))
                 if not att or att.task_id != task.id:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid attachment for cover",
-                    )
+                    raise ValidationError("Invalid attachment for cover")
                 if not att.mime_type.startswith("image/"):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Attachment is not an image",
-                    )
+                    raise ValidationError("Attachment is not an image")
             elif ct == "color" and cv:
                 if not re.match(r"^#[0-9A-Fa-f]{6}$", cv):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid hex color",
-                    )
+                    raise ValidationError("Invalid hex color format (expected #RRGGBB)")
             elif ct == "gradient" and cv:
                 if cv not in GRADIENT_PRESETS:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid gradient preset",
-                    )
+                    raise ValidationError("Invalid gradient preset")
             elif ct is None:
                 update_data["cover_value"] = None
                 update_data["cover_size"] = None
@@ -403,10 +388,7 @@ class TaskService:
             for aid in (assignee_agent_ids or []):
                 agent = await crud_agent.get(db, aid)
                 if not agent or agent.project_id != task.project_id or not agent.is_active:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid or inactive assignee agent",
-                    )
+                    raise ValidationError("Invalid or inactive assignee agent")
             await _sync_assignees(
                 db, task.id,
                 assignee_user_ids or [],

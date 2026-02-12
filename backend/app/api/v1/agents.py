@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import check_project_access, get_current_user
+from app.core.errors import DuplicateError, NotFoundError
 from app.core.database import get_db
 from app.crud import crud_agent
 from app.models.agent import Agent
@@ -40,10 +41,7 @@ async def create_agent(
 ):
     existing = await crud_agent.get_by_name(db, project.id, agent_in.name)
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Agent with this name already exists",
-        )
+        raise DuplicateError(f'Agent "{agent_in.name}" already exists in this project')
     agent = Agent(
         project_id=project.id,
         name=agent_in.name,
@@ -65,20 +63,14 @@ async def update_agent(
 ):
     agent = await crud_agent.get(db, agent_id)
     if not agent or agent.project_id != project.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Agent not found",
-        )
+        raise NotFoundError("Agent not found")
     update_data = agent_in.model_dump(exclude_unset=True)
     if "name" in update_data and update_data["name"] != agent.name:
         existing = await crud_agent.get_by_name(
             db, project.id, update_data["name"]
         )
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Agent with this name already exists",
-            )
+            raise DuplicateError(f'Agent "{update_data["name"]}" already exists in this project')
     for field, value in update_data.items():
         setattr(agent, field, value)
     db.add(agent)
@@ -95,8 +87,5 @@ async def delete_agent(
 ):
     agent = await crud_agent.get(db, agent_id)
     if not agent or agent.project_id != project.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Agent not found",
-        )
+        raise NotFoundError("Agent not found")
     await crud_agent.remove(db, id=agent_id)

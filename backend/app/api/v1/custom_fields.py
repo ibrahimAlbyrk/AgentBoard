@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import check_board_access, get_current_user
+from app.core.errors import DuplicateError, NotFoundError
 from app.core.database import get_db
 from app.crud import crud_custom_field_definition, crud_custom_field_value, crud_task
 from app.models.board import Board
@@ -57,10 +58,7 @@ async def create_custom_field(
         db, board.id, field_in.name
     )
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f'Field "{field_in.name}" already exists on this board',
-        )
+        raise DuplicateError(f'Field "{field_in.name}" already exists on this board')
 
     definition = await CustomFieldService.create_definition(db, board.id, field_in)
     response = CustomFieldDefinitionResponse.model_validate(definition)
@@ -88,20 +86,14 @@ async def update_custom_field(
 ):
     definition = await crud_custom_field_definition.get(db, field_id)
     if not definition or definition.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Custom field not found",
-        )
+        raise NotFoundError("Custom field not found")
 
     if field_in.name and field_in.name != definition.name:
         existing = await crud_custom_field_definition.get_by_name(
             db, board.id, field_in.name
         )
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f'Field "{field_in.name}" already exists on this board',
-            )
+            raise DuplicateError(f'Field "{field_in.name}" already exists on this board')
 
     updated = await CustomFieldService.update_definition(db, definition, field_in)
     response = CustomFieldDefinitionResponse.model_validate(updated)
@@ -128,10 +120,7 @@ async def delete_custom_field(
 ):
     definition = await crud_custom_field_definition.get(db, field_id)
     if not definition or definition.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Custom field not found",
-        )
+        raise NotFoundError("Custom field not found")
 
     await crud_custom_field_definition.remove(db, id=field_id)
 
@@ -156,10 +145,7 @@ async def reorder_custom_fields(
     for i, field_id in enumerate(body.field_ids):
         definition = await crud_custom_field_definition.get(db, field_id)
         if not definition or definition.board_id != board.id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Custom field {field_id} not found",
-            )
+            raise NotFoundError(f"Custom field not found")
         definition.position = (i + 1) * 1024.0
         db.add(definition)
 
@@ -192,9 +178,7 @@ async def list_field_values(
 ):
     task = await crud_task.get(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
 
     values = await crud_custom_field_value.get_by_task(db, task_id)
     return ResponseBase(
@@ -215,9 +199,7 @@ async def bulk_set_field_values(
 ):
     task = await crud_task.get(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
 
     results = await CustomFieldService.bulk_set_values(
         db, task_id, board.id, body.values
@@ -254,16 +236,11 @@ async def set_field_value(
 ):
     task = await crud_task.get(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
 
     definition = await crud_custom_field_definition.get(db, field_id)
     if not definition or definition.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Custom field not found",
-        )
+        raise NotFoundError("Custom field not found")
 
     result = await CustomFieldService.set_field_value(
         db, task_id, definition, value_in
@@ -297,9 +274,7 @@ async def clear_field_value(
 ):
     task = await crud_task.get(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
 
     await crud_custom_field_value.delete_by_task_and_field(db, task_id, field_id)
 

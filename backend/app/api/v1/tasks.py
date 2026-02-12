@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import check_board_access, get_current_user
+from app.core.errors import NotFoundError
 from app.core.database import get_db
 from app.crud import crud_reaction, crud_task
 from app.models.board import Board
@@ -117,9 +118,7 @@ async def get_task(
 ):
     task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
     resp = TaskResponse.model_validate(task)
     resp.reactions = await crud_reaction.get_summary(
         db, "task", task_id, current_user_id=current_user.id
@@ -137,9 +136,7 @@ async def update_task(
 ):
     task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
     updated = await TaskService.update_task(db, task, current_user.id, task_in)
     response = TaskResponse.model_validate(updated)
     await manager.broadcast_to_board(str(board.project_id), str(board.id), {
@@ -169,9 +166,7 @@ async def delete_task(
 ):
     task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
     task_title = task.title
     assignee_user_ids = [a.user_id for a in task.assignees if a.user_id]
     watcher_user_ids = [w.user_id for w in task.watchers if w.user_id]
@@ -227,9 +222,7 @@ async def move_task(
 ):
     task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
     moved = await TaskService.move_task(
         db, task, current_user.id, body.status_id, body.position
     )

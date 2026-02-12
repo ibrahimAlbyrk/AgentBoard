@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import check_board_access, get_current_user
+from app.core.errors import NotFoundError, PermissionError_, ValidationError
 from app.core.database import get_db
 from app.crud import crud_agent, crud_attachment, crud_comment, crud_reaction, crud_task
 from app.models.board import Board
@@ -27,9 +28,7 @@ async def _get_task_or_404(
 ):
     task = await crud_task.get(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
     return task
 
 
@@ -78,18 +77,13 @@ async def create_comment(
 ):
     task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
-        )
+        raise NotFoundError("Task not found")
 
     # Validate agent_creator_id if provided
     if comment_in.agent_creator_id:
         agent = await crud_agent.get(db, comment_in.agent_creator_id)
         if not agent or agent.project_id != board.project_id or not agent.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or inactive agent_creator_id",
-            )
+            raise ValidationError("Invalid or inactive agent creator")
 
     # Normalize content to Tiptap JSON
     content_doc = normalize_content(comment_in.content)
@@ -172,14 +166,9 @@ async def update_comment(
 ):
     comment = await crud_comment.get(db, comment_id)
     if not comment or comment.task_id != task_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
-        )
+        raise NotFoundError("Comment not found")
     if comment.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Can only edit own comments",
-        )
+        raise PermissionError_("You can only edit your own comments")
     # Normalize content
     content_doc = normalize_content(comment_in.content)
     content_text = extract_plain_text(content_doc) if content_doc else ""
@@ -234,13 +223,8 @@ async def delete_comment(
 ):
     comment = await crud_comment.get(db, comment_id)
     if not comment or comment.task_id != task_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
-        )
+        raise NotFoundError("Comment not found")
     if comment.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Can only delete own comments",
-        )
+        raise PermissionError_("You can only delete your own comments")
     await ReactionService.delete_reactions_for_entity(db, "comment", comment_id)
     await crud_comment.remove(db, id=comment_id)

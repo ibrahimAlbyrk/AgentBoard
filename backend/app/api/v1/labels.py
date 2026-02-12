@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import check_project_access
 from app.core.database import get_db
+from app.core.errors import DuplicateError, NotFoundError
 from app.crud import crud_label
 from app.models.label import Label
 from app.models.project import Project
@@ -33,6 +34,12 @@ async def create_label(
     db: AsyncSession = Depends(get_db),
     project: Project = Depends(check_project_access),
 ):
+    # Check for duplicate label name in project
+    existing_labels = await crud_label.get_multi_by_project(db, project.id)
+    for existing in existing_labels:
+        if existing.name.lower() == label_in.name.lower():
+            raise DuplicateError(f'Label "{label_in.name}" already exists in this project')
+
     label = Label(
         project_id=project.id,
         name=label_in.name,
@@ -54,9 +61,7 @@ async def update_label(
 ):
     label = await crud_label.get(db, label_id)
     if not label or label.project_id != project.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Label not found"
-        )
+        raise NotFoundError("Label not found")
     updated = await crud_label.update(db, db_obj=label, obj_in=label_in)
     return ResponseBase(data=LabelResponse.model_validate(updated))
 
@@ -69,7 +74,5 @@ async def delete_label(
 ):
     label = await crud_label.get(db, label_id)
     if not label or label.project_id != project.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Label not found"
-        )
+        raise NotFoundError("Label not found")
     await crud_label.remove(db, id=label_id)

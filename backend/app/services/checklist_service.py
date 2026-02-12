@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import LimitExceededError
 from app.crud import crud_activity_log
 from app.crud.checklist import crud_checklist
 from app.crud.checklist_item import crud_checklist_item
@@ -33,10 +34,7 @@ class ChecklistService:
     ) -> Checklist:
         count = await crud_checklist.count(db, filters={"task_id": task.id})
         if count >= MAX_CHECKLISTS_PER_TASK:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Maximum {MAX_CHECKLISTS_PER_TASK} checklists per task",
-            )
+            raise LimitExceededError(f"Maximum {MAX_CHECKLISTS_PER_TASK} checklists per task")
 
         max_pos = await crud_checklist.get_max_position(db, task.id)
         position = (max_pos or 0) + POSITION_GAP
@@ -109,10 +107,7 @@ class ChecklistService:
     ) -> ChecklistItem:
         count = await crud_checklist_item.count(db, filters={"checklist_id": checklist.id})
         if count >= MAX_ITEMS_PER_CHECKLIST:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Maximum {MAX_ITEMS_PER_CHECKLIST} items per checklist",
-            )
+            raise LimitExceededError(f"Maximum {MAX_ITEMS_PER_CHECKLIST} items per checklist")
 
         max_pos = await crud_checklist_item.get_max_position(db, checklist.id)
         position = (max_pos or 0) + POSITION_GAP

@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import NotFoundError, ValidationError as AppValidationError
 from app.crud.custom_field import crud_custom_field_definition, crud_custom_field_value
 from app.models.custom_field import CustomFieldDefinition
 from app.models.custom_field_value import CustomFieldValue
@@ -28,7 +29,10 @@ class CustomFieldService:
         ])
 
         if definition.is_required and not has_value:
-            raise HTTPException(400, f'Field "{definition.name}" is required')
+            raise AppValidationError(
+                f'Field "{definition.name}" is required',
+                errors=[{"field": definition.name, "message": "This field is required"}],
+            )
 
         if not has_value:
             return
@@ -36,55 +40,55 @@ class CustomFieldService:
         match ft:
             case "text":
                 if value_set.value_text is None:
-                    raise HTTPException(400, f'Text field "{definition.name}" requires value_text')
+                    raise AppValidationError(f'Text field "{definition.name}" requires a text value')
 
             case "number":
                 if value_set.value_number is None:
-                    raise HTTPException(400, f'Number field "{definition.name}" requires value_number')
+                    raise AppValidationError(f'Number field "{definition.name}" requires a numeric value')
 
             case "select":
                 opt_id = value_set.value_json
                 if not isinstance(opt_id, str):
-                    raise HTTPException(400, "Select field requires a string option ID")
+                    raise AppValidationError("Select field requires a string option ID")
                 valid_ids = {o["id"] for o in (definition.options or [])}
                 if opt_id not in valid_ids:
-                    raise HTTPException(400, f'Invalid option for "{definition.name}"')
+                    raise AppValidationError(f'Invalid option for "{definition.name}"')
 
             case "multi_select":
                 ids = value_set.value_json
                 if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
-                    raise HTTPException(400, "Multi-select field requires a list of option IDs")
+                    raise AppValidationError("Multi-select field requires a list of option IDs")
                 valid_ids = {o["id"] for o in (definition.options or [])}
                 invalid = set(ids) - valid_ids
                 if invalid:
-                    raise HTTPException(400, f'Invalid options for "{definition.name}": {invalid}')
+                    raise AppValidationError(f'Invalid options for "{definition.name}"')
 
             case "date":
                 if value_set.value_date is None:
-                    raise HTTPException(400, f'Date field "{definition.name}" requires value_date')
+                    raise AppValidationError(f'Date field "{definition.name}" requires a date value')
 
             case "checkbox":
                 if value_set.value_number is None or value_set.value_number not in (0.0, 1.0):
-                    raise HTTPException(400, "Checkbox field requires value_number 0 or 1")
+                    raise AppValidationError("Checkbox field requires a true/false value")
 
             case "url":
                 if value_set.value_text is None:
-                    raise HTTPException(400, f'URL field "{definition.name}" requires value_text')
+                    raise AppValidationError(f'URL field "{definition.name}" requires a URL value')
                 if not (
                     value_set.value_text.startswith("http://")
                     or value_set.value_text.startswith("https://")
                 ):
-                    raise HTTPException(400, "URL must start with http:// or https://")
+                    raise AppValidationError("Invalid URL format — must start with http:// or https://")
 
             case "person":
                 persons = value_set.value_json
                 if not isinstance(persons, list):
-                    raise HTTPException(400, "Person field requires a list of person objects")
+                    raise AppValidationError("Person field requires a list of person objects")
                 for p in persons:
                     if not isinstance(p, dict):
-                        raise HTTPException(400, "Invalid person entry")
+                        raise AppValidationError("Invalid person entry")
                     if "user_id" not in p and "agent_id" not in p:
-                        raise HTTPException(400, "Person entry needs user_id or agent_id")
+                        raise AppValidationError("Person entry needs user_id or agent_id")
 
     @staticmethod
     async def create_definition(
@@ -176,7 +180,7 @@ class CustomFieldService:
         for v in values:
             definition = await crud_custom_field_definition.get(db, v.field_definition_id)
             if not definition or definition.board_id != board_id:
-                raise HTTPException(404, f"Field definition {v.field_definition_id} not found")
+                raise NotFoundError(f"Field definition not found")
             result = await CustomFieldService.set_field_value(db, task_id, definition, v)
             results.append(result)
         return results

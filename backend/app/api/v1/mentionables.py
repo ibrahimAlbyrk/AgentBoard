@@ -126,7 +126,13 @@ async def get_referenceables(
     boards_q = boards_q.limit(5)
     result = await db.execute(boards_q)
     boards = [
-        {"id": str(b.id), "name": b.name, "icon": b.icon, "color": b.color}
+        {
+            "id": str(b.id),
+            "name": b.name,
+            "icon": b.icon,
+            "color": b.color,
+            "project_id": str(b.project_id),
+        }
         for b in result.scalars().all()
     ]
 
@@ -141,6 +147,7 @@ async def get_referenceables(
             "id": str(t.id),
             "title": t.title,
             "board_id": str(t.board_id),
+            "project_id": str(t.project_id),
             "status_name": "",
         }
         for t in result.scalars().all()

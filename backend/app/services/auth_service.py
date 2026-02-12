@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import AuthError, DuplicateError
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -21,16 +22,10 @@ class AuthService:
     async def register(db: AsyncSession, user_in: UserCreate) -> dict:
         existing = await crud_user.get_by_email(db, user_in.email)
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered",
-            )
+            raise DuplicateError("Email already registered")
         existing = await crud_user.get_by_username(db, user_in.username)
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already taken",
-            )
+            raise DuplicateError("Username already taken")
         user = await crud_user.create(db, obj_in=user_in)
         access_token = create_access_token(data={"sub": str(user.id)})
         refresh_token = create_refresh_token(str(user.id))
@@ -44,15 +39,9 @@ class AuthService:
     async def login(db: AsyncSession, email: str, password: str) -> dict:
         user = await crud_user.authenticate(db, email, password)
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password",
-            )
+            raise AuthError("Invalid email or password")
         if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account is disabled",
-            )
+            raise AuthError("Account is disabled", status_code=403)
         user.last_login_at = datetime.now(UTC)
         db.add(user)
         await db.flush()
