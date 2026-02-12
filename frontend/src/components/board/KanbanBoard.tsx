@@ -19,7 +19,7 @@ import { useMoveTask } from '@/hooks/useTasks'
 import { markLocalMove } from '@/hooks/useWebSocket'
 import { BoardColumn } from './BoardColumn'
 import { TaskCard } from './TaskCard'
-import { TaskAnimationLayer, startFlight } from './TaskAnimationLayer'
+import { TaskAnimationLayer, startFlight, getCardRect } from './TaskAnimationLayer'
 import type { Task } from '@/types'
 
 /**
@@ -97,6 +97,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
   const { tasksByStatus, getFilteredTasks } = useBoardStore()
   const moveTask = useMoveTask(currentProject?.id ?? '', currentBoard?.id ?? '')
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [draggedCardHeight, setDraggedCardHeight] = useState(72)
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
   const [tilt, setTilt] = useState({ x: 0, y: 0 })
@@ -111,6 +112,13 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
     const taskId = String(event.active.id)
     prevDelta.current = { x: 0, y: 0 }
     setTilt({ x: 0, y: 0 })
+
+    // Measure the card's actual height for placeholder sizing
+    const cardRect = getCardRect(taskId)
+    if (cardRect) {
+      setDraggedCardHeight(cardRect.height)
+    }
+
     for (const tasks of Object.values(tasksByStatus)) {
       const task = tasks.find((t) => t.id === taskId)
       if (task) {
@@ -307,7 +315,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="flex gap-4 p-6 h-full overflow-x-auto">
+      <div className="flex gap-4 p-6 overflow-x-auto min-h-[200px]">
         {statuses.map((status) => (
           <BoardColumn
             key={status.id}
@@ -316,6 +324,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
             onTaskClick={onTaskClick}
             onAddTask={() => onAddTask(status.id)}
             placeholderIdx={getPlaceholderIdx(status.id)}
+            placeholderHeight={draggedCardHeight}
             hideDragSourceId={
               activeTask && dragOverColumnId && dragOverColumnId !== activeTask.status.id && activeTask.status.id === status.id
                 ? activeTask.id

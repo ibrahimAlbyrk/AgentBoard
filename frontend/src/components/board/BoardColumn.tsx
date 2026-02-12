@@ -11,19 +11,45 @@ interface BoardColumnProps {
   onTaskClick: (task: Task) => void
   onAddTask: () => void
   placeholderIdx?: number
+  placeholderHeight?: number
   hideDragSourceId?: string
   compact?: boolean
 }
 
-const dropPlaceholder = (
-  <div className="h-[72px] rounded-xl border-2 border-dashed border-[var(--accent-solid)]/30 bg-[var(--accent-muted-bg)]/50" />
-)
+function DropPlaceholder({ height }: { height: number }) {
+  return (
+    <div
+      className="rounded-xl border-2 border-dashed border-[var(--accent-solid)]/40 bg-[var(--accent-muted-bg)]/30 relative overflow-hidden transition-all duration-200"
+      style={{ height }}
+    >
+      {/* Animated shimmer */}
+      <div
+        className="absolute inset-0 opacity-60"
+        style={{
+          background: 'linear-gradient(90deg, transparent 0%, var(--accent-solid) 50%, transparent 100%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 1.5s ease-in-out infinite',
+          opacity: 0.06,
+        }}
+      />
+      {/* Pulsing inner glow */}
+      <div
+        className="absolute inset-0 rounded-[10px]"
+        style={{
+          boxShadow: 'inset 0 0 16px -4px var(--accent-solid)',
+          animation: 'glow-pulse 2s ease-in-out infinite',
+          opacity: 0.3,
+        }}
+      />
+    </div>
+  )
+}
 
-export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, hideDragSourceId, compact }: BoardColumnProps) {
+export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, placeholderHeight = 72, hideDragSourceId, compact }: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status.id}` })
 
   return (
-    <div className="w-[300px] flex-shrink-0 flex flex-col max-h-full">
+    <div className="w-[300px] flex-shrink-0 flex flex-col">
       <div className="flex items-center justify-between px-1 py-2 mb-2">
         <div className="flex items-center gap-2">
           <span
@@ -45,7 +71,7 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
 
       <div
         ref={setNodeRef}
-        className={`flex-1 overflow-y-auto rounded-xl p-2 space-y-2 min-h-[120px] transition-all duration-200 ${
+        className={`rounded-xl p-2 space-y-2 min-h-[120px] transition-all duration-200 ${
           isOver
             ? 'border border-[var(--accent-solid)]/40 bg-[var(--accent-muted-bg)] shadow-[inset_0_0_20px_-8px_var(--glow)]'
             : 'bg-[var(--surface)]/40 border border-dashed border-[var(--border-subtle)]'
@@ -57,16 +83,17 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
         >
           {tasks.map((task, idx) => (
             <Fragment key={task.id}>
-              {idx === placeholderIdx && dropPlaceholder}
+              {idx === placeholderIdx && <DropPlaceholder height={placeholderHeight} />}
               <SortableTaskCard
                 task={task}
                 onClick={() => onTaskClick(task)}
                 hideWhileDragging={task.id === hideDragSourceId}
+                placeholderHeight={placeholderHeight}
                 compact={compact}
               />
             </Fragment>
           ))}
-          {placeholderIdx >= 0 && placeholderIdx >= tasks.length && dropPlaceholder}
+          {placeholderIdx >= 0 && placeholderIdx >= tasks.length && <DropPlaceholder height={placeholderHeight} />}
         </SortableContext>
 
         {tasks.length === 0 && placeholderIdx < 0 && (

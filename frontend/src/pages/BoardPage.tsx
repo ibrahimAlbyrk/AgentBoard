@@ -15,6 +15,8 @@ import { TaskForm } from '@/components/tasks/TaskForm'
 import { TaskDetailPanel } from '@/components/board/TaskDetailPanel'
 import { TaskFilters } from '@/components/tasks/TaskFilters'
 import { LabelManager } from '@/components/labels/LabelManager'
+import { AgentCluster } from '@/components/agents/AgentCluster'
+import { AgentManager } from '@/components/agents/AgentManager'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import type { Task } from '@/types'
 
@@ -33,6 +35,7 @@ export function BoardPage() {
   const { mode: cardMode, setMode: setCardMode } = useCardDisplayMode()
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [showLabelManager, setShowLabelManager] = useState(false)
+  const [showAgentManager, setShowAgentManager] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const selectedTaskRef = useRef(selectedTask)
   selectedTaskRef.current = selectedTask
@@ -105,9 +108,12 @@ export function BoardPage() {
     setShowTaskForm(true)
   }
 
+  const agents = project.agents ?? []
+
   return (
-    <div className="flex flex-col h-full -m-6">
-      <div className="px-6 py-4 border-b border-[var(--border-subtle)] bg-background/60 backdrop-blur-sm">
+    <div className="flex flex-col -m-6 min-h-full">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-20 px-6 py-4 border-b border-[var(--border-subtle)] bg-background/80 backdrop-blur-xl">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <span className="text-xl">{project.icon || '📋'}</span>
@@ -120,7 +126,14 @@ export function BoardPage() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <AgentCluster
+              agents={agents}
+              onManageClick={() => setShowAgentManager(true)}
+            />
+
+            <div className="w-px h-6 bg-[var(--border-subtle)]" />
+
             <div className="flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] p-0.5">
               <button
                 onClick={() => setCardMode('compact')}
@@ -167,7 +180,8 @@ export function BoardPage() {
         <TaskFilters />
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      {/* Board area: grows vertically, scrolls horizontally */}
+      <div className="flex-1">
         <KanbanBoard
           onTaskClick={setSelectedTask}
           onAddTask={handleAddTask}
@@ -195,6 +209,12 @@ export function BoardPage() {
         projectId={projectId!}
         open={showLabelManager}
         onClose={() => setShowLabelManager(false)}
+      />
+
+      <AgentManager
+        projectId={projectId!}
+        open={showAgentManager}
+        onClose={() => setShowAgentManager(false)}
       />
     </div>
   )

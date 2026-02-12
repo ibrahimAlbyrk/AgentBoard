@@ -12,12 +12,14 @@ import {
 } from 'lucide-react'
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -184,6 +186,7 @@ function ChecklistBlock({
   const [title, setTitle] = useState(checklist.title)
   const [newItemText, setNewItemText] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [activeId, setActiveId] = useState<string | null>(null)
   const addItemRef = useRef<HTMLInputElement>(null)
 
   const total = checklist.items.length
@@ -215,7 +218,12 @@ function ChecklistBlock({
     )
   }
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
 
@@ -338,6 +346,7 @@ function ChecklistBlock({
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
               <SortableContext
@@ -354,15 +363,44 @@ function ChecklistBlock({
                       boardId={boardId}
                       taskId={taskId}
                       members={members}
+                      isOverlay={false}
+                      isDragActive={activeId === item.id}
                     />
                   ))}
                 </AnimatePresence>
               </SortableContext>
+              <DragOverlay dropAnimation={null}>
+                {activeId ? (() => {
+                  const activeItem = checklist.items.find((i) => i.id === activeId)
+                  if (!activeItem) return null
+                  return (
+                    <ChecklistItemRow
+                      item={activeItem}
+                      checklistId={checklist.id}
+                      projectId={projectId}
+                      boardId={boardId}
+                      taskId={taskId}
+                      members={members}
+                      isOverlay
+                      isDragActive={false}
+                    />
+                  )
+                })() : null}
+              </DragOverlay>
             </DndContext>
 
             {/* Add item input */}
             <div className="flex items-center gap-2 px-4 py-2 border-t border-[var(--border-subtle)]">
-              <Plus className="size-3.5 text-[var(--text-tertiary)] shrink-0" />
+              <button
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  handleAddItem()
+                }}
+                className="shrink-0 flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] transition-colors"
+                tabIndex={-1}
+              >
+                <Plus className="size-3.5" />
+              </button>
               <input
                 ref={addItemRef}
                 value={newItemText}
@@ -397,6 +435,8 @@ function ChecklistItemRow({
   boardId,
   taskId,
   members,
+  isOverlay = false,
+  isDragActive = false,
 }: {
   item: ChecklistItemType
   checklistId: string
@@ -404,6 +444,8 @@ function ChecklistItemRow({
   boardId: string
   taskId: string
   members: ProjectMember[]
+  isOverlay?: boolean
+  isDragActive?: boolean
 }) {
   const toggleItem = useToggleChecklistItem(projectId, boardId, taskId)
   const updateItem = useUpdateChecklistItem(projectId, boardId, taskId)
@@ -421,14 +463,22 @@ function ChecklistItemRow({
     setNodeRef,
     transform,
     transition,
-    isDragging,
+    isDragging: _isDragging,
   } = useSortable({ id: item.id })
 
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }
+  const style: React.CSSProperties = isOverlay
+    ? {
+        boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+        transform: 'scale(1.02)',
+        borderLeft: '2px solid var(--accent-solid)',
+        borderRadius: '8px',
+        background: 'var(--surface)',
+      }
+    : {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragActive ? 0.3 : 1,
+      }
 
   const handleToggle = useCallback(() => {
     setOptimisticChecked(!isChecked)
@@ -461,20 +511,11 @@ function ChecklistItemRow({
 
   const isOverdue = item.due_date && !item.is_completed && isPast(parseISO(item.due_date))
 
-  return (
-    <motion.div
-      ref={setNodeRef}
-      style={style}
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      exit={{ opacity: 0, x: -20, height: 0 }}
-      transition={{ duration: 0.2 }}
-      className="flex items-center gap-2 px-4 py-1.5 group hover:bg-[var(--elevated)] transition-colors"
-    >
+  const content = (
+    <>
       {/* Drag handle */}
       <div
-        {...attributes}
-        {...listeners}
+        {...(isOverlay ? {} : { ...attributes, ...listeners })}
         className="hidden sm:flex size-4 items-center justify-center cursor-grab opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
       >
         <GripVertical className="size-3 text-[var(--text-tertiary)]" />
@@ -483,24 +524,22 @@ function ChecklistItemRow({
       {/* Checkbox */}
       <button
         onClick={handleToggle}
-        className="size-4 rounded-md border-2 flex items-center justify-center shrink-0 transition-all duration-200"
+        className="size-4 rounded-md border-2 flex items-center justify-center shrink-0"
         style={{
           borderColor: isChecked ? 'var(--accent-solid)' : 'var(--border-strong)',
           backgroundColor: isChecked ? 'var(--accent-solid)' : 'transparent',
+          transition: 'border-color 0.2s ease, background-color 0.2s ease',
         }}
       >
-        <AnimatePresence mode="wait">
-          {isChecked && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: [0, 1.2, 1] }}
-              exit={{ scale: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Check className="size-2.5 text-white" strokeWidth={3} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <Check
+          className="size-2.5 text-white"
+          strokeWidth={3}
+          style={{
+            transform: isChecked ? 'scale(1)' : 'scale(0)',
+            opacity: isChecked ? 1 : 0,
+            transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease',
+          }}
+        />
       </button>
 
       {/* Title */}
@@ -630,6 +669,31 @@ function ChecklistItemRow({
       >
         <X className="size-3 text-[var(--text-tertiary)] hover:text-[var(--priority-urgent)] transition-colors" />
       </button>
+    </>
+  )
+
+  if (isOverlay) {
+    return (
+      <div
+        style={style}
+        className="flex items-center gap-2 px-4 py-1.5 group"
+      >
+        {content}
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      ref={setNodeRef}
+      style={style}
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, x: -20, height: 0 }}
+      transition={{ duration: 0.2 }}
+      className="flex items-center gap-2 px-4 py-1.5 group hover:bg-[var(--elevated)] transition-colors"
+    >
+      {content}
     </motion.div>
   )
 }

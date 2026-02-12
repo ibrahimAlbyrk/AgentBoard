@@ -9,10 +9,11 @@ interface SortableTaskCardProps {
   task: Task
   onClick: () => void
   hideWhileDragging?: boolean
+  placeholderHeight?: number
   compact?: boolean
 }
 
-export function SortableTaskCard({ task, onClick, hideWhileDragging, compact }: SortableTaskCardProps) {
+export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholderHeight = 72, compact }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -49,7 +50,19 @@ export function SortableTaskCard({ task, onClick, hideWhileDragging, compact }: 
       {...listeners}
     >
       {isDragging && !hidden ? (
-        <div className="h-[72px] rounded-xl border-2 border-dashed border-[var(--accent-solid)]/30 bg-[var(--accent-muted-bg)]/50" />
+        <div
+          className="rounded-xl border-2 border-dashed border-[var(--accent-solid)]/40 bg-[var(--accent-muted-bg)]/30 relative overflow-hidden"
+          style={{ height: placeholderHeight }}
+        >
+          <div
+            className="absolute inset-0 rounded-[10px]"
+            style={{
+              boxShadow: 'inset 0 0 16px -4px var(--accent-solid)',
+              animation: 'glow-pulse 2s ease-in-out infinite',
+              opacity: 0.3,
+            }}
+          />
+        </div>
       ) : hidden ? null : (
         <TaskCard task={task} onClick={onClick} compact={compact} />
       )}
