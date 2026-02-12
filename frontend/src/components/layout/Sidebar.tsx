@@ -61,7 +61,7 @@ function SidebarProjectItem({
         >
           <span
             className="size-2.5 rounded flex-shrink-0"
-            style={{ backgroundColor: project.color || '#3B82F6' }}
+            style={{ backgroundColor: project.color || 'var(--accent-solid)' }}
           />
           <span className="truncate">{project.name}</span>
         </Link>
@@ -126,7 +126,7 @@ export function Sidebar({ onClose }: SidebarProps) {
     <aside className="w-[248px] h-full border-r border-[var(--sidebar-border)] bg-sidebar flex flex-col">
       {/* Brand */}
       <div className="h-14 flex items-center gap-2.5 px-5 border-b border-[var(--sidebar-border)]">
-        <div className="size-7 rounded-lg bg-gradient-to-br from-[var(--accent-solid)] to-[#3B82F6] flex items-center justify-center shadow-sm">
+        <div className="size-7 rounded-lg bg-gradient-to-br from-[var(--accent-solid)] to-[var(--accent-solid-hover)] flex items-center justify-center shadow-sm">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="7" height="7" rx="1" />
             <rect x="14" y="3" width="7" height="7" rx="1" />

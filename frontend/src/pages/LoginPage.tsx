@@ -39,18 +39,18 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#09090B] grain-overlay">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[var(--background)] grain-overlay">
       {/* Animated gradient mesh */}
       <div className="absolute inset-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-[#2563EB]/15 blur-[120px] animate-gradient" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#60A5FA]/10 blur-[120px] animate-gradient" style={{ animationDelay: '-4s' }} />
-        <div className="absolute top-[40%] right-[20%] w-[30%] h-[30%] rounded-full bg-[#3B82F6]/8 blur-[100px] animate-gradient" style={{ animationDelay: '-2s' }} />
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-[var(--accent-solid)]/15 blur-[120px] animate-gradient" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[var(--glow-pink)] blur-[120px] animate-gradient" style={{ animationDelay: '-4s' }} />
+        <div className="absolute top-[40%] right-[20%] w-[30%] h-[30%] rounded-full bg-[var(--accent-solid)]/8 blur-[100px] animate-gradient" style={{ animationDelay: '-2s' }} />
       </div>
 
       <div className="relative z-10 w-full max-w-[420px] animate-fade-in">
-        <div className="bg-[#18181B]/80 backdrop-blur-2xl border border-[#ffffff08] rounded-2xl p-8 shadow-[0_0_80px_-20px_#3B82F620]">
+        <div className="bg-[var(--elevated)]/80 backdrop-blur-2xl border border-[var(--border-subtle)] rounded-2xl p-8 shadow-[0_0_80px_-20px_var(--glow)]">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center size-12 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#3B82F6] mb-4 shadow-[0_0_24px_-4px_#2563EB80]">
+            <div className="inline-flex items-center justify-center size-12 rounded-xl bg-gradient-to-br from-[var(--accent-solid)] to-[var(--accent-solid-hover)] mb-4 shadow-[0_0_24px_-4px_var(--accent-solid)]">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" rx="1" />
                 <rect x="14" y="3" width="7" height="7" rx="1" />
@@ -58,45 +58,45 @@ export function LoginPage() {
                 <rect x="14" y="14" width="7" height="7" rx="1" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Welcome back</h1>
-            <p className="text-sm text-[#A1A1AA] mt-1.5">Sign in to continue to AgentBoard</p>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Welcome back</h1>
+            <p className="text-sm text-[var(--text-secondary)] mt-1.5">Sign in to continue to AgentBoard</p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#A1A1AA] text-xs font-medium uppercase tracking-wider">Email</Label>
+              <Label htmlFor="email" className="text-[var(--text-secondary)] text-xs font-medium uppercase tracking-wider">Email</Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="you@example.com"
-                className="bg-[#09090B] border-[#27272A] h-11 text-white placeholder:text-[#52525B] focus:border-[#2563EB] transition-colors"
+                className="bg-[var(--background)] border-[var(--border-subtle)] h-11 text-foreground placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-solid)] transition-colors"
                 {...register('email')}
                 aria-invalid={!!errors.email}
               />
               {errors.email && (
-                <p className="text-sm text-[#EF4444]">{errors.email.message}</p>
+                <p className="text-sm text-destructive">{errors.email.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-[#A1A1AA] text-xs font-medium uppercase tracking-wider">Password</Label>
+              <Label htmlFor="password" className="text-[var(--text-secondary)] text-xs font-medium uppercase tracking-wider">Password</Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="Enter your password"
-                className="bg-[#09090B] border-[#27272A] h-11 text-white placeholder:text-[#52525B] focus:border-[#2563EB] transition-colors"
+                className="bg-[var(--background)] border-[var(--border-subtle)] h-11 text-foreground placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-solid)] transition-colors"
                 {...register('password')}
                 aria-invalid={!!errors.password}
               />
               {errors.password && (
-                <p className="text-sm text-[#EF4444]">{errors.password.message}</p>
+                <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-gradient-to-r from-[#2563EB] to-[#3B82F6] hover:from-[#1D4ED8] hover:to-[#2563EB] text-white font-medium shadow-[0_0_20px_-4px_#2563EB50] hover:shadow-[0_0_28px_-4px_#2563EB80] transition-all duration-200"
+              className="w-full h-11 bg-gradient-to-r from-[var(--accent-solid)] to-[var(--accent-solid-hover)] hover:from-[var(--accent-solid-hover)] hover:to-[var(--accent-solid)] text-white font-medium shadow-[0_0_20px_-4px_var(--glow)] hover:shadow-[0_0_28px_-4px_var(--glow)] transition-all duration-200"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
@@ -111,9 +111,9 @@ export function LoginPage() {
               )}
             </Button>
 
-            <p className="text-center text-sm text-[#52525B]">
+            <p className="text-center text-sm text-[var(--text-tertiary)]">
               Don&apos;t have an account?{' '}
-              <Link to="/register" className="text-[#3B82F6] hover:text-[#60A5FA] transition-colors">
+              <Link to="/register" className="text-[var(--accent-solid)] hover:text-[var(--accent-solid-hover)] transition-colors">
                 Sign up
               </Link>
             </p>

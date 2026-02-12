@@ -296,10 +296,10 @@
 
 /* Suggestion dropdown */
 .tippy-box[data-theme="mention-suggestion"] {
-  background: var(--elevated, hsl(240 6% 12%));
-  border: 1px solid var(--border-subtle, hsl(240 5% 18%));
+  background: var(--elevated, #282e33);
+  border: 1px solid var(--border-subtle, #3d474f);
   border-radius: 12px;
-  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(140, 155, 171, 0.06);
   overflow: hidden;
   padding: 4px;
 }
