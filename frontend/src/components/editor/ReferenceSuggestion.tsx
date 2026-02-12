@@ -32,11 +32,11 @@ export const ReferenceSuggestion = forwardRef<
     if (!item) return
 
     if (item.type === 'project') {
-      command({ id: item.data.id, label: item.data.name, entityType: 'project' })
+      command({ id: item.data.id, label: item.data.name, entityType: 'project', projectId: item.data.id })
     } else if (item.type === 'board') {
-      command({ id: item.data.id, label: item.data.name, entityType: 'board' })
+      command({ id: item.data.id, label: item.data.name, entityType: 'board', projectId: item.data.project_id, boardId: item.data.id })
     } else {
-      command({ id: item.data.id, label: item.data.title, entityType: 'task' })
+      command({ id: item.data.id, label: item.data.title, entityType: 'task', projectId: item.data.project_id, boardId: item.data.board_id })
     }
   }
 

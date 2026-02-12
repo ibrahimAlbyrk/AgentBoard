@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -22,6 +23,40 @@ import { useReferenceables } from './hooks/useReferenceables'
 import type { TiptapDoc, MentionableUser, MentionableAgent } from '@/types'
 import { cn } from '@/lib/utils'
 import './styles/editor.css'
+
+/** Reference extension with routing attrs (entityType, projectId, boardId) */
+const ReferenceExtension = Mention.extend({
+  name: 'reference',
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      entityType: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-entity-type'),
+        renderHTML: (attrs: Record<string, unknown>) => {
+          if (!attrs.entityType) return {}
+          return { 'data-entity-type': attrs.entityType }
+        },
+      },
+      projectId: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-project-id'),
+        renderHTML: (attrs: Record<string, unknown>) => {
+          if (!attrs.projectId) return {}
+          return { 'data-project-id': attrs.projectId }
+        },
+      },
+      boardId: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-board-id'),
+        renderHTML: (attrs: Record<string, unknown>) => {
+          if (!attrs.boardId) return {}
+          return { 'data-board-id': attrs.boardId }
+        },
+      },
+    }
+  },
+})
 
 interface RichTextEditorProps {
   projectId: string
@@ -90,6 +125,7 @@ export function RichTextEditor({
   className,
   autoFocus = false,
 }: RichTextEditorProps) {
+  const navigate = useNavigate()
   const [focused, setFocused] = useState(false)
   const [refQuery, setRefQuery] = useState('')
   const { data: mentionables } = useMentionables(projectId)
@@ -139,6 +175,7 @@ export function RichTextEditor({
       Underline,
       LinkExt.configure({
         openOnClick: false,
+        autolink: true,
         HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
       }),
       Placeholder.configure({ placeholder }),
@@ -162,7 +199,7 @@ export function RichTextEditor({
           render: createSuggestionRenderer(MentionSuggestion),
         },
       }),
-      Mention.extend({ name: 'reference' }).configure({
+      ReferenceExtension.configure({
         HTMLAttributes: { class: 'reference' },
         suggestion: {
           char: '#',
@@ -185,6 +222,23 @@ export function RichTextEditor({
           return true
         }
         return false
+      },
+      handleClick: (_view, _pos, event) => {
+        if (!(event.metaKey || event.ctrlKey)) return false
+        const target = (event.target as HTMLElement).closest?.('[data-type="reference"]')
+        if (!target) return false
+
+        const entityType = target.getAttribute('data-entity-type')
+        const pId = target.getAttribute('data-project-id')
+        const bId = target.getAttribute('data-board-id')
+        const entityId = target.getAttribute('data-id')
+        if (!entityType || !pId) return false
+
+        event.preventDefault()
+        if (entityType === 'project') navigate(`/projects/${pId}`)
+        else if (entityType === 'board' && bId) navigate(`/projects/${pId}/boards/${bId}`)
+        else if (entityType === 'task' && bId && entityId) navigate(`/projects/${pId}/boards/${bId}?task=${entityId}`)
+        return true
       },
     },
   })

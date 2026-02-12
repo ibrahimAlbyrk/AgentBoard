@@ -56,12 +56,14 @@ export interface ReferenceableBoard {
   name: string
   icon: string | null
   color: string | null
+  project_id: string
 }
 
 export interface ReferenceableTask {
   id: string
   title: string
   board_id: string
+  project_id: string
   status_name: string
 }
 
