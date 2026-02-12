@@ -1,8 +1,9 @@
 import { Fragment } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Plus } from 'lucide-react'
+import { Plus, Filter } from 'lucide-react'
 import { SortableTaskCard } from './SortableTaskCard'
+import { useBoardStore } from '@/stores/boardStore'
 import type { Status, Task } from '@/types'
 
 interface BoardColumnProps {
@@ -47,6 +48,7 @@ function DropPlaceholder({ height }: { height: number }) {
 
 export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, placeholderHeight = 72, hideDragSourceId, compact }: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status.id}` })
+  const filtersActive = useBoardStore((s) => s.hasActiveFilters())
 
   return (
     <div className="w-[300px] flex-shrink-0 flex flex-col">
@@ -97,8 +99,15 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
         </SortableContext>
 
         {tasks.length === 0 && placeholderIdx < 0 && (
-          <div className="flex items-center justify-center h-20 border border-dashed border-[var(--border-subtle)] rounded-lg text-[13px] text-[var(--text-tertiary)]">
-            No tasks
+          <div className="flex flex-col items-center justify-center h-20 border border-dashed border-[var(--border-subtle)] rounded-lg text-[13px] text-[var(--text-tertiary)] gap-1">
+            {filtersActive ? (
+              <>
+                <Filter className="size-3.5 opacity-50" />
+                <span>No matching tasks</span>
+              </>
+            ) : (
+              <span>No tasks</span>
+            )}
           </div>
         )}
       </div>
