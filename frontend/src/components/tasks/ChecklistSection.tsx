@@ -462,9 +462,8 @@ function ChecklistItemRow({
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState(item.title)
-  const [optimisticChecked, setOptimisticChecked] = useState<boolean | null>(null)
 
-  const isChecked = optimisticChecked ?? item.is_completed
+  const isChecked = item.is_completed
 
   const {
     attributes,
@@ -490,15 +489,8 @@ function ChecklistItemRow({
       }
 
   const handleToggle = useCallback(() => {
-    setOptimisticChecked(!isChecked)
-    toggleItem.mutate(
-      { checklistId, itemId: item.id },
-      {
-        onError: () => setOptimisticChecked(null),
-        onSettled: () => setOptimisticChecked(null),
-      },
-    )
-  }, [isChecked, toggleItem, checklistId, item.id])
+    toggleItem.mutate({ checklistId, itemId: item.id })
+  }, [toggleItem, checklistId, item.id])
 
   const handleTitleSave = () => {
     const trimmed = title.trim()

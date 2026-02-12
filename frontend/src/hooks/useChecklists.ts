@@ -94,11 +94,35 @@ export function useDeleteChecklistItem(projectId: string, boardId: string, taskI
 
 export function useToggleChecklistItem(projectId: string, boardId: string, taskId: string) {
   const qc = useQueryClient()
+  const key = checklistKey(projectId, boardId, taskId)
   return useMutation({
     mutationFn: ({ checklistId, itemId }: { checklistId: string; itemId: string }) =>
       api.toggleChecklistItem(projectId, boardId, taskId, checklistId, itemId),
+    onMutate: async ({ checklistId, itemId }) => {
+      await qc.cancelQueries({ queryKey: key })
+      const prev = qc.getQueryData<APIResponse<Checklist[]>>(key)
+      if (prev) {
+        qc.setQueryData<APIResponse<Checklist[]>>(key, {
+          ...prev,
+          data: prev.data.map((cl) =>
+            cl.id === checklistId
+              ? {
+                  ...cl,
+                  items: cl.items.map((it) =>
+                    it.id === itemId ? { ...it, is_completed: !it.is_completed } : it
+                  ),
+                }
+              : cl
+          ),
+        })
+      }
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(key, ctx.prev)
+    },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: checklistKey(projectId, boardId, taskId) })
+      qc.invalidateQueries({ queryKey: key })
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
     },
   })
