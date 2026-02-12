@@ -4,7 +4,7 @@
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/__init__.py`
 - **Purpose**: Re-exports all CRUD singletons and defines `__all__`
-- Exports: `crud_user`, `crud_agent`, `crud_api_key`, `crud_board`, `crud_board_member`, `crud_project`, `crud_project_member`, `crud_status`, `crud_label`, `crud_task`, `crud_comment`, `crud_activity_log`, `crud_attachment`, `crud_notification`, `crud_webhook`
+- Exports: `crud_user`, `crud_agent`, `crud_checklist`, `crud_checklist_item`, `crud_api_key`, `crud_board`, `crud_board_member`, `crud_project`, `crud_project_member`, `crud_status`, `crud_label`, `crud_task`, `crud_comment`, `crud_activity_log`, `crud_attachment`, `crud_notification`, `crud_reaction`, `crud_webhook`, `crud_custom_field_definition`, `crud_custom_field_value`
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/base.py`
 - **Purpose**: Generic async CRUD base class parameterized by model and schema types
@@ -34,16 +34,51 @@
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/task.py`
 - **Purpose**: Task CRUD with relation loading, filtering, and aggregate queries
-- `_task_load_options` — shared eager-load tuple: status, creator, agent_creator, assignees (user+agent), labels, attachments (user), watchers (user+agent)
+- `_task_load_options` — shared eager-load tuple: status, creator, agent_creator, assignees (user+agent), labels, attachments (user), watchers (user+agent), checklists (items+assignee), custom_field_values
 - `CRUDTask` (extends `CRUDBase[Task, TaskCreate, TaskUpdate]`) — task DB operations
   - `get_with_relations(db, task_id)` — fetch task with all relations via `_task_load_options`
-  - `get_multi_by_board(db, board_id, status_id, priority, assignee_id, search, skip, limit)` — filtered board tasks ordered by position, filters by assignee via TaskAssignee subquery
+  - `get_multi_by_board(db, board_id, status_id, priority, assignee_id, search, skip, limit)` — filtered board tasks ordered by position, searches title and description_text
   - `get_max_position(db, status_id)` — highest position value in a status column
   - `get_children(db, parent_id)` — fetch subtasks of a parent
   - `bulk_update(db, task_ids, updates)` — apply same updates to multiple tasks
   - `count_by_status(db, project_id)` — task count grouped by status UUID
   - `get_assigned_to_user(db, user_id, project_ids, limit, agent_id)` — incomplete tasks assigned to user/agent across projects, joins Status to exclude terminal, includes comments_count subquery, ordered by due_date
   - `count_by_priority(db, project_id)` — task count grouped by priority string
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/checklist.py`
+- **Purpose**: Checklist CRUD with task-scoped queries and item eager-loading
+- `CRUDChecklist` (extends `CRUDBase[Checklist, ChecklistCreate, ChecklistUpdate]`) — checklist DB operations
+  - `get_with_items(db, checklist_id)` — fetch checklist with items and item assignees
+  - `get_multi_by_task(db, task_id)` — all checklists for a task, ordered by position, with items
+  - `get_max_position(db, task_id)` — highest position value among task checklists
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/checklist_item.py`
+- **Purpose**: Checklist item CRUD with position queries
+- `CRUDChecklistItem` (extends `CRUDBase[ChecklistItem, ChecklistItemCreate, ChecklistItemUpdate]`) — checklist item DB operations
+  - `get_max_position(db, checklist_id)` — highest position value in a checklist
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/custom_field.py`
+- **Purpose**: Custom field definition and value CRUD with board/task-scoped queries
+- `CRUDCustomFieldDefinition` (extends `CRUDBase[CustomFieldDefinition, CustomFieldDefinitionCreate, CustomFieldDefinitionUpdate]`) — field definition DB operations
+  - `get_multi_by_board(db, board_id)` — all definitions for a board, ordered by position
+  - `get_max_position(db, board_id)` — highest position value among board field definitions
+  - `get_by_name(db, board_id, name)` — lookup definition by board and name
+- `CRUDCustomFieldValue` (extends `CRUDBase[CustomFieldValue, CustomFieldValueResponse, CustomFieldValueResponse]`) — field value DB operations
+  - `get_by_task(db, task_id)` — all custom field values for a task
+  - `get_by_task_and_field(db, task_id, field_definition_id)` — single value by task and field
+  - `delete_by_task_and_field(db, task_id, field_definition_id)` — remove value if exists
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/reaction.py`
+- **Purpose**: Reaction CRUD with entity-scoped queries, summary aggregation, and batch operations
+- `CRUDReaction` (extends `CRUDBase[Reaction, ReactionCreate, ReactionCreate]`) — reaction DB operations
+  - `find_reaction(db, entity_type, entity_id, emoji, user_id, agent_id)` — lookup specific reaction by entity+emoji+actor
+  - `get_by_entity(db, entity_type, entity_id)` — all reactions for an entity with user/agent, ordered by created_at
+  - `get_summary(db, entity_type, entity_id, current_user_id)` — grouped emoji summary with reactor details and reacted_by_me flag
+  - `get_summaries_batch(db, entity_type, entity_ids, current_user_id)` — batch summaries for multiple entities in one query
+  - `delete_by_entity(db, entity_type, entity_id)` — delete all reactions for an entity
+  - `count_emoji_for_entity(db, entity_type, entity_id, emoji)` — count of specific emoji on entity
+  - `get_vote_counts(db, task_ids)` — thumbs-up count per task for multiple tasks
+  - `_build_summary(reactions, current_user_id)` — static: build ReactionSummary from reaction list
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/crud/status.py`
 - **Purpose**: Status column CRUD with board-scoped queries
@@ -137,7 +172,8 @@
   - `create_project(db, user_id, project_in)` — creates project, generates slug, adds owner as admin member, optionally creates default board via BoardService
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/task_service.py`
-- **Purpose**: Task lifecycle orchestration with position management, assignee/watcher/label syncing, activity logging, and notification dispatch
+- **Purpose**: Task lifecycle orchestration with position management, content normalization, cover validation, assignee/watcher/label syncing, activity logging, mention notifications, and notification dispatch
+- `GRADIENT_PRESETS` — dict of named gradient CSS values for task covers
 - `FIELD_LABELS` — dict mapping field names to human-readable labels for change descriptions
 - `_describe_changes(changes, label_changed)` — format changes dict into human-readable string
 - `_get_assignee_user_ids(task)` — extract user IDs from task assignees
@@ -146,11 +182,47 @@
 - `_notify_watchers(db, task, actor_id, type, title, message)` — notify user-watchers excluding assignees to avoid duplicates
 - `_notify_assignees(db, task, actor_id, type, title, message)` — notify all user-assignees
 - `TaskService` — static methods for task business logic
-  - `create_task(db, project_id, board_id, creator_id, task_in)` — resolves default status, calculates end position, validates agent IDs, syncs assignees/watchers/labels, logs "created" activity, notifies assignees and watchers
-  - `update_task(db, task, user_id, task_in)` — diffs changed fields, syncs labels/assignees/watchers, validates agent assignees, logs "updated" activity, notifies assignees (assigned or updated) and watchers, commits and reloads relations
+  - `create_task(db, project_id, board_id, creator_id, task_in)` — resolves default status, calculates end position, validates agent IDs, normalizes description to Tiptap JSON, syncs assignees/watchers/labels, logs "created" activity, notifies assignees, watchers, and @mentioned users
+  - `update_task(db, task, user_id, task_in)` — diffs changed fields, validates covers (image/color/gradient), normalizes description, syncs labels/assignees/watchers, validates agent assignees, logs "updated" activity, notifies assignees (assigned or updated), watchers, and newly @mentioned users, commits and reloads relations
   - `move_task(db, task, user_id, new_status_id, position)` — moves task between columns, sets/clears completed_at for terminal statuses, logs "moved" activity, notifies assignees and watchers
   - `bulk_update(db, project_id, user_id, task_ids, updates)` — apply updates to multiple tasks, logs activity per task
   - `bulk_move(db, project_id, user_id, task_ids, status_id)` — move multiple tasks to status with sequential positions, logs activity per task
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/checklist_service.py`
+- **Purpose**: Checklist and checklist item lifecycle with position management, limits enforcement, and activity logging
+- `POSITION_GAP = 1024.0` — constant gap between positions
+- `MAX_CHECKLISTS_PER_TASK = 10` — max checklists allowed per task
+- `MAX_ITEMS_PER_CHECKLIST = 50` — max items allowed per checklist
+- `ChecklistService` — static methods for checklist business logic
+  - `create_checklist(db, task, user_id, body)` — enforces max limit, calculates position, creates checklist, logs activity
+  - `update_checklist(db, checklist, user_id, body)` — updates checklist title
+  - `delete_checklist(db, checklist, user_id)` — deletes checklist, logs activity
+  - `create_item(db, checklist, user_id, body)` — enforces max limit, calculates position, creates item with assignee/due_date
+  - `update_item(db, item, user_id, body)` — updates item fields, sets completed_at on completion toggle
+  - `toggle_item(db, item, user_id)` — toggles is_completed and sets/clears completed_at
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/content_service.py`
+- **Purpose**: Tiptap rich text processing: normalization, plain-text extraction, and mention extraction
+- `normalize_content(value)` — convert string/dict to Tiptap JSON doc, returns None for empty
+- `extract_plain_text(doc)` — recursively extract text from Tiptap JSON nodes
+- `extract_mentions(doc, entity_types)` — extract mention nodes, optionally filtered by entity_type
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/custom_field_service.py`
+- **Purpose**: Custom field definition CRUD orchestration and value validation with type-specific rules
+- `CustomFieldService` — static methods for custom field business logic
+  - `validate_value(definition, value_set)` — validates value against field type (text, number, select, multi_select, date, checkbox, url, person)
+  - `create_definition(db, board_id, field_in)` — creates field definition with auto-positioned ordering
+  - `update_definition(db, definition, field_in)` — patches definition fields including options serialization
+  - `set_field_value(db, task_id, definition, value_set)` — validates and upserts a custom field value for a task
+  - `bulk_set_values(db, task_id, board_id, values)` — set multiple field values, validates each definition belongs to board
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/reaction_service.py`
+- **Purpose**: Reaction toggle orchestration with notification dispatch for task and comment reactions
+- `ReactionService` — static methods for reaction business logic
+  - `toggle_reaction(db, entity_type, entity_id, emoji, user_id, agent_id)` — adds or removes reaction (idempotent toggle), returns action + updated summary
+  - `get_summary(db, entity_type, entity_id, current_user_id)` — delegates to crud_reaction.get_summary
+  - `notify_reaction(db, entity_type, entity_id, emoji, actor_id, project_id, board_id)` — sends notification to task creator or comment author, skips self-reactions
+  - `delete_reactions_for_entity(db, entity_type, entity_id)` — bulk delete all reactions for an entity
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/services/position_service.py`
 - **Purpose**: Task position calculation for drag-and-drop ordering within status columns

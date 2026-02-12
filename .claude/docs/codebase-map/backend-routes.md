@@ -93,12 +93,12 @@ All routes are mounted under the `/api/v1` prefix in `main.py`.
 ---
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/tasks.py`
-- **Purpose**: Board-scoped task CRUD, move, and bulk operations with WebSocket broadcasts and notifications (requires board access)
-- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/` → `list_tasks()` — Paginated task list; query params: `status_id`, `priority`, `assignee_id`, `search`, `page`, `per_page`
+- **Purpose**: Board-scoped task CRUD, move, and bulk operations with reaction summaries, WebSocket broadcasts, and notifications (requires board access)
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/` → `list_tasks()` — Paginated task list with per-task reaction summaries; query params: `status_id`, `priority`, `assignee_id`, `search`, `page`, `per_page`
 - `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/` → `create_task()` — Create task via TaskService; broadcasts `task.created` via WebSocket; notifies assignees and watchers
-- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `get_task()` — Get single task with all relations
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `get_task()` — Get single task with all relations and reaction summary
 - `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `update_task()` — Update task fields via TaskService; broadcasts `task.updated`; notifies assignees and watchers
-- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `delete_task()` — Delete a task; broadcasts `task.deleted`; creates notifications for assignees and watchers
+- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}` → `delete_task()` — Delete a task; cleans up reactions; broadcasts `task.deleted`; creates notifications for assignees and watchers
 - `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/move` → `move_task()` — Move task to new status/position via TaskService; broadcasts `task.moved`; notifies assignees and watchers
 - `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/bulk-update` → `bulk_update_tasks()` — Update multiple tasks via TaskService; broadcasts `task.updated` per task; notifies assignees
 - `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/bulk-move` → `bulk_move_tasks()` — Move multiple tasks to a status via TaskService; broadcasts `task.moved` per task; notifies assignees
@@ -106,21 +106,66 @@ All routes are mounted under the `/api/v1` prefix in `main.py`.
 
 ---
 
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/checklists.py`
+- **Purpose**: Task-scoped checklist and checklist item CRUD with reordering and toggle support (requires board access)
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/checklists/` → `list_checklists()` — List all checklists for a task
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/checklists/` → `create_checklist()` — Create a checklist on a task via ChecklistService; broadcasts `checklist.updated`
+- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/checklists/{checklist_id}` → `update_checklist()` — Update checklist fields; broadcasts `checklist.updated`
+- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/checklists/{checklist_id}` → `delete_checklist()` — Delete a checklist; broadcasts `checklist.updated`
+- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/checklists/{checklist_id}/reorder` → `reorder_checklist()` — Update checklist position; broadcasts `checklist.updated`
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/checklists/{checklist_id}/items` → `create_item()` — Add an item to a checklist via ChecklistService; broadcasts `checklist.updated`
+- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/checklists/{checklist_id}/items/{item_id}` → `update_item()` — Update checklist item fields; broadcasts `checklist.updated`
+- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/checklists/{checklist_id}/items/{item_id}` → `delete_item()` — Delete a checklist item; broadcasts `checklist.updated`
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/checklists/{checklist_id}/items/{item_id}/toggle` → `toggle_item()` — Toggle item checked state via ChecklistService; broadcasts `checklist.updated`
+- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/checklists/{checklist_id}/items/{item_id}/reorder` → `reorder_item()` — Update checklist item position; broadcasts `checklist.updated`
+
+---
+
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/comments.py`
-- **Purpose**: Task-scoped comment CRUD with notifications to assignees (requires board access; edit/delete restricted to comment owner)
-- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/` → `list_comments()` — Paginated list of comments on a task; query params: `page`, `per_page`
-- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/` → `create_comment()` — Add a comment to a task; supports `agent_creator_id` for agent-authored comments; links `attachment_ids` if provided; sends `task_comment` notifications to assignees via WebSocket
-- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/{comment_id}` → `update_comment()` — Edit own comment content; sets `is_edited=True`; 403 if not owner
-- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/{comment_id}` → `delete_comment()` — Delete own comment; 403 if not owner
+- **Purpose**: Task-scoped comment CRUD with rich text (Tiptap JSON), @mention notifications, and reaction cleanup (requires board access; edit/delete restricted to comment owner)
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/` → `list_comments()` — Paginated list of comments with per-comment reaction summaries; query params: `page`, `per_page`
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/` → `create_comment()` — Add a comment; normalizes content to Tiptap JSON; supports `agent_creator_id`; links `attachment_ids`; sends `task_comment` notifications to assignees and `mentioned` notifications to @mentioned users via WebSocket
+- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/{comment_id}` → `update_comment()` — Edit own comment content; normalizes to Tiptap JSON; sets `is_edited=True`; sends `mentioned` notifications for newly @mentioned users; 403 if not owner
+- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/{comment_id}` → `delete_comment()` — Delete own comment; cleans up associated reactions; 403 if not owner
 
 ---
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/attachments.py`
-- **Purpose**: Task-scoped file attachment upload, listing, deletion, and a separate download endpoint (requires board access for task-scoped ops)
+- **Purpose**: Task-scoped file attachment upload, listing, deletion with cover image cleanup, and a separate download endpoint (requires board access for task-scoped ops)
 - `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/attachments/` → `upload_attachment()` — Upload a file attachment to a task; enforces `MAX_FILE_SIZE`; stores via storage service; requires auth
 - `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/attachments/` → `list_attachments()` — List all attachments for a task
-- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/attachments/{attachment_id}` → `delete_attachment()` — Delete own attachment; removes file from storage; 403 if not uploader
+- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/attachments/{attachment_id}` → `delete_attachment()` — Delete own attachment; removes file from storage; clears task cover if attachment was used as cover image; 403 if not uploader
 - `GET /api/v1/attachments/{attachment_id}/download` → `download_attachment()` — Download an attachment file by ID (separate `download_router`, not task-scoped); returns `FileResponse`
+
+---
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/custom_fields.py`
+- **Purpose**: Board-scoped custom field definition CRUD, reordering, and task-scoped field value get/set/clear with WebSocket broadcasts (requires board access)
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/custom-fields` → `list_custom_fields()` — List all custom field definitions for a board
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/custom-fields` → `create_custom_field()` — Create a custom field definition; 409 if name already exists on board; broadcasts `custom_field.created`
+- `PATCH /api/v1/projects/{project_id}/boards/{board_id}/custom-fields/{field_id}` → `update_custom_field()` — Update a custom field definition; 409 if renaming to existing name; broadcasts `custom_field.updated`
+- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/custom-fields/{field_id}` → `delete_custom_field()` — Delete a custom field definition and all its values; broadcasts `custom_field.deleted`
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/custom-fields/reorder` → `reorder_custom_fields()` — Reorder custom field definitions by position; broadcasts `custom_field.reordered`
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/field-values` → `list_field_values()` — List all custom field values for a task
+- `PUT /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/field-values` → `bulk_set_field_values()` — Set multiple field values at once via CustomFieldService; broadcasts `task.updated`
+- `PUT /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/field-values/{field_id}` → `set_field_value()` — Set a single custom field value on a task; broadcasts `task.updated`
+- `DELETE /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/field-values/{field_id}` → `clear_field_value()` — Clear a custom field value from a task; broadcasts `task.updated`
+
+---
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/mentionables.py`
+- **Purpose**: Autocomplete endpoints for @mention (users/agents) and #reference (projects/boards/tasks) in rich text editors (requires project membership)
+- `GET /api/v1/projects/{project_id}/mentionables` → `get_mentionables()` — Return project members (users) and active agents for @mention autocomplete; query param: `q` (search filter, max 100 chars); returns up to 20 users and 20 agents
+- `GET /api/v1/projects/{project_id}/referenceables` → `get_referenceables()` — Return accessible projects, boards within current project, and tasks within current project for #reference autocomplete; query param: `q` (search filter, max 100 chars); returns up to 5 each
+
+---
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/reactions.py`
+- **Purpose**: Toggle and retrieve emoji reactions on tasks and comments with WebSocket broadcasts and notifications (requires board access)
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/reactions/toggle` → `toggle_task_reaction()` — Toggle an emoji reaction on a task; broadcasts `reaction.updated`; sends notification on add via ReactionService
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/reactions` → `get_task_reactions()` — Get reaction summary for a task
+- `POST /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/{comment_id}/reactions/toggle` → `toggle_comment_reaction()` — Toggle an emoji reaction on a comment; broadcasts `reaction.updated`; sends notification on add via ReactionService
+- `GET /api/v1/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments/{comment_id}/reactions` → `get_comment_reactions()` — Get reaction summary for a comment
 
 ---
 
@@ -132,8 +177,8 @@ All routes are mounted under the `/api/v1` prefix in `main.py`.
 ---
 
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/api/v1/search.py`
-- **Purpose**: Global search across projects and tasks (requires auth)
-- `GET /api/v1/search/` → `global_search()` — Search projects/tasks by name; query params: `q` (required), `type` (project|task), `project_id`, `page`, `per_page`
+- **Purpose**: Global search across projects and tasks, searches task description_text in addition to title (requires auth)
+- `GET /api/v1/search/` → `global_search()` — Search projects by name and tasks by title or description_text; query params: `q` (required), `type` (project|task), `project_id`, `page`, `per_page`
 
 ---
 

@@ -1,6 +1,8 @@
 ### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/backend/app/main.py`
 - **Purpose**: FastAPI application factory — configures middleware, registers all v1 routers, and initializes the database on startup.
 - `app` — FastAPI instance with CORS, request-ID middleware, error handlers
+- Registers 20 route modules under `/api/v1`: auth, users, api_keys, projects, boards, members, agents, statuses, labels, tasks, comments, checklists, attachments, activity, notifications, search, stats, custom_fields, mentionables, dashboard
+- Registers separate routers: `websocket.router`, `attachments.download_router`, `reactions.task_router`, `reactions.comment_router`
 - `startup()` — creates upload dir and calls `init_db()`
 - `health()` — GET `/health` returning status and version
 
