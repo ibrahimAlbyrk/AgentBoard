@@ -99,7 +99,7 @@ async def create_comment(
 
     if comment_in.attachment_ids:
         unlinked = await crud_attachment.get_unlinked_by_ids(
-            db, comment_in.attachment_ids, task_id, current_user.id
+            db, comment_in.attachment_ids, task_id, actor.user.id
         )
         for att in unlinked:
             att.comment_id = comment.id
