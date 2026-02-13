@@ -36,7 +36,7 @@ async def get_current_user(
         ak = await crud_api_key.get_by_key_hash(db, key_hash)
         if not ak or not ak.is_active:
             raise AuthError("Invalid API key")
-        if ak.expires_at and ak.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
+        if ak.expires_at and ak.expires_at < datetime.now(UTC):
             raise AuthError("API key has expired")
         await crud_api_key.update_last_used(db, ak)
         from app.crud import crud_user

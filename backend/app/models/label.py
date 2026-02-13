@@ -1,10 +1,10 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, TZDateTime
 
 
 class Label(Base):
@@ -24,7 +24,7 @@ class Label(Base):
     description: Mapped[str | None] = mapped_column(Text)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+        TZDateTime(), default=lambda: datetime.now(UTC)
     )
 
     project = relationship("Project", back_populates="labels")

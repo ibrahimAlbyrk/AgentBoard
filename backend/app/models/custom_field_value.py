@@ -2,7 +2,6 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import (
-    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -12,7 +11,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, TZDateTime
 
 
 class CustomFieldValue(Base):
@@ -35,12 +34,12 @@ class CustomFieldValue(Base):
     value_text: Mapped[str | None] = mapped_column(Text)
     value_number: Mapped[float | None] = mapped_column(Float)
     value_json: Mapped[dict | None] = mapped_column(JSON)
-    value_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    value_date: Mapped[datetime | None] = mapped_column(TZDateTime())
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+        TZDateTime(), default=lambda: datetime.now(UTC)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        TZDateTime(),
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )

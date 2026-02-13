@@ -1,10 +1,10 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String
+from sqlalchemy import Boolean, ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, TZDateTime
 
 
 class APIKey(Base):
@@ -25,13 +25,13 @@ class APIKey(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     last_used_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
+        TZDateTime()
     )
     expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
+        TZDateTime()
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+        TZDateTime(), default=lambda: datetime.now(UTC)
     )
 
     user = relationship("User", back_populates="api_keys")

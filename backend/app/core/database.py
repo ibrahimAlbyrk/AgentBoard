@@ -1,5 +1,7 @@
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 
+from sqlalchemy import DateTime
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -7,8 +9,29 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.types import TypeDecorator
 
 from app.core.config import settings
+
+
+class TZDateTime(TypeDecorator):
+    """DateTime that ensures UTC-aware datetimes when read from SQLite.
+
+    SQLite stores datetimes as naive strings (no timezone info).
+    This ensures they come back as UTC-aware so Pydantic serializes
+    them with +00:00 suffix and frontends parse them correctly.
+    """
+
+    impl = DateTime
+    cache_ok = True
+
+    def __init__(self):
+        super().__init__(timezone=True)
+
+    def process_result_value(self, value, dialect):
+        if isinstance(value, datetime) and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
 
 
 def _build_engine():

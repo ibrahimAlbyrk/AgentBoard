@@ -78,7 +78,7 @@ async def get_my_tasks(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     today_end = now.replace(hour=23, minute=59, second=59)
     week_end = today_end + timedelta(days=7 - now.weekday())
 
@@ -122,8 +122,7 @@ async def get_my_tasks(
 
     for t in tasks:
         if t.due_date:
-            # Strip tzinfo for safe comparison (SQLite stores naive datetimes)
-            dd = t.due_date.replace(tzinfo=None) if t.due_date.tzinfo else t.due_date
+            dd = t.due_date if t.due_date.tzinfo else t.due_date.replace(tzinfo=UTC)
             if dd < now:
                 overdue_count += 1
             elif dd <= today_end:
