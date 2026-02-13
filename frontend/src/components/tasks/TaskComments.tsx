@@ -139,6 +139,7 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
             <button
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               className="size-7 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--elevated)] transition-all"
@@ -165,6 +166,7 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
           </div>
           <Button
             size="sm"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handleSubmit}
             disabled={(!hasContent && pendingAttachments.length === 0) || createComment.isPending}
             className="bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 text-xs gap-1.5"
