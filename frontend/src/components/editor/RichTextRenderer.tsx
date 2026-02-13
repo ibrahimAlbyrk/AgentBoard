@@ -83,17 +83,20 @@ export function RichTextRenderer({ content, className }: RichTextRendererProps) 
 
   const html = useMemo(() => {
     if (!content) return ''
+    let raw: string
     if (typeof content === 'string') {
-      return content
+      raw = content
         .split('\n')
         .map((line) => `<p>${escapeHtml(line) || '<br>'}</p>`)
         .join('')
+    } else {
+      try {
+        raw = generateHTML(content, extensions)
+      } catch {
+        return '<p>[Unable to render content]</p>'
+      }
     }
-    try {
-      return generateHTML(content, extensions)
-    } catch {
-      return '<p>[Unable to render content]</p>'
-    }
+    return linkifyHtml(raw)
   }, [content])
 
   const handleClick = useCallback(
@@ -148,4 +151,26 @@ function escapeHtml(str: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+/** Convert plain-text URLs (not already inside <a> tags) into clickable links */
+function linkifyHtml(html: string): string {
+  const urlRe = /(https?:\/\/[^\s<>"')+\]]+(?:[)\]][^\s<>"')*\]]*)*)/g
+  const parts = html.split(/(<[^>]+>)/)
+  let insideAnchor = false
+
+  return parts
+    .map((part) => {
+      if (part.startsWith('<')) {
+        if (/^<a[\s>]/i.test(part)) insideAnchor = true
+        if (/^<\/a>/i.test(part)) insideAnchor = false
+        return part
+      }
+      if (insideAnchor) return part
+      return part.replace(
+        urlRe,
+        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
+      )
+    })
+    .join('')
 }
