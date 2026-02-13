@@ -15,7 +15,9 @@ export function useCreateComment(projectId: string, boardId: string, taskId: str
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mutationFn: (data: { content: any; attachment_ids?: string[] }) =>
       api.createComment(projectId, boardId, taskId, data),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['comments', projectId, boardId, taskId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['comments', projectId, boardId, taskId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
+    },
   })
 }

@@ -22,6 +22,7 @@ export function useCreateChecklist(projectId: string, boardId: string, taskId: s
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: checklistKey(projectId, boardId, taskId) })
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }
@@ -33,6 +34,7 @@ export function useUpdateChecklist(projectId: string, boardId: string, taskId: s
       api.updateChecklist(projectId, boardId, taskId, checklistId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: checklistKey(projectId, boardId, taskId) })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }
@@ -45,6 +47,7 @@ export function useDeleteChecklist(projectId: string, boardId: string, taskId: s
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: checklistKey(projectId, boardId, taskId) })
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }
@@ -57,6 +60,7 @@ export function useCreateChecklistItem(projectId: string, boardId: string, taskI
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: checklistKey(projectId, boardId, taskId) })
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }
@@ -76,6 +80,7 @@ export function useUpdateChecklistItem(projectId: string, boardId: string, taskI
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: checklistKey(projectId, boardId, taskId) })
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }
@@ -88,6 +93,7 @@ export function useDeleteChecklistItem(projectId: string, boardId: string, taskI
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: checklistKey(projectId, boardId, taskId) })
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }
@@ -124,6 +130,7 @@ export function useToggleChecklistItem(projectId: string, boardId: string, taskI
     onSettled: () => {
       qc.invalidateQueries({ queryKey: key })
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }

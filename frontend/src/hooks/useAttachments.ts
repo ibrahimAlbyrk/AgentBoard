@@ -16,6 +16,7 @@ export function useUploadAttachment(projectId: string, boardId: string, taskId: 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['attachments', projectId, boardId, taskId] })
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }
@@ -28,6 +29,7 @@ export function useDeleteAttachment(projectId: string, boardId: string, taskId: 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['attachments', projectId, boardId, taskId] })
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }

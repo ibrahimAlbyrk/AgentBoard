@@ -31,8 +31,13 @@ export function useWebSocket(projectId: string, boardId: string) {
     const wsActorName = (user: { username: string; agent?: { name: string } }) =>
       user.agent?.name ?? user.username
 
+    const invalidateActivity = () => {
+      queryClient.invalidateQueries({ queryKey: ['activity'] })
+    }
+
     const handleCreated = (e: Record<string, unknown>) => {
       addTask(e.data as Task)
+      invalidateActivity()
       const user = e.user as { username: string; agent?: { name: string } } | undefined
       const data = e.data as { title: string }
       if (user) toast.info(`${wsActorName(user)} created "${data.title}"`)
@@ -55,10 +60,12 @@ export function useWebSocket(projectId: string, boardId: string) {
       } else {
         updateTask(data.id, data)
       }
+      invalidateActivity()
     }
     const handleDeleted = (e: Record<string, unknown>) => {
       const data = e.data as { task_id: string }
       removeTask(data.task_id)
+      invalidateActivity()
     }
     const handleMoved = (e: Record<string, unknown>) => {
       const data = e.data as Task
@@ -69,6 +76,7 @@ export function useWebSocket(projectId: string, boardId: string) {
         const user = e.user as { username: string; agent?: { name: string } } | undefined
         if (user) toast.info(`${wsActorName(user)} moved a task`)
       }
+      invalidateActivity()
     }
 
     const handleNotification = () => {
@@ -88,6 +96,7 @@ export function useWebSocket(projectId: string, boardId: string) {
       const taskId = (e.data as { task_id: string }).task_id
       queryClient.invalidateQueries({ queryKey: ['checklists', projectId, boardId, taskId] })
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      invalidateActivity()
     }
 
     const handleCustomFieldChanged = () => {

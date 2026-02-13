@@ -70,6 +70,7 @@ export function useSetFieldValue(projectId: string, boardId: string, taskId: str
       api.setFieldValue(projectId, boardId, taskId, data.field_definition_id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }
@@ -81,6 +82,7 @@ export function useBulkSetFieldValues(projectId: string, boardId: string, taskId
       api.bulkSetFieldValues(projectId, boardId, taskId, values),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }
@@ -92,6 +94,7 @@ export function useClearFieldValue(projectId: string, boardId: string, taskId: s
       api.clearFieldValue(projectId, boardId, taskId, fieldId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
     },
   })
 }
