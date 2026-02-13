@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, parseISO } from 'date-fns'
 import {
   Users,
   MoreHorizontal,
@@ -51,7 +51,7 @@ export function ProjectCard({ project, onEdit, onArchive, onDelete }: ProjectCar
   const color = project.color || '#3B82F6'
   const rgb = hexToRgb(color)
 
-  const updatedAgo = formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })
+  const updatedAgo = formatDistanceToNow(parseISO(project.updated_at), { addSuffix: true })
 
   return (
     <div
