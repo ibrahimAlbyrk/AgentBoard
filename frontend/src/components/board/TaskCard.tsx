@@ -11,7 +11,7 @@ const priorityBorderColors: Record<string, string> = {
   high: 'var(--priority-high)',
   medium: 'var(--priority-medium)',
   low: 'var(--priority-low)',
-  none: 'transparent',
+  none: 'var(--border-subtle)',
 }
 
 interface TaskCardProps {
@@ -41,7 +41,7 @@ export function TaskCard({ task, onClick, isDragOverlay, compact }: TaskCardProp
     <div
       onClick={onClick}
       style={{
-        borderLeftColor: priorityBorderColors[task.priority] || 'transparent',
+        borderLeftColor: priorityBorderColors[task.priority] || 'var(--border-subtle)',
         ...(isDragOverlay && {
           borderColor: 'var(--accent-solid)',
         }),
@@ -49,7 +49,7 @@ export function TaskCard({ task, onClick, isDragOverlay, compact }: TaskCardProp
       className={cn(
         'bg-card border border-[var(--border-subtle)] border-l-[3px] rounded-xl cursor-pointer',
         compact ? 'p-2.5' : 'p-3.5',
-        !isDragOverlay && 'hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-4px_var(--glow)] hover:border-[var(--border-strong)] transition-all duration-200',
+        !isDragOverlay && 'hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-4px_var(--glow)] hover:border-[var(--border-strong)] transition-[box-shadow,border-color,translate] duration-200',
       )}
     >
       {/* Cover */}

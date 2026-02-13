@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
 import { useBoardStore } from '@/stores/boardStore'
-import type { TaskCreate, TaskUpdate, TaskMove, TaskFilters } from '@/types'
+import { clearLocalMove } from '@/hooks/useWebSocket'
+import type { Task, TaskCreate, TaskUpdate, TaskMove, TaskFilters } from '@/types'
 
 export function useTasks(projectId: string, boardId: string, filters?: TaskFilters) {
   return useQuery({
@@ -54,12 +55,12 @@ export function useMoveTask(projectId: string, boardId: string) {
       taskId: string
       fromStatusId: string
       data: TaskMove
+      _prevSnapshot?: Record<string, Task[]>
     }) => api.moveTask(projectId, boardId, taskId, data),
 
-    onMutate: async () => {
+    onMutate: async ({ _prevSnapshot }) => {
       await qc.cancelQueries({ queryKey: ['tasks', projectId, boardId] })
-      const prevBoard = { ...useBoardStore.getState().tasksByStatus }
-      return { prevBoard }
+      return { prevBoard: _prevSnapshot }
     },
 
     onError: (_err, _vars, context) => {
@@ -71,7 +72,8 @@ export function useMoveTask(projectId: string, boardId: string) {
       }
     },
 
-    onSettled: () => {
+    onSettled: (_data, _error, variables) => {
+      clearLocalMove(variables.taskId)
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
       qc.invalidateQueries({ queryKey: ['activity', projectId] })
     },

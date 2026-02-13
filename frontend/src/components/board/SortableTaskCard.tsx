@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { useSortable } from '@dnd-kit/sortable'
+import { useSortable, defaultAnimateLayoutChanges, type AnimateLayoutChanges } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { TaskCard } from './TaskCard'
 import { registerCardRef, useIsFlying } from './TaskAnimationLayer'
@@ -13,6 +13,14 @@ interface SortableTaskCardProps {
   compact?: boolean
 }
 
+// Skip layout animation when an item is being dropped (wasDragging = true).
+// This prevents the overlap/jump glitch during same-column reorder because
+// the default layout animation conflicts with dnd-kit's transform removal.
+const animateLayoutChanges: AnimateLayoutChanges = (args) => {
+  if (args.wasDragging) return false
+  return defaultAnimateLayoutChanges(args)
+}
+
 export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholderHeight = 72, compact }: SortableTaskCardProps) {
   const {
     attributes,
@@ -21,7 +29,7 @@ export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholder
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: task.id })
+  } = useSortable({ id: task.id, animateLayoutChanges })
 
   const flying = useIsFlying(task.id)
 
@@ -36,7 +44,9 @@ export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholder
   const hidden = isDragging && hideWhileDragging
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    // Use Translate (not Transform) to avoid dnd-kit injecting scaleX/scaleY
+    // that can cause visual glitches during reorder
+    transform: CSS.Translate.toString(transform),
     transition,
     ...(flying && { opacity: 0 }),
     ...(hidden && { height: 0, overflow: 'hidden', margin: 0, padding: 0 }),

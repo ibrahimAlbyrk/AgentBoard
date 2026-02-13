@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useProjectStore } from './projectStore'
 import type { Task } from '@/types'
 
 export type DueDatePreset = 'overdue' | 'today' | 'this_week' | 'next_week' | 'no_date'
@@ -87,7 +88,8 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     if (taskIndex === -1) return
 
     const [task] = fromTasks.splice(taskIndex, 1)
-    const movedTask = { ...task, position, status: { ...task.status, id: toStatusId } }
+    const targetStatus = useProjectStore.getState().statuses.find(s => s.id === toStatusId)
+    const movedTask = { ...task, position, status: targetStatus ?? { ...task.status, id: toStatusId } }
 
     const toTasks =
       fromStatusId === toStatusId

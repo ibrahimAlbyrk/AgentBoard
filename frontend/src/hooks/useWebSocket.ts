@@ -11,7 +11,11 @@ import type { Task } from '@/types'
 const localMoves = new Set<string>()
 export function markLocalMove(taskId: string) {
   localMoves.add(taskId)
-  setTimeout(() => localMoves.delete(taskId), 2000)
+  // Fallback cleanup — normally cleared by useMoveTask.onSettled
+  setTimeout(() => localMoves.delete(taskId), 10000)
+}
+export function clearLocalMove(taskId: string) {
+  localMoves.delete(taskId)
 }
 
 export function useWebSocket(projectId: string, boardId: string) {

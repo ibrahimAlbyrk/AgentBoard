@@ -46,23 +46,29 @@ const findColumnAtPointer = (args: Parameters<CollisionDetection>[0]) => {
 }
 
 /**
- * Custom collision detection for Kanban cross-column drags.
- * 1. pointerWithin for direct task hit
- * 2. Find column by horizontal band (works even above/below the droppable zone)
- * 3. closestCenter scoped to tasks inside that column
+ * Custom collision detection using "between-midpoints" approach.
+ *
+ * Instead of closest-center (which flickers at boundaries), we determine
+ * which pair of task midpoints the pointer sits between and return the
+ * task AFTER the gap. This gives stable, predictable targeting:
+ *
+ *   pointer above A's midpoint  → return A  (insert before A)
+ *   pointer between A and B mid → return B  (insert before B = between A and B)
+ *   pointer past last midpoint  → return column (append to end)
+ *
+ * Fix 2: active item is filtered from pointerWithin so the collision
+ * never returns the dragged card itself.
  */
 const kanbanCollision: CollisionDetection = (args) => {
   const withinCollisions = pointerWithin(args)
 
-  // Pointer directly over a task card
+  // Fix 2: filter active item — prevents over=active which breaks drop position
   const directTask = withinCollisions.find(
-    (c) => !String(c.id).startsWith('column-'),
+    (c) => !String(c.id).startsWith('column-') && c.id !== args.active.id,
   )
   if (directTask) return [directTask]
 
-  // Find the column — first try pointerWithin, then fall back to horizontal band lookup.
-  // The fallback handles the case when the pointer is above/below the droppable zone
-  // (e.g. in the column header area) where pointerWithin wouldn't match.
+  // Find column via pointerWithin or horizontal band fallback
   const withinColumn = withinCollisions.find((c) =>
     String(c.id).startsWith('column-'),
   )
@@ -70,43 +76,47 @@ const kanbanCollision: CollisionDetection = (args) => {
     ? { id: withinColumn.id, rect: args.droppableRects.get(withinColumn.id)! }
     : findColumnAtPointer(args)
 
-  if (col) {
-    const columnRect = col.rect
-    if (columnRect) {
-      const allClosest = closestCenter(args)
-      const nearestInColumn = allClosest.find((c) => {
-        const r = args.droppableRects.get(c.id)
-        return r ? isInColumn(c.id, r, columnRect) : false
-      })
+  if (!col?.rect) return closestCenter(args)
+  const columnRect = col.rect
+  const pointerY = args.pointerCoordinates?.y ?? 0
 
-      if (nearestInColumn) {
-        const nearestRect = args.droppableRects.get(nearestInColumn.id)
-        const pointerY = args.pointerCoordinates?.y ?? 0
-
-        // Pointer below nearest task: check if it's the bottom-most in column
-        if (nearestRect && pointerY > nearestRect.top + nearestRect.height) {
-          const hasLowerTask = allClosest.some((c) => {
-            if (c.id === nearestInColumn.id) return false
-            const r = args.droppableRects.get(c.id)
-            return r ? isInColumn(c.id, r, columnRect) && r.top > nearestRect.top : false
-          })
-
-          if (!hasLowerTask) {
-            const activeRect = args.droppableRects.get(args.active.id)
-            if (activeRect && isInColumn(args.active.id, activeRect, columnRect)) {
-              return [nearestInColumn]
-            }
-            return [{ id: col.id, data: { droppableContainer: undefined } }]
-          }
-        }
-
-        return [nearestInColumn]
-      }
+  // Collect tasks in this column (excluding active), sorted top-to-bottom
+  const tasksInColumn: { id: string | number; rect: { top: number; height: number } }[] = []
+  for (const [id, rect] of args.droppableRects.entries()) {
+    if (id !== args.active.id && isInColumn(id, rect, columnRect)) {
+      tasksInColumn.push({ id, rect })
     }
+  }
+  tasksInColumn.sort((a, b) => a.rect.top - b.rect.top)
+
+  // Empty column → return column droppable
+  if (tasksInColumn.length === 0) {
     return [{ id: col.id, data: { droppableContainer: undefined } }]
   }
 
-  return closestCenter(args)
+  // Pointer above first task's midpoint → target first task
+  const firstMid = tasksInColumn[0].rect.top + tasksInColumn[0].rect.height / 2
+  if (pointerY <= firstMid) {
+    return [{ id: tasksInColumn[0].id, data: { droppableContainer: undefined } }]
+  }
+
+  // Fix 4: "between-midpoints" — find which gap the pointer is in.
+  // Return the task AFTER the gap for stable targeting (no flickering).
+  for (let i = 0; i < tasksInColumn.length - 1; i++) {
+    const nextMid = tasksInColumn[i + 1].rect.top + tasksInColumn[i + 1].rect.height / 2
+    if (pointerY <= nextMid) {
+      return [{ id: tasksInColumn[i + 1].id, data: { droppableContainer: undefined } }]
+    }
+  }
+
+  // Pointer past last task's midpoint
+  // Same-column: return last task so verticalListSortingStrategy can shift properly
+  // Cross-column: return column ID to signal "append to end"
+  const activeRect = args.droppableRects.get(args.active.id)
+  if (activeRect && isInColumn(args.active.id, activeRect, columnRect)) {
+    return [{ id: tasksInColumn[tasksInColumn.length - 1].id, data: { droppableContainer: undefined } }]
+  }
+  return [{ id: col.id, data: { droppableContainer: undefined } }]
 }
 
 interface KanbanBoardProps {
@@ -125,7 +135,6 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
   const [tilt, setTilt] = useState({ x: 0, y: 0 })
   const prevDelta = useRef({ x: 0, y: 0 })
-  const insertAfterRef = useRef(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -153,7 +162,6 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
         setActiveTask(task)
         setDragOverColumnId(task.status.id)
         setDragOverItemId(null)
-        insertAfterRef.current = false
         break
       }
     }
@@ -173,8 +181,9 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
     setTilt({ x: tiltX, y: tiltY })
   }, [])
 
+  // Fix 3: simplified — no more insertAfterRef
   const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { over, active } = event
+    const { over } = event
     if (!over || !activeTask) return
 
     const overId = String(over.id)
@@ -196,19 +205,6 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
     if (targetColumnId) {
       setDragOverColumnId(targetColumnId)
       setDragOverItemId(overItemId)
-
-      // Determine above/below using dragged card center vs over card center.
-      // Used for both same-column and cross-column to keep placeholder + position calc consistent.
-      if (overItemId) {
-        const translated = active.rect.current.translated
-        if (translated) {
-          const activeCenterY = translated.top + translated.height / 2
-          const overCenterY = over.rect.top + over.rect.height / 2
-          insertAfterRef.current = activeCenterY > overCenterY
-        }
-      } else {
-        insertAfterRef.current = false
-      }
     }
   }, [activeTask, tasksByStatus])
 
@@ -217,7 +213,6 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
     setDragOverColumnId(null)
     setDragOverItemId(null)
     setTilt({ x: 0, y: 0 })
-    insertAfterRef.current = false
   }, [])
 
   const handleDragEnd = useCallback(
@@ -256,19 +251,41 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
         (t) => t.id !== taskId,
       )
 
-      // Determine insert index in the filtered array.
-      // Use pointer-based insertAfterRef for both same-column and cross-column
-      // instead of original-index heuristic which breaks with variable-height cards.
+      // Fix 1 & 3: compute insertIdx matching the visual exactly.
+      //
+      // Same-column: verticalListSortingStrategy shows gap at overIndex.
+      //   arrayMove(items, activeIdx, overIdx) puts active at overIdx.
+      //   In the filtered array (active removed), the insert position is:
+      //     dragging down (activeOrigIdx < overOrigIdx) → overIdxInFiltered + 1
+      //     dragging up   (activeOrigIdx > overOrigIdx) → overIdxInFiltered
+      //
+      // Cross-column: collision returns the task AFTER the gap (between-midpoints).
+      //   Always insert BEFORE the over task (= overIdxInFiltered).
+      //   Column ID means "append to end".
       let insertIdx: number
       if (overId.startsWith('column-')) {
+        // Dropped on empty area / column → append
         insertIdx = filtered.length
-      } else {
-        const overIdx = filtered.findIndex((t) => t.id === overId)
-        if (overIdx === -1) {
+      } else if (fromStatusId === targetStatusId) {
+        // Same column — match verticalListSortingStrategy visual
+        const columnTasks = tasksByStatus[targetStatusId] ?? []
+        const activeOrigIdx = columnTasks.findIndex((t) => t.id === taskId)
+        const overOrigIdx = columnTasks.findIndex((t) => t.id === overId)
+        const overIdxInFiltered = filtered.findIndex((t) => t.id === overId)
+
+        if (overIdxInFiltered === -1) {
           insertIdx = filtered.length
+        } else if (activeOrigIdx < overOrigIdx) {
+          // Dragging down: visual puts active after items that shifted up
+          insertIdx = overIdxInFiltered + 1
         } else {
-          insertIdx = insertAfterRef.current ? overIdx + 1 : overIdx
+          // Dragging up (or same position): visual puts active before over
+          insertIdx = overIdxInFiltered
         }
+      } else {
+        // Cross column: always insert before the over task
+        const overIdxInFiltered = filtered.findIndex((t) => t.id === overId)
+        insertIdx = overIdxInFiltered === -1 ? filtered.length : overIdxInFiltered
       }
 
       // Calculate position from filtered array
@@ -298,6 +315,12 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
         return
       }
 
+      // Capture store snapshot before optimistic update (for error rollback)
+      const prevSnapshot: Record<string, Task[]> = {}
+      for (const [sid, tasks] of Object.entries(tasksByStatus)) {
+        prevSnapshot[sid] = [...tasks]
+      }
+
       // Mark as local drag so WS echo won't re-animate
       markLocalMove(taskId)
 
@@ -309,12 +332,14 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
         taskId,
         fromStatusId,
         data: { status_id: targetStatusId, position },
+        _prevSnapshot: prevSnapshot,
       })
     },
     [activeTask, tasksByStatus, moveTask]
   )
 
-  // Cross-column placeholder: index where a gap should appear in the target column
+  // Cross-column placeholder: index where a gap should appear in the target column.
+  // Collision returns the task AFTER the gap, so placeholder goes at that index (before it).
   const getPlaceholderIdx = (statusId: string): number => {
     if (!activeTask || dragOverColumnId !== statusId || activeTask.status.id === statusId) return -1
 
@@ -323,8 +348,13 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
 
     const idx = tasks.findIndex(t => t.id === dragOverItemId)
     if (idx === -1) return tasks.length
-    return insertAfterRef.current ? idx + 1 : idx
+    return idx
   }
+
+  // Use fresh task data from store for overlay (handles WS updates during drag)
+  const freshOverlayTask = activeTask
+    ? (Object.values(tasksByStatus).flat().find(t => t.id === activeTask.id) ?? activeTask)
+    : null
 
   return (
     <DndContext
@@ -360,7 +390,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
       <TaskAnimationLayer />
 
       <DragOverlay dropAnimation={null}>
-        {activeTask && (
+        {freshOverlayTask && (
           <div style={{
             perspective: 600,
           }}>
@@ -371,7 +401,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
               boxShadow: `${-tilt.y * 0.5}px ${tilt.x * 0.5 + 12}px 40px -8px rgba(0,0,0,0.35)`,
               borderRadius: 12,
             }}>
-              <TaskCard task={activeTask} onClick={() => {}} isDragOverlay compact={compact} />
+              <TaskCard task={freshOverlayTask} onClick={() => {}} isDragOverlay compact={compact} />
             </div>
           </div>
         )}
