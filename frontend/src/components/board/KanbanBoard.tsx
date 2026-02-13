@@ -18,6 +18,7 @@ import { useProjectStore } from '@/stores/projectStore'
 import { useBoardStore } from '@/stores/boardStore'
 import { useMoveTask } from '@/hooks/useTasks'
 import { markLocalMove } from '@/hooks/useWebSocket'
+import { calculateInsertPosition } from '@/lib/position'
 import { BoardColumn } from './BoardColumn'
 import { TaskCard } from './TaskCard'
 import { TaskAnimationLayer, startFlight, getCardRect } from './TaskAnimationLayer'
@@ -48,27 +49,23 @@ const findColumnAtPointer = (args: Parameters<CollisionDetection>[0]) => {
 /**
  * Custom collision detection using "between-midpoints" approach.
  *
- * Instead of closest-center (which flickers at boundaries), we determine
- * which pair of task midpoints the pointer sits between and return the
- * task AFTER the gap. This gives stable, predictable targeting:
+ * Determines which pair of task midpoints the pointer sits between and
+ * returns the task AFTER the gap. This gives stable, predictable targeting:
  *
  *   pointer above A's midpoint  → return A  (insert before A)
  *   pointer between A and B mid → return B  (insert before B = between A and B)
  *   pointer past last midpoint  → return column (append to end)
  *
- * Fix 2: active item is filtered from pointerWithin so the collision
- * never returns the dragged card itself.
+ * Active item is filtered from the task list so collision never targets
+ * the dragged card itself.
  */
 const kanbanCollision: CollisionDetection = (args) => {
   const withinCollisions = pointerWithin(args)
 
-  // Fix 2: filter active item — prevents over=active which breaks drop position
-  const directTask = withinCollisions.find(
-    (c) => !String(c.id).startsWith('column-') && c.id !== args.active.id,
-  )
-  if (directTask) return [directTask]
-
-  // Find column via pointerWithin or horizontal band fallback
+  // Find column via pointerWithin or horizontal band fallback.
+  // We intentionally skip the "directTask" shortcut (returning the first
+  // pointerWithin task hit) because it bypasses the stable between-midpoints
+  // logic below and causes oscillation with MeasuringStrategy changes.
   const withinColumn = withinCollisions.find((c) =>
     String(c.id).startsWith('column-'),
   )
@@ -140,9 +137,10 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
 
-  // Re-measure droppables while dragging so variable-height cards stay accurate
+  // Measure droppables once before drag starts — MeasuringStrategy.Always causes
+  // oscillation where re-measured (transformed) rects reset the sort baseline
   const measuring = useMemo(() => ({
-    droppable: { strategy: MeasuringStrategy.Always },
+    droppable: { strategy: MeasuringStrategy.BeforeDragging },
   }), [])
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -288,19 +286,9 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
         insertIdx = overIdxInFiltered === -1 ? filtered.length : overIdxInFiltered
       }
 
-      // Calculate position from filtered array
-      let position: number
-      if (filtered.length === 0) {
-        position = 1024
-      } else if (insertIdx <= 0) {
-        position = (filtered[0]?.position ?? 1024) / 2
-      } else if (insertIdx >= filtered.length) {
-        position = (filtered[filtered.length - 1]?.position ?? 0) + 1024
-      } else {
-        const before = filtered[insertIdx - 1]?.position ?? 0
-        const after = filtered[insertIdx]?.position ?? before + 2048
-        position = (before + after) / 2
-      }
+      // Calculate position from filtered array using shared utility
+      const sortedPositions = filtered.map((t) => t.position)
+      const position = calculateInsertPosition(sortedPositions, insertIdx)
 
       // Animate back to position (works even if nothing changed)
       const translated = active.rect.current.translated

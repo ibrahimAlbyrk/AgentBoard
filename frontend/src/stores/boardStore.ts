@@ -95,8 +95,15 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       fromStatusId === toStatusId
         ? fromTasks
         : [...(state.tasksByStatus[toStatusId] ?? [])]
-    toTasks.push(movedTask)
-    toTasks.sort((a, b) => a.position - b.position)
+
+    // Binary insert at correct position instead of push+sort
+    let lo = 0, hi = toTasks.length
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1
+      if (toTasks[mid].position < position) lo = mid + 1
+      else hi = mid
+    }
+    toTasks.splice(lo, 0, movedTask)
 
     set({
       tasksByStatus: {
