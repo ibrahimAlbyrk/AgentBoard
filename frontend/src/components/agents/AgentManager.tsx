@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { useAgents, useCreateAgent, useUpdateAgent, useDeleteAgent, useMyAgents, useLinkAgent } from '@/hooks/useAgents'
 import { EmptyState } from '@/components/shared/EmptyState'
-import type { Agent } from '@/types'
+import type { Agent, AgentWithProjects } from '@/types'
 
 const PRESET_COLORS = [
   '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B',
@@ -37,7 +37,7 @@ export function AgentManager({ projectId, open, onClose }: AgentManagerProps) {
   const updateAgent = useUpdateAgent(projectId)
   const deleteAgent = useDeleteAgent(projectId)
   const [showDeleted, setShowDeleted] = useState(false)
-  const { data: myAgentsRes } = useMyAgents(showDeleted)
+  const { data: myAgentsRes } = useMyAgents(true)
   const linkAgent = useLinkAgent(projectId)
 
   const agents = agentsRes?.data ?? []

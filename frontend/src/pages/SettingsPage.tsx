@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { toast } from '@/lib/toast'
-import { Copy, Plus, Trash2, Key, Bell, BellOff, Monitor, Mail, VolumeX, Bot } from 'lucide-react'
+import { Copy, Plus, Trash2, Key, Bell, BellOff, Monitor, Mail, VolumeX, Bot, Pencil, Check, X, Eye, EyeOff } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,10 +16,11 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api-client'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { useMyAgents } from '@/hooks/useAgents'
+import { useMyAgents, useCreateGlobalAgent, useUpdateGlobalAgent, useDeleteGlobalAgent } from '@/hooks/useAgents'
 import { useNotificationPreferences, useUpdateNotificationPreferences } from '@/hooks/useNotifications'
 import { useProjects } from '@/hooks/useProjects'
 import type { NotificationPreferences } from '@/types/user'
+import type { AgentWithProjects } from '@/types/agent'
 
 interface ApiKeyEntry {
   id: string
@@ -120,6 +121,7 @@ export function SettingsPage() {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="api-keys" onClick={loadKeys}>API Keys</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="agents">Agents</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
@@ -346,7 +348,337 @@ export function SettingsPage() {
         <TabsContent value="notifications" className="mt-6">
           <NotificationSettings />
         </TabsContent>
+
+        <TabsContent value="agents" className="mt-6">
+          <AgentsSettings />
+        </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+
+const PRESET_COLORS = [
+  '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B',
+  '#22C55E', '#EF4444', '#06B6D4', '#6366F1',
+]
+
+function AgentsSettings() {
+  const [showDeleted, setShowDeleted] = useState(false)
+  // Always fetch with include_deleted=true so we can show the toggle count
+  const { data: agentsRes, isLoading } = useMyAgents(true)
+  const createAgent = useCreateGlobalAgent()
+  const updateAgent = useUpdateGlobalAgent()
+  const deleteAgent = useDeleteGlobalAgent()
+
+  const agents = agentsRes?.data ?? []
+  const activeAgents = agents.filter((a) => !a.deleted_at)
+  const deletedAgents = agents.filter((a) => a.deleted_at)
+
+  const [showAdd, setShowAdd] = useState(false)
+  const [name, setName] = useState('')
+  const [color, setColor] = useState(PRESET_COLORS[0])
+  const [editingAgent, setEditingAgent] = useState<AgentWithProjects | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editColor, setEditColor] = useState('')
+
+  const resetAdd = () => {
+    setShowAdd(false)
+    setName('')
+    setColor(PRESET_COLORS[0])
+  }
+
+  const handleCreate = async () => {
+    if (!name.trim()) return
+    try {
+      await createAgent.mutateAsync({ name: name.trim(), color })
+      toast.success('Agent created')
+      resetAdd()
+    } catch (err) {
+      toast.error(err)
+    }
+  }
+
+  const openEdit = (agent: AgentWithProjects) => {
+    setEditingAgent(agent)
+    setEditName(agent.name)
+    setEditColor(agent.color)
+  }
+
+  const handleEdit = async () => {
+    if (!editingAgent || !editName.trim()) return
+    try {
+      await updateAgent.mutateAsync({
+        agentId: editingAgent.id,
+        data: { name: editName.trim(), color: editColor },
+      })
+      toast.success('Agent updated')
+      setEditingAgent(null)
+    } catch (err) {
+      toast.error(err)
+    }
+  }
+
+  const handleToggleActive = async (agent: AgentWithProjects) => {
+    try {
+      await updateAgent.mutateAsync({
+        agentId: agent.id,
+        data: { is_active: !agent.is_active },
+      })
+    } catch (err) {
+      toast.error(err)
+    }
+  }
+
+  const handleDelete = async (agent: AgentWithProjects) => {
+    if (!confirm(`Delete "${agent.name}"? This will remove it from all projects.`)) return
+    try {
+      await deleteAgent.mutateAsync(agent.id)
+      toast.success('Agent deleted')
+    } catch (err) {
+      toast.error(err)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-5 w-40 bg-foreground/10 rounded" />
+          <div className="h-4 w-64 bg-foreground/5 rounded" />
+          <div className="space-y-3 mt-6">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-16 bg-foreground/5 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+              <Bot className="size-4" />
+              Your Agents
+            </h2>
+            <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">Manage AI agents across all your projects</p>
+          </div>
+          {!showAdd && (
+            <Button
+              onClick={() => setShowAdd(true)}
+              className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)] shadow-[0_0_16px_-4px_var(--glow)] transition-all"
+            >
+              <Plus className="size-4" />
+              New Agent
+            </Button>
+          )}
+        </div>
+
+        {/* Add form */}
+        {showAdd && (
+          <div className="space-y-3 p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] mb-4">
+            <Input
+              autoFocus
+              placeholder="Agent name (e.g. Claude Code)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+              className="bg-[var(--elevated)] border-[var(--border-subtle)]"
+            />
+            <div className="space-y-1.5">
+              <span className="text-xs text-[var(--text-tertiary)] font-medium">Color</span>
+              <div className="flex gap-2">
+                {PRESET_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    className="size-7 rounded-full transition-transform hover:scale-110"
+                    style={{
+                      backgroundColor: c,
+                      outline: color === c ? '2px solid var(--foreground)' : 'none',
+                      outlineOffset: '2px',
+                    }}
+                    onClick={() => setColor(c)}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[var(--elevated)]">
+              <span
+                className="size-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                style={{ backgroundColor: color }}
+              >
+                {(name || 'A').charAt(0).toUpperCase()}
+              </span>
+              <span className="text-sm font-medium text-foreground">{name || 'Agent name'}</span>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={resetAdd}>
+                <X className="size-3.5" />
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleCreate} disabled={!name.trim() || createAgent.isPending}>
+                <Check className="size-3.5" />
+                {createAgent.isPending ? 'Creating...' : 'Create Agent'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Agent list */}
+        {activeAgents.length === 0 && !showAdd ? (
+          <EmptyState
+            icon={Bot}
+            title="No agents"
+            description="Create agents to assign tasks to AI assistants"
+            action={{ label: 'New Agent', onClick: () => setShowAdd(true) }}
+          />
+        ) : (
+          <div className="space-y-2">
+            {activeAgents.map((agent) => (
+              <div
+                key={agent.id}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--surface)] border border-[var(--border-subtle)] group hover:border-[var(--border-strong)] transition-colors"
+              >
+                <span
+                  className="size-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                  style={{ backgroundColor: agent.color }}
+                >
+                  {agent.name.charAt(0).toUpperCase()}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground truncate">{agent.name}</p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      agent.is_active
+                        ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                        : 'bg-foreground/5 text-[var(--text-tertiary)]'
+                    }`}>
+                      {agent.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {agent.projects.length > 0 ? (
+                      agent.projects.map((p) => (
+                        <span
+                          key={p.id}
+                          className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent-muted-bg)] text-[var(--accent-solid)] font-medium"
+                        >
+                          {p.name}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[10px] text-[var(--text-tertiary)]">No projects</span>
+                    )}
+                  </div>
+                </div>
+                <Switch
+                  checked={agent.is_active}
+                  onCheckedChange={() => handleToggleActive(agent)}
+                  className="shrink-0"
+                />
+                <button
+                  onClick={() => openEdit(agent)}
+                  className="size-7 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--elevated)] transition-all opacity-0 group-hover:opacity-100"
+                >
+                  <Pencil className="size-3.5" />
+                </button>
+                <button
+                  onClick={() => handleDelete(agent)}
+                  className="size-7 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Deleted agents */}
+      {(deletedAgents.length > 0 || showDeleted) && (
+        <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
+          <button
+            onClick={() => setShowDeleted(!showDeleted)}
+            className="flex items-center gap-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors w-full"
+          >
+            {showDeleted ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            {showDeleted ? 'Hide deleted agents' : `Show deleted agents (${deletedAgents.length})`}
+          </button>
+          {showDeleted && (
+            <div className="space-y-2 mt-3">
+              {deletedAgents.map((agent) => {
+                const displayName = agent.name.replace(/__del_[a-f0-9]{8}$/, '')
+                return (
+                  <div
+                    key={agent.id}
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border-subtle)] opacity-50"
+                  >
+                    <span
+                      className="size-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 grayscale"
+                      style={{ backgroundColor: agent.color }}
+                    >
+                      {displayName.charAt(0).toUpperCase()}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate line-through">{displayName}</p>
+                      <p className="text-[11px] text-[var(--text-tertiary)]">Deleted</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Edit dialog */}
+      {editingAgent && (
+        <Dialog open={!!editingAgent} onOpenChange={(v) => !v && setEditingAgent(null)}>
+          <DialogContent className="bg-[var(--elevated)] border-[var(--border-subtle)] sm:max-w-[380px]">
+            <DialogHeader>
+              <DialogTitle>Edit Agent</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <span className="text-xs text-[var(--text-tertiary)] font-medium">Name</span>
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
+                  className="bg-[var(--surface)] border-[var(--border-subtle)]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-xs text-[var(--text-tertiary)] font-medium">Color</span>
+                <div className="flex gap-2">
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      className="size-7 rounded-full transition-transform hover:scale-110"
+                      style={{
+                        backgroundColor: c,
+                        outline: editColor === c ? '2px solid var(--foreground)' : 'none',
+                        outlineOffset: '2px',
+                      }}
+                      onClick={() => setEditColor(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingAgent(null)}>Cancel</Button>
+              <Button onClick={handleEdit} disabled={updateAgent.isPending || !editName.trim()}>
+                {updateAgent.isPending ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

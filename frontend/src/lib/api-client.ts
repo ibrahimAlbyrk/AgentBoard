@@ -2,6 +2,7 @@ import type {
   Agent,
   AgentCreate,
   AgentUpdate,
+  AgentWithProjects,
   APIResponse,
   PaginatedResponse,
   TokenResponse,
@@ -353,7 +354,27 @@ class APIClient {
 
   async listMyAgents(includeDeleted = false) {
     const qs = includeDeleted ? '?include_deleted=true' : ''
-    return this.request<APIResponse<Agent[]>>(`/agents/mine${qs}`)
+    return this.request<APIResponse<AgentWithProjects[]>>(`/agents/mine${qs}`)
+  }
+
+  async createGlobalAgent(data: AgentCreate) {
+    return this.request<APIResponse<AgentWithProjects>>('/agents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateGlobalAgent(agentId: string, data: AgentUpdate) {
+    return this.request<APIResponse<AgentWithProjects>>(`/agents/${agentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteGlobalAgent(agentId: string) {
+    return this.request<void>(`/agents/${agentId}`, {
+      method: 'DELETE',
+    })
   }
 
   async linkAgentToProject(projectId: string, agentId: string) {

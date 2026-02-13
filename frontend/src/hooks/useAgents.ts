@@ -62,3 +62,35 @@ export function useLinkAgent(projectId: string) {
     },
   })
 }
+
+// Global agent CRUD (no project scope)
+export function useCreateGlobalAgent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: AgentCreate) => api.createGlobalAgent(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agents', 'mine'] })
+    },
+  })
+}
+
+export function useUpdateGlobalAgent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ agentId, data }: { agentId: string; data: AgentUpdate }) =>
+      api.updateGlobalAgent(agentId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agents', 'mine'] })
+    },
+  })
+}
+
+export function useDeleteGlobalAgent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (agentId: string) => api.deleteGlobalAgent(agentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agents', 'mine'] })
+    },
+  })
+}
