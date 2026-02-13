@@ -351,6 +351,17 @@ class APIClient {
     })
   }
 
+  async listMyAgents(includeDeleted = false) {
+    const qs = includeDeleted ? '?include_deleted=true' : ''
+    return this.request<APIResponse<Agent[]>>(`/agents/mine${qs}`)
+  }
+
+  async linkAgentToProject(projectId: string, agentId: string) {
+    return this.request<APIResponse<Agent>>(`/projects/${projectId}/agents/${agentId}/link`, {
+      method: 'POST',
+    })
+  }
+
   // Tasks (board-scoped)
   async listTasks(projectId: string, boardId: string, filters?: TaskFilters) {
     const query = new URLSearchParams()
@@ -492,10 +503,10 @@ class APIClient {
 
   // API Keys
   async listApiKeys() {
-    return this.request<APIResponse<Array<{ id: string; name: string; key_prefix: string; last_used: string | null; created_at: string }>>>('/api-keys')
+    return this.request<APIResponse<Array<{ id: string; name: string; key_prefix: string; agent_id: string | null; agent_name: string | null; last_used: string | null; created_at: string }>>>('/api-keys')
   }
 
-  async createApiKey(data: { name: string }) {
+  async createApiKey(data: { name: string; agent_id?: string }) {
     return this.request<APIResponse<{ id: string; key: string; name: string }>>('/api-keys', {
       method: 'POST',
       body: JSON.stringify(data),

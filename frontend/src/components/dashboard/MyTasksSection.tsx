@@ -176,6 +176,15 @@ function DashboardTaskRow({ task }: { task: DashboardTask }) {
               {priorityLabels[task.priority]}
             </span>
           )}
+          {task.agent_creator && (
+            <span
+              className="shrink-0 size-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white"
+              style={{ backgroundColor: task.agent_creator.color }}
+              title={`Created by ${task.agent_creator.name}`}
+            >
+              {task.agent_creator.name.charAt(0).toUpperCase()}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 mt-1">

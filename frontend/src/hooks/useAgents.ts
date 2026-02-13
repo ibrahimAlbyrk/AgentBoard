@@ -10,6 +10,13 @@ export function useAgents(projectId: string, includeInactive = true) {
   })
 }
 
+export function useMyAgents(includeDeleted = false) {
+  return useQuery({
+    queryKey: ['agents', 'mine', includeDeleted],
+    queryFn: () => api.listMyAgents(includeDeleted),
+  })
+}
+
 export function useCreateAgent(projectId: string) {
   const qc = useQueryClient()
   return useMutation({
@@ -39,6 +46,18 @@ export function useDeleteAgent(projectId: string) {
     mutationFn: (agentId: string) => api.deleteAgent(projectId, agentId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['agents', projectId] })
+      qc.invalidateQueries({ queryKey: ['project', projectId] })
+    },
+  })
+}
+
+export function useLinkAgent(projectId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (agentId: string) => api.linkAgentToProject(projectId, agentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agents', projectId] })
+      qc.invalidateQueries({ queryKey: ['agents', 'mine'] })
       qc.invalidateQueries({ queryKey: ['project', projectId] })
     },
   })

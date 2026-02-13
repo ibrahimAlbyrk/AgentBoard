@@ -5,6 +5,7 @@ export interface Agent {
   is_active: boolean
   created_at: string
   updated_at: string | null
+  deleted_at: string | null
 }
 
 export interface AgentBrief {
@@ -22,4 +23,8 @@ export interface AgentUpdate {
   name?: string
   color?: string
   is_active?: boolean
+}
+
+export interface AgentWithProjects extends Agent {
+  projects: { id: string; name: string }[]
 }

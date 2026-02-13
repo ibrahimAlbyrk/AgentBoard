@@ -2,7 +2,7 @@ export interface WSEvent {
   type: string
   project_id: string
   data: Record<string, unknown>
-  user?: { id: string; username: string }
+  user?: { id: string; username: string; agent?: { id: string; name: string } }
   timestamp: string
 }
 

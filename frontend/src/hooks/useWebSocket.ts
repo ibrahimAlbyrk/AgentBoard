@@ -28,11 +28,14 @@ export function useWebSocket(projectId: string, boardId: string) {
 
     wsManager.connect(projectId, boardId, accessToken)
 
+    const wsActorName = (user: { username: string; agent?: { name: string } }) =>
+      user.agent?.name ?? user.username
+
     const handleCreated = (e: Record<string, unknown>) => {
       addTask(e.data as Task)
-      const user = e.user as { username: string } | undefined
+      const user = e.user as { username: string; agent?: { name: string } } | undefined
       const data = e.data as { title: string }
-      if (user) toast.info(`${user.username} created "${data.title}"`)
+      if (user) toast.info(`${wsActorName(user)} created "${data.title}"`)
     }
 
     const animatedRelocate = (data: Task) => {
@@ -63,8 +66,8 @@ export function useWebSocket(projectId: string, boardId: string) {
         relocateTask(data.id, data)
       } else {
         animatedRelocate(data)
-        const user = e.user as { username: string } | undefined
-        if (user) toast.info(`${user.username} moved a task`)
+        const user = e.user as { username: string; agent?: { name: string } } | undefined
+        if (user) toast.info(`${wsActorName(user)} moved a task`)
       }
     }
 

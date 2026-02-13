@@ -110,7 +110,6 @@ export interface TaskCreate {
   priority?: Priority
   assignee_user_ids?: string[]
   assignee_agent_ids?: string[]
-  agent_creator_id?: string
   label_ids?: string[]
   watcher_user_ids?: string[]
   watcher_agent_ids?: string[]
@@ -167,6 +166,7 @@ export interface ActivityLog {
   entity_type: string
   changes: Record<string, { old?: string; new?: string } | string>
   user: UserBrief
+  agent: AgentBrief | null
   task_id: string | null
   created_at: string
 }

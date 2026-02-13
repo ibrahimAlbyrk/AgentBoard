@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { toast } from '@/lib/toast'
-import { Copy, Plus, Trash2, Key, Bell, BellOff, Monitor, Mail, VolumeX } from 'lucide-react'
+import { Copy, Plus, Trash2, Key, Bell, BellOff, Monitor, Mail, VolumeX, Bot } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api-client'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { useMyAgents } from '@/hooks/useAgents'
 import { useNotificationPreferences, useUpdateNotificationPreferences } from '@/hooks/useNotifications'
 import { useProjects } from '@/hooks/useProjects'
 import type { NotificationPreferences } from '@/types/user'
@@ -24,6 +25,8 @@ interface ApiKeyEntry {
   id: string
   name: string
   key_prefix: string
+  agent_id: string | null
+  agent_name: string | null
   last_used: string | null
   created_at: string
 }
@@ -39,8 +42,11 @@ export function SettingsPage() {
   const [keysLoaded, setKeysLoaded] = useState(false)
   const [showCreateKey, setShowCreateKey] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
+  const [newKeyAgentId, setNewKeyAgentId] = useState<string>('')
   const [createdKey, setCreatedKey] = useState('')
   const [creatingKey, setCreatingKey] = useState(false)
+  const { data: myAgentsRes } = useMyAgents()
+  const myAgents = myAgentsRes?.data ?? []
 
   const loadKeys = async () => {
     if (keysLoaded) return
@@ -70,10 +76,21 @@ export function SettingsPage() {
     if (!newKeyName.trim()) return
     setCreatingKey(true)
     try {
-      const res = await api.createApiKey({ name: newKeyName.trim() })
+      const payload: { name: string; agent_id?: string } = { name: newKeyName.trim() }
+      if (newKeyAgentId) payload.agent_id = newKeyAgentId
+      const selectedAgent = myAgents.find((a) => a.id === newKeyAgentId)
+      const res = await api.createApiKey(payload)
       setCreatedKey(res.data.key)
-      setApiKeys((prev) => [...prev, { ...res.data, key_prefix: res.data.key.slice(0, 8), last_used: null, created_at: new Date().toISOString() }])
+      setApiKeys((prev) => [...prev, {
+        ...res.data,
+        key_prefix: res.data.key.slice(0, 8),
+        agent_id: newKeyAgentId || null,
+        agent_name: selectedAgent?.name ?? null,
+        last_used: null,
+        created_at: new Date().toISOString(),
+      }])
       setNewKeyName('')
+      setNewKeyAgentId('')
     } catch (err) {
       toast.error(err)
     } finally {
@@ -181,18 +198,36 @@ export function SettingsPage() {
                     key={key.id}
                     className="flex items-center justify-between bg-[var(--surface)] border border-[var(--border-subtle)] rounded-xl p-4 card-hover"
                   >
-                    <div>
-                      <p className="font-medium text-[13px] text-foreground">{key.name}</p>
-                      <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5 font-mono">
-                        {key.key_prefix}... | Last used:{' '}
-                        {key.last_used ?? 'Never'}
-                      </p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      {key.agent_name ? (
+                        <span className="shrink-0 size-8 rounded-full bg-[var(--accent-muted-bg)] flex items-center justify-center">
+                          <Bot className="size-4 text-[var(--accent-solid)]" />
+                        </span>
+                      ) : (
+                        <span className="shrink-0 size-8 rounded-full bg-[var(--surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                          <Key className="size-3.5 text-[var(--text-tertiary)]" />
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-[13px] text-foreground truncate">{key.name}</p>
+                          {key.agent_name && (
+                            <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                              {key.agent_name}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5 font-mono">
+                          {key.key_prefix}... | Last used:{' '}
+                          {key.last_used ?? 'Never'}
+                        </p>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon-xs"
                       onClick={() => handleDeleteKey(key.id)}
-                      className="hover:bg-[var(--destructive)]/10"
+                      className="hover:bg-[var(--destructive)]/10 shrink-0"
                     >
                       <Trash2 className="size-3.5 text-destructive" />
                     </Button>
@@ -248,10 +283,49 @@ export function SettingsPage() {
                       className="bg-[var(--surface)] border-[var(--border-subtle)]"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label className="text-[13px]">Assign to Agent <span className="text-[var(--text-tertiary)]">(optional)</span></Label>
+                    <div className="space-y-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setNewKeyAgentId('')}
+                        className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg border transition-colors text-left text-sm ${
+                          !newKeyAgentId
+                            ? 'border-[var(--accent-solid)] bg-[var(--accent-muted-bg)]'
+                            : 'border-[var(--border-subtle)] bg-[var(--surface)] hover:border-[var(--border-strong)]'
+                        }`}
+                      >
+                        <Key className="size-4 text-[var(--text-tertiary)]" />
+                        <span className="font-medium">User Key</span>
+                        <span className="text-[var(--text-tertiary)] text-xs ml-auto">Standard API access</span>
+                      </button>
+                      {myAgents.filter(a => a.is_active).map((agent) => (
+                        <button
+                          key={agent.id}
+                          type="button"
+                          onClick={() => setNewKeyAgentId(agent.id)}
+                          className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg border transition-colors text-left text-sm ${
+                            newKeyAgentId === agent.id
+                              ? 'border-[var(--accent-solid)] bg-[var(--accent-muted-bg)]'
+                              : 'border-[var(--border-subtle)] bg-[var(--surface)] hover:border-[var(--border-strong)]'
+                          }`}
+                        >
+                          <span
+                            className="size-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                            style={{ backgroundColor: agent.color }}
+                          >
+                            {agent.name.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="font-medium">{agent.name}</span>
+                          <span className="text-[var(--text-tertiary)] text-xs ml-auto">Agent key</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <DialogFooter>
                     <Button
                       variant="outline"
-                      onClick={() => setShowCreateKey(false)}
+                      onClick={() => { setShowCreateKey(false); setNewKeyAgentId('') }}
                     >
                       Cancel
                     </Button>
