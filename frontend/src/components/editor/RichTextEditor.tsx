@@ -171,6 +171,8 @@ export function RichTextEditor({
     extensions: [
       StarterKit.configure({
         codeBlock: false,
+        link: false,
+        underline: false,
       }),
       Underline,
       LinkExt.configure({

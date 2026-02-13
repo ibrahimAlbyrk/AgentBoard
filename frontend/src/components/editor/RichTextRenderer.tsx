@@ -53,7 +53,7 @@ const ReferenceForRenderer = Mention.extend({
 })
 
 const extensions = [
-  StarterKit.configure({ codeBlock: false }),
+  StarterKit.configure({ codeBlock: false, link: false, underline: false }),
   Underline,
   LinkExt.configure({
     openOnClick: false,
