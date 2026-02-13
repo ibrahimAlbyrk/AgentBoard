@@ -118,6 +118,14 @@ export function useWebSocket(projectId: string, boardId: string) {
       }
     }
 
+    const handleSubtaskChange = (e: Record<string, unknown>) => {
+      const parentId = e.parent_id as string | undefined
+      if (parentId) {
+        queryClient.invalidateQueries({ queryKey: ['subtasks', projectId, boardId, parentId] })
+      }
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+    }
+
     wsManager.on('task.created', handleCreated)
     wsManager.on('task.updated', handleUpdated)
     wsManager.on('task.deleted', handleDeleted)
@@ -129,6 +137,10 @@ export function useWebSocket(projectId: string, boardId: string) {
     wsManager.on('custom_field.updated', handleCustomFieldChanged)
     wsManager.on('custom_field.deleted', handleCustomFieldChanged)
     wsManager.on('custom_field.reordered', handleCustomFieldChanged)
+    wsManager.on('subtask.created', handleSubtaskChange)
+    wsManager.on('subtask.updated', handleSubtaskChange)
+    wsManager.on('subtask.deleted', handleSubtaskChange)
+    wsManager.on('subtask.reordered', handleSubtaskChange)
 
     return () => {
       wsManager.off('task.created', handleCreated)
@@ -142,6 +154,10 @@ export function useWebSocket(projectId: string, boardId: string) {
       wsManager.off('custom_field.updated', handleCustomFieldChanged)
       wsManager.off('custom_field.deleted', handleCustomFieldChanged)
       wsManager.off('custom_field.reordered', handleCustomFieldChanged)
+      wsManager.off('subtask.created', handleSubtaskChange)
+      wsManager.off('subtask.updated', handleSubtaskChange)
+      wsManager.off('subtask.deleted', handleSubtaskChange)
+      wsManager.off('subtask.reordered', handleSubtaskChange)
     }
   }, [projectId, boardId, accessToken, addTask, updateTask, relocateTask, removeTask, queryClient])
 }

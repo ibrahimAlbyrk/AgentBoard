@@ -59,6 +59,23 @@ export interface ChecklistProgress {
   completed: number
 }
 
+export interface SubtaskProgress {
+  total: number
+  completed: number
+}
+
+export interface SubtaskBrief {
+  id: string
+  title: string
+  status: Status
+  priority: Priority
+  position: number
+  completed_at: string | null
+  assignees: AssigneeBrief[]
+}
+
+export type TaskDeleteMode = 'cascade' | 'orphan'
+
 export interface ChecklistItemCreate {
   title: string
   assignee_id?: string
@@ -92,6 +109,9 @@ export interface Task {
   parent_id: string | null
   comments_count: number
   checklist_progress: ChecklistProgress
+  subtask_progress: SubtaskProgress
+  children_count: number
+  children: SubtaskBrief[]
   cover_type: CoverType | null
   cover_value: string | null
   cover_size: CoverSize | null
@@ -128,6 +148,7 @@ export interface TaskUpdate {
   watcher_user_ids?: string[]
   watcher_agent_ids?: string[]
   due_date?: string
+  parent_id?: string | null
   cover_type?: CoverType | null
   cover_value?: string | null
   cover_size?: CoverSize | null
@@ -173,6 +194,7 @@ export interface ActivityLog {
 
 export interface DashboardTask extends Task {
   project_name: string
+  parent_title: string | null
 }
 
 export interface MyTasksSummary {

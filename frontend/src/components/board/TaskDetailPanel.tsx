@@ -21,6 +21,9 @@ import {
   Check,
   ImageIcon,
   Trash2,
+  ListTree,
+  ArrowUpFromLine,
+  ArrowDownToLine,
 } from 'lucide-react'
 import {
   Select,
@@ -33,13 +36,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useProjectStore } from '@/stores/projectStore'
-import { useUpdateTask } from '@/hooks/useTasks'
+import { useUpdateTask, useDeleteTask } from '@/hooks/useTasks'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api-client'
 import { useCustomFieldDefinitions } from '@/hooks/useCustomFields'
 import { CustomFieldsSection } from '@/components/board/CustomFieldsSection'
 import { TaskComments } from '@/components/tasks/TaskComments'
 import { TaskActivity } from '@/components/tasks/TaskActivity'
 import { TaskAttachments } from '@/components/tasks/TaskAttachments'
 import { ChecklistSection } from '@/components/tasks/ChecklistSection'
+import { SubtasksSection } from '@/components/tasks/SubtasksSection'
 import { LabelManager } from '@/components/labels/LabelManager'
 import { VoteButton } from '@/components/reactions/VoteButton'
 import { ReactionBar } from '@/components/reactions/ReactionBar'
@@ -48,6 +54,9 @@ import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { RichTextRenderer } from '@/components/editor/RichTextRenderer'
 import { GRADIENT_PRESETS } from '@/lib/cover-presets'
 import { usePanelEsc } from '@/contexts/PanelStackContext'
+import { useConvertToSubtask, usePromoteSubtask } from '@/hooks/useSubtasks'
+import { DeleteTaskDialog } from '@/components/shared/DeleteTaskDialog'
+import { TaskPickerDialog } from '@/components/tasks/TaskPickerDialog'
 import type { Task, Priority, AssigneeBrief, WatcherBrief, ProjectMember, Agent, TiptapDoc } from '@/types'
 
 const priorities: { value: Priority; label: string; color: string; icon: typeof Flag }[] = [
@@ -166,18 +175,34 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   const [showLabelManager, setShowLabelManager] = useState(false)
   const [showCoverPicker, setShowCoverPicker] = useState(false)
   const [activeSection, setActiveSection] = useState<FloatingSection | null>(null)
+  const [subtaskStack, setSubtaskStack] = useState<string[]>([])
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showTaskPicker, setShowTaskPicker] = useState(false)
+  const deleteTask = useDeleteTask(projectId, boardId)
+  const convertToSubtask = useConvertToSubtask(projectId, boardId)
+  const promoteSubtask = usePromoteSubtask(projectId, boardId)
   const panelRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const lastTaskRef = useRef<Task | null>(null)
   if (task) lastTaskRef.current = task
-  const displayTask = task ?? lastTaskRef.current
+
+  // If navigating into subtask, fetch it
+  const currentSubtaskId = subtaskStack.length > 0 ? subtaskStack[subtaskStack.length - 1] : null
+  const { data: subtaskRes } = useQuery({
+    queryKey: ['task', projectId, boardId, currentSubtaskId],
+    queryFn: () => api.getTask(projectId, boardId, currentSubtaskId!),
+    enabled: !!currentSubtaskId,
+  })
+  const subtaskData = subtaskRes?.data ?? null
+  const displayTask = currentSubtaskId ? (subtaskData ?? lastTaskRef.current) : (task ?? lastTaskRef.current)
 
   useEffect(() => {
     if (!open) {
       setEditingTitle(false)
       setEditingDesc(false)
       setActiveSection(null)
+      setSubtaskStack([])
     }
   }, [open])
 
@@ -350,13 +375,56 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                     </span>
                     <ChevronRight className="size-3" />
                     <span>{displayTask.status.name}</span>
+                    {displayTask.parent_id && (
+                      <span className="flex items-center gap-1 text-[var(--accent-solid)]">
+                        <ListTree className="size-3" />
+                        Subtask
+                      </span>
+                    )}
                   </div>
-                  <button
-                    onClick={handleFullClose}
-                    className="size-8 rounded-xl flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--surface)] transition-all duration-150"
-                  >
-                    <X className="size-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {/* Convert to subtask (only for root tasks) */}
+                    {!displayTask.parent_id && (
+                      <button
+                        onClick={() => setShowTaskPicker(true)}
+                        title="Make subtask of..."
+                        className="size-8 rounded-xl flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--surface)] transition-all duration-150"
+                      >
+                        <ArrowDownToLine className="size-4" />
+                      </button>
+                    )}
+                    {/* Promote to root task (only for subtasks) */}
+                    {displayTask.parent_id && (
+                      <button
+                        onClick={() => {
+                          promoteSubtask.mutate(displayTask.id, {
+                            onSuccess: () => {
+                              setSubtaskStack([])
+                            },
+                          })
+                        }}
+                        title="Promote to task"
+                        className="size-8 rounded-xl flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--surface)] transition-all duration-150"
+                      >
+                        <ArrowUpFromLine className="size-4" />
+                      </button>
+                    )}
+                    {/* Delete */}
+                    <button
+                      onClick={() => setShowDeleteDialog(true)}
+                      title="Delete task"
+                      className="size-8 rounded-xl flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--priority-urgent)] hover:bg-[var(--surface)] transition-all duration-150"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                    {/* Close */}
+                    <button
+                      onClick={handleFullClose}
+                      className="size-8 rounded-xl flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--surface)] transition-all duration-150"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Scrollable content */}
@@ -367,6 +435,19 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                     animate="visible"
                     className="px-6 py-5"
                   >
+                    {/* Subtask breadcrumb */}
+                    {subtaskStack.length > 0 && (
+                      <motion.div variants={fadeUp} className="mb-3">
+                        <button
+                          onClick={() => setSubtaskStack((prev) => prev.slice(0, -1))}
+                          className="flex items-center gap-1 text-xs text-[var(--accent-solid)] hover:underline"
+                        >
+                          <ChevronRight className="size-3 rotate-180" />
+                          Back to parent task
+                        </button>
+                      </motion.div>
+                    )}
+
                     {/* Title */}
                     <motion.div variants={fadeUp} className="mb-6">
                       {editingTitle ? (
@@ -640,6 +721,17 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                       )}
                     </motion.div>
 
+                    {/* Subtasks */}
+                    <SubtasksSection
+                      projectId={projectId}
+                      boardId={boardId}
+                      taskId={displayTask.id}
+                      onOpenSubtask={(subtask) => {
+                        setSubtaskStack((prev) => [...prev, subtask.id])
+                        scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                    />
+
                     {/* Checklists */}
                     <ChecklistSection
                       projectId={projectId}
@@ -837,6 +929,38 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
       open={showLabelManager}
       onClose={() => setShowLabelManager(false)}
     />
+    {displayTask && (
+      <DeleteTaskDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        taskTitle={displayTask.title}
+        childrenCount={displayTask.children_count}
+        onDelete={(mode) => {
+          deleteTask.mutate({ taskId: displayTask.id, mode }, {
+            onSuccess: () => {
+              if (subtaskStack.length > 0) {
+                setSubtaskStack((prev) => prev.slice(0, -1))
+              } else {
+                onClose()
+              }
+            },
+          })
+        }}
+      />
+    )}
+    {displayTask && (
+      <TaskPickerDialog
+        open={showTaskPicker}
+        onOpenChange={setShowTaskPicker}
+        excludeTaskIds={[displayTask.id]}
+        onSelect={(parentTask) => {
+          convertToSubtask.mutate(
+            { parentId: parentTask.id, taskId: displayTask.id },
+            { onSuccess: () => onClose() },
+          )
+        }}
+      />
+    )}
     </>
   )
 }

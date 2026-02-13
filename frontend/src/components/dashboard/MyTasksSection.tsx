@@ -163,8 +163,18 @@ function DashboardTaskRow({ task }: { task: DashboardTask }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-medium text-foreground truncate">
+            {task.parent_id && (
+              <span className="text-[10px] text-[var(--text-tertiary)] mr-1.5">
+                ↳
+              </span>
+            )}
             {task.title}
           </span>
+          {task.parent_id && task.parent_title && (
+            <span className="text-[10px] text-[var(--text-tertiary)] shrink-0 truncate max-w-[120px]">
+              {task.parent_title}
+            </span>
+          )}
           {task.priority !== 'none' && (
             <span
               className="text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0"

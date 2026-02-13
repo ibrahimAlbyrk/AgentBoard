@@ -17,6 +17,8 @@ import {
 import { useProjectStore } from '@/stores/projectStore'
 import { useBoardStore } from '@/stores/boardStore'
 import { useMoveTask } from '@/hooks/useTasks'
+import { useExpandedTasks } from '@/hooks/useExpandedTasks'
+import { useSubtasks } from '@/hooks/useSubtasks'
 import { markLocalMove } from '@/hooks/useWebSocket'
 import { calculateInsertPosition } from '@/lib/position'
 import { BoardColumn } from './BoardColumn'
@@ -122,10 +124,46 @@ interface KanbanBoardProps {
   compact?: boolean
 }
 
+function ExpandedSubtasks({ projectId, boardId, taskId, onTaskClick }: { projectId: string; boardId: string; taskId: string; onTaskClick: (task: Task) => void }) {
+  const { data } = useSubtasks(projectId, boardId, taskId)
+  const subtasks = data?.data ?? []
+  if (subtasks.length === 0) return null
+  const sorted = [...subtasks].sort((a, b) => a.position - b.position)
+  return (
+    <div className="mt-2 pt-2 border-t border-[var(--border-subtle)] space-y-1">
+      {sorted.map((s) => (
+        <button
+          key={s.id}
+          onClick={(e) => { e.stopPropagation(); onTaskClick(s) }}
+          className="w-full flex items-center gap-1.5 py-1 px-1 rounded text-left hover:bg-[var(--overlay)] transition-colors"
+        >
+          <span
+            className="size-2 rounded-full shrink-0 border"
+            style={{
+              backgroundColor: s.completed_at ? 'rgb(16, 185, 129)' : `${s.status.color ?? 'var(--text-tertiary)'}30`,
+              borderColor: s.completed_at ? 'rgb(16, 185, 129)' : s.status.color ?? 'var(--text-tertiary)',
+            }}
+          />
+          <span
+            className="text-[11px] truncate"
+            style={{
+              textDecoration: s.completed_at ? 'line-through' : undefined,
+              color: s.completed_at ? 'var(--text-tertiary)' : undefined,
+            }}
+          >
+            {s.title}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProps) {
   const { statuses, currentProject, currentBoard } = useProjectStore()
   const { tasksByStatus, getFilteredTasks } = useBoardStore()
   const moveTask = useMoveTask(currentProject?.id ?? '', currentBoard?.id ?? '')
+  const { isExpanded, toggle } = useExpandedTasks(currentBoard?.id ?? '')
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [draggedCardHeight, setDraggedCardHeight] = useState(72)
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
@@ -371,6 +409,16 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
                 : undefined
             }
             compact={compact}
+            isTaskExpanded={isExpanded}
+            onToggleExpand={toggle}
+            renderExpandedContent={(t) => (
+              <ExpandedSubtasks
+                projectId={currentProject?.id ?? ''}
+                boardId={currentBoard?.id ?? ''}
+                taskId={t.id}
+                onTaskClick={onTaskClick}
+              />
+            )}
           />
         ))}
       </div>

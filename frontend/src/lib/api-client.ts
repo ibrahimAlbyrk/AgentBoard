@@ -414,8 +414,9 @@ class APIClient {
     })
   }
 
-  async deleteTask(projectId: string, boardId: string, taskId: string) {
-    return this.request<void>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}`, {
+  async deleteTask(projectId: string, boardId: string, taskId: string, mode?: 'cascade' | 'orphan') {
+    const params = mode ? `?mode=${mode}` : ''
+    return this.request<void>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}${params}`, {
       method: 'DELETE',
     })
   }
@@ -445,6 +446,38 @@ class APIClient {
     return this.request<void>(`/projects/${projectId}/boards/${boardId}/tasks/bulk-delete`, {
       method: 'POST',
       body: JSON.stringify({ task_ids: taskIds }),
+    })
+  }
+
+  // Subtasks
+  async listSubtasks(projectId: string, boardId: string, taskId: string) {
+    return this.request<APIResponse<Task[]>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/subtasks`)
+  }
+
+  async createSubtask(projectId: string, boardId: string, parentId: string, data: TaskCreate) {
+    return this.request<APIResponse<Task>>(`/projects/${projectId}/boards/${boardId}/tasks/${parentId}/subtasks`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async reorderSubtask(projectId: string, boardId: string, parentId: string, subtaskId: string, position: number) {
+    return this.request<APIResponse<Task>>(`/projects/${projectId}/boards/${boardId}/tasks/${parentId}/subtasks/reorder`, {
+      method: 'PATCH',
+      body: JSON.stringify({ subtask_id: subtaskId, position }),
+    })
+  }
+
+  async convertToSubtask(projectId: string, boardId: string, parentId: string, taskIdToConvert: string) {
+    return this.request<APIResponse<Task>>(`/projects/${projectId}/boards/${boardId}/tasks/${parentId}/convert-to-subtask`, {
+      method: 'POST',
+      body: JSON.stringify({ task_id_to_convert: taskIdToConvert }),
+    })
+  }
+
+  async promoteSubtask(projectId: string, boardId: string, taskId: string) {
+    return this.request<APIResponse<Task>>(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/promote`, {
+      method: 'POST',
     })
   }
 

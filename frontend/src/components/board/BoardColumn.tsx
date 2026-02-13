@@ -15,6 +15,9 @@ interface BoardColumnProps {
   placeholderHeight?: number
   hideDragSourceId?: string
   compact?: boolean
+  isTaskExpanded?: (taskId: string) => boolean
+  onToggleExpand?: (taskId: string) => void
+  renderExpandedContent?: (task: Task) => React.ReactNode
 }
 
 function DropPlaceholder({ height }: { height: number }) {
@@ -46,7 +49,7 @@ function DropPlaceholder({ height }: { height: number }) {
   )
 }
 
-export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, placeholderHeight = 72, hideDragSourceId, compact }: BoardColumnProps) {
+export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, placeholderHeight = 72, hideDragSourceId, compact, isTaskExpanded, onToggleExpand, renderExpandedContent }: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status.id}` })
   const filtersActive = useBoardStore((s) => s.hasActiveFilters())
 
@@ -92,6 +95,9 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
                 hideWhileDragging={task.id === hideDragSourceId}
                 placeholderHeight={placeholderHeight}
                 compact={compact}
+                isExpanded={isTaskExpanded?.(task.id)}
+                onToggleExpand={task.children_count > 0 ? () => onToggleExpand?.(task.id) : undefined}
+                expandedContent={isTaskExpanded?.(task.id) ? renderExpandedContent?.(task) : undefined}
               />
             </Fragment>
           ))}

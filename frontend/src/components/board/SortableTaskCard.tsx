@@ -11,6 +11,9 @@ interface SortableTaskCardProps {
   hideWhileDragging?: boolean
   placeholderHeight?: number
   compact?: boolean
+  isExpanded?: boolean
+  onToggleExpand?: () => void
+  expandedContent?: React.ReactNode
 }
 
 // Skip layout animation when an item is being dropped (wasDragging = true).
@@ -21,7 +24,7 @@ const animateLayoutChanges: AnimateLayoutChanges = (args) => {
   return defaultAnimateLayoutChanges(args)
 }
 
-export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholderHeight = 72, compact }: SortableTaskCardProps) {
+export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholderHeight = 72, compact, isExpanded, onToggleExpand, expandedContent }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -74,7 +77,7 @@ export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholder
           />
         </div>
       ) : hidden ? null : (
-        <TaskCard task={task} onClick={onClick} compact={compact} />
+        <TaskCard task={task} onClick={onClick} compact={compact} isExpanded={isExpanded} onToggleExpand={onToggleExpand} expandedContent={expandedContent} />
       )}
     </div>
   )

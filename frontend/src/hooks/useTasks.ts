@@ -28,8 +28,10 @@ export function useUpdateTask(projectId: string, boardId: string) {
   return useMutation({
     mutationFn: ({ taskId, data }: { taskId: string; data: TaskUpdate }) =>
       api.updateTask(projectId, boardId, taskId, data),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['task', projectId, boardId, variables.taskId] })
+      qc.invalidateQueries({ queryKey: ['subtasks', projectId, boardId] })
       qc.invalidateQueries({ queryKey: ['activity', projectId] })
     },
   })
@@ -38,9 +40,12 @@ export function useUpdateTask(projectId: string, boardId: string) {
 export function useDeleteTask(projectId: string, boardId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (taskId: string) => api.deleteTask(projectId, boardId, taskId),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] }),
+    mutationFn: ({ taskId, mode }: { taskId: string; mode?: 'cascade' | 'orphan' }) =>
+      api.deleteTask(projectId, boardId, taskId, mode),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId] })
+    },
   })
 }
 

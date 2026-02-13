@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Calendar, MessageCircle } from 'lucide-react'
+import { Calendar, MessageCircle, ListTree, ChevronRight, ChevronDown } from 'lucide-react'
 import { formatDistanceToNow, isPast, parseISO } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { GRADIENT_PRESETS } from '@/lib/cover-presets'
@@ -19,9 +19,12 @@ interface TaskCardProps {
   onClick: () => void
   isDragOverlay?: boolean
   compact?: boolean
+  isExpanded?: boolean
+  onToggleExpand?: () => void
+  expandedContent?: React.ReactNode
 }
 
-export function TaskCard({ task, onClick, isDragOverlay, compact }: TaskCardProps) {
+export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, onToggleExpand, expandedContent }: TaskCardProps) {
   const isOverdue = task.due_date && isPast(parseISO(task.due_date))
   const visibleLabels = task.labels.slice(0, 3)
   const extraCount = task.labels.length - 3
@@ -188,6 +191,44 @@ export function TaskCard({ task, onClick, isDragOverlay, compact }: TaskCardProp
               </div>
             )
           })()}
+
+          {/* Subtask progress bar */}
+          {task.subtask_progress && task.subtask_progress.total > 0 && (() => {
+            const { total, completed } = task.subtask_progress
+            const pct = (completed / total) * 100
+            const allDone = completed === total
+            return (
+              <div className="mt-2.5 flex items-center gap-2">
+                <ListTree className="size-3 shrink-0 text-[var(--text-tertiary)]" />
+                <div className="flex-1 h-[3px] rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: allDone ? 'rgb(16, 185, 129)' : 'var(--accent-solid)',
+                    }}
+                  />
+                </div>
+                <span className={`text-[10px] font-medium tabular-nums ${allDone ? 'text-emerald-500' : 'text-[var(--text-tertiary)]'}`}>
+                  {completed}/{total}
+                </span>
+              </div>
+            )
+          })()}
+
+          {/* Expand/Collapse subtasks */}
+          {task.children_count > 0 && onToggleExpand && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleExpand() }}
+              className="mt-2 flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] transition-colors w-full"
+            >
+              {isExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+              <span>{isExpanded ? 'Hide' : 'Show'} {task.children_count} subtask{task.children_count !== 1 ? 's' : ''}</span>
+            </button>
+          )}
+
+          {/* Expanded subtask list */}
+          {isExpanded && expandedContent}
 
           {(task.due_date || task.comments_count > 0 || task.assignees.length > 0) && (
             <>
