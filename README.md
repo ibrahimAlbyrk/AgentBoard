@@ -27,91 +27,32 @@
 
 <br>
 
-<!-- ============================================================ -->
+<p align="center"><img src=".github/assets/divider.svg" width="70%"></p>
 
 ## ✨ Features
 
-<table>
-<tr>
-<td width="50%">
-
-**📋 Kanban Boards**
-
-Multi-project boards with drag-and-drop, customizable statuses, and position-based ordering
-
-</td>
-<td width="50%">
-
-**🤖 Agent-Friendly API**
-
-REST API with API key authentication (`X-API-Key`), auto-generated OpenAPI docs, and bulk operations
-
-</td>
-</tr>
-<tr>
-<td>
-
-**⚡ Real-time Collaboration**
-
-WebSocket-powered live updates with Redis pub/sub — see changes as they happen
-
-</td>
-<td>
-
-**🔗 Task Dependencies**
-
-Parent/child relationships, cross-task dependency tracking, and multi-assignee support (users + agents)
-
-</td>
-</tr>
-<tr>
-<td>
-
-**📎 Rich Content**
-
-File attachments (up to 10 MB), labels, threaded comments, and full activity logging
-
-</td>
-<td>
-
-**🔔 Smart Notifications**
-
-Email (via Resend), webhooks with HMAC-SHA256 signing, and per-project notification preferences
-
-</td>
-</tr>
-<tr>
-<td>
-
-**📊 Dashboard & Analytics**
-
-Project statistics, overdue/due-today/due-this-week tracking, and personalized task overview
-
-</td>
-<td>
-
-**🐳 One-Command Deploy**
-
-Docker Compose with PostgreSQL + Redis for production, SQLite for zero-config local development
-
-</td>
-</tr>
-</table>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/features-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset=".github/assets/features-light.svg">
+  <img alt="Features" src=".github/assets/features-dark.svg" width="100%">
+</picture>
 
 <br>
 
-<!-- ============================================================ -->
+<p align="center"><img src=".github/assets/divider.svg" width="70%"></p>
 
 ## 🚀 Quick Start
 
-### Prerequisites
+> [!NOTE]
+> AgentBoard runs two independent servers — a **Python backend** (API) and a **React frontend** (UI).
+> For local development SQLite is used by default, no database setup required.
 
-- **Python 3.11+** &nbsp;·&nbsp; **Node.js 18+** &nbsp;·&nbsp; **Redis** *(optional for local dev)*
+#### Prerequisites
 
-### Development
+**Python 3.11+** &nbsp;·&nbsp; **Node.js 18+** &nbsp;·&nbsp; **Redis** *(optional for local dev)*
 
 <details>
-<summary>&nbsp;<b>Backend</b>&nbsp;—&nbsp;FastAPI on :8000</summary>
+<summary>&nbsp;⚙️&nbsp;<b>Backend</b>&nbsp;—&nbsp;FastAPI on <code>:8000</code></summary>
 
 <br>
 
@@ -124,12 +65,12 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-API docs → [http://localhost:8000/api/docs](http://localhost:8000/api/docs)
+> API docs available at [localhost:8000/api/docs](http://localhost:8000/api/docs)
 
 </details>
 
 <details>
-<summary>&nbsp;<b>Frontend</b>&nbsp;—&nbsp;React on :3000</summary>
+<summary>&nbsp;🖥️&nbsp;<b>Frontend</b>&nbsp;—&nbsp;React on <code>:3000</code></summary>
 
 <br>
 
@@ -139,54 +80,104 @@ npm install
 npm run dev
 ```
 
-App → [http://localhost:3000](http://localhost:3000) &nbsp;*(proxies `/api` to backend)*
+> App at [localhost:3000](http://localhost:3000) &nbsp;·&nbsp; proxies `/api` requests to backend
 
 </details>
 
-### Production (Docker)
+<details>
+<summary>&nbsp;🐳&nbsp;<b>Docker</b>&nbsp;—&nbsp;Production deployment</summary>
+
+<br>
 
 ```bash
 cp .env.example .env   # edit with production values
 docker-compose up -d
 ```
 
-Open [http://localhost](http://localhost)
+> Opens at [localhost](http://localhost) with PostgreSQL + Redis
+
+</details>
+
+<details>
+<summary>&nbsp;🌱&nbsp;<b>Seed Demo Data</b>&nbsp;—&nbsp;Populate with sample projects</summary>
 
 <br>
 
-<!-- ============================================================ -->
+```bash
+python scripts/seed_demo_data.py --api-key <your_api_key>            # 3 projects, ~290 tasks
+python scripts/seed_demo_data.py --api-key <your_api_key> --clean    # clean + re-seed
+```
+
+</details>
+
+<br>
+
+<p align="center"><img src=".github/assets/divider.svg" width="70%"></p>
 
 ## 🤖 Agent Integration
 
-Agents interact with AgentBoard via REST API using API keys:
+Agents interact with AgentBoard via REST API using API keys passed in the `X-API-Key` header.
+
+<details open>
+<summary>&nbsp;<b>Create a Task</b>&nbsp;&nbsp;<code>POST /projects/{id}/tasks</code></summary>
+
+<br>
 
 ```bash
-# Create a task
 curl -X POST http://localhost:8000/api/v1/projects/{project_id}/tasks \
   -H "X-API-Key: your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"title": "Investigate API latency", "priority": "high"}'
+```
 
-# Move task to a different status
+</details>
+
+<details>
+<summary>&nbsp;<b>Move Task</b>&nbsp;&nbsp;<code>POST /projects/{id}/tasks/{id}/move</code></summary>
+
+<br>
+
+```bash
 curl -X POST http://localhost:8000/api/v1/projects/{project_id}/tasks/{task_id}/move \
   -H "X-API-Key: your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"status_id": "target-status-uuid"}'
+```
 
-# List tasks with filters
+</details>
+
+<details>
+<summary>&nbsp;<b>List Tasks</b>&nbsp;&nbsp;<code>GET /projects/{id}/tasks</code></summary>
+
+<br>
+
+```bash
 curl "http://localhost:8000/api/v1/projects/{project_id}/tasks?priority=high&status_id=xxx" \
   -H "X-API-Key: your_api_key"
+```
 
-# Bulk update
+</details>
+
+<details>
+<summary>&nbsp;<b>Bulk Update</b>&nbsp;&nbsp;<code>POST /projects/{id}/tasks/bulk-update</code></summary>
+
+<br>
+
+```bash
 curl -X POST http://localhost:8000/api/v1/projects/{project_id}/tasks/bulk-update \
   -H "X-API-Key: your_api_key" \
   -H "Content-Type: application/json" \
   -d '{"task_ids": ["uuid1", "uuid2"], "updates": {"priority": "urgent"}}'
 ```
 
+</details>
+
+> [!TIP]
+> Full interactive API docs with request/response schemas at **[localhost:8000/api/docs](http://localhost:8000/api/docs)** after starting the backend.
+
 <br>
 
-<!-- ============================================================ -->
+<p align="center"><img src=".github/assets/divider.svg" width="70%"></p>
 
 ## 🏗 Architecture
 
@@ -204,14 +195,19 @@ curl -X POST http://localhost:8000/api/v1/projects/{project_id}/tasks/bulk-updat
 
 ### Request Flow
 
-```
-Client ──→ FastAPI Routes ──→ Services ──→ CRUD ──→ SQLAlchemy ──→ DB
-                │
-                └──→ WebSocket Manager ──→ Redis Pub/Sub ──→ Connected Clients
+```mermaid
+graph LR
+    A["Client"] -->|"REST API"| B["FastAPI Routes"]
+    B --> C["Services"]
+    C --> D["CRUD"]
+    D --> E[("Database")]
+    B -->|"Events"| F["WebSocket Manager"]
+    F -->|"Pub/Sub"| G["Redis"]
+    G --> H["Connected Clients"]
 ```
 
 <details>
-<summary><b>Project Structure</b></summary>
+<summary>&nbsp;📂&nbsp;<b>Project Structure</b></summary>
 
 <br>
 
@@ -243,7 +239,7 @@ AgentBoard/
 
 <br>
 
-<!-- ============================================================ -->
+<p align="center"><img src=".github/assets/divider.svg" width="70%"></p>
 
 ## 📖 API Documentation
 
@@ -251,11 +247,11 @@ After starting the backend, interactive docs are available at:
 
 | | URL |
 |:--|:---|
-| **Swagger UI** | [http://localhost:8000/api/docs](http://localhost:8000/api/docs) |
-| **ReDoc** | [http://localhost:8000/api/redoc](http://localhost:8000/api/redoc) |
+| **Swagger UI** | [localhost:8000/api/docs](http://localhost:8000/api/docs) |
+| **ReDoc** | [localhost:8000/api/redoc](http://localhost:8000/api/redoc) |
 
 <details>
-<summary><b>Environment Variables</b></summary>
+<summary>&nbsp;⚙️&nbsp;<b>Environment Variables</b></summary>
 
 <br>
 
@@ -274,7 +270,7 @@ After starting the backend, interactive docs are available at:
 
 <br>
 
-<!-- ============================================================ -->
+<p align="center"><img src=".github/assets/divider.svg" width="70%"></p>
 
 ## 📄 License
 
@@ -283,5 +279,5 @@ After starting the backend, interactive docs are available at:
 <br>
 
 <p align="center">
-  <sub>Built for agents and humans &nbsp;·&nbsp; Star the repo if you find it useful</sub>
+  <sub>Built for agents and humans</sub>
 </p>
