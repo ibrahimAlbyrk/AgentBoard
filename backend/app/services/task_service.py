@@ -193,6 +193,32 @@ async def _notify_assignees(
 
 class TaskService:
     @staticmethod
+    async def _validate_parent(
+        db: AsyncSession,
+        task_id: UUID | None,
+        parent_id: UUID,
+        board_id: UUID,
+    ) -> Task:
+        """Validate parent_id for subtask operations. Returns parent task."""
+        parent = await crud_task.get(db, parent_id)
+        if not parent:
+            raise NotFoundError("Parent task not found")
+        if parent.board_id != board_id:
+            raise ValidationError("Parent task must be in the same board")
+        if task_id and parent_id == task_id:
+            raise ValidationError("A task cannot be its own parent")
+        # Check for circular reference: walk ancestors from parent
+        if task_id:
+            ancestors = await crud_task.get_ancestor_ids(db, parent_id)
+            if task_id in ancestors:
+                raise ValidationError("Circular parent-child relationship detected")
+        # Depth check: ancestors of parent + 1 (this task) must be <= 10
+        ancestors = await crud_task.get_ancestor_ids(db, parent_id)
+        if len(ancestors) >= 10:
+            raise ValidationError("Maximum nesting depth (10 levels) exceeded")
+        return parent
+
+    @staticmethod
     async def create_task(
         db: AsyncSession,
         project_id: UUID,
@@ -202,6 +228,14 @@ class TaskService:
         *,
         agent_creator_id: UUID | None = None,
     ) -> Task:
+        # If creating as subtask, validate parent and inherit board/project
+        if task_in.parent_id:
+            parent = await TaskService._validate_parent(
+                db, None, task_in.parent_id, board_id
+            )
+            project_id = parent.project_id
+            board_id = parent.board_id
+
         status_id = task_in.status_id
         if not status_id:
             default_status = await crud_status.get_default_by_board(db, board_id)
@@ -214,7 +248,11 @@ class TaskService:
             if not target_status or target_status.board_id != board_id:
                 raise NotFoundError("Status not found in this board")
 
-        position = await PositionService.get_end_position(db, status_id)
+        # Position: within parent if subtask, else within status column
+        if task_in.parent_id:
+            position = await PositionService.get_end_position_in_parent(db, task_in.parent_id)
+        else:
+            position = await PositionService.get_end_position(db, status_id)
 
         # Validate agent IDs belong to project and are active
         if agent_creator_id:
@@ -274,6 +312,10 @@ class TaskService:
             creation_changes["priority"] = task_in.priority
         if task_in.due_date:
             creation_changes["due_date"] = str(task_in.due_date)
+        if task_in.parent_id:
+            parent_task = await crud_task.get(db, task_in.parent_id)
+            if parent_task:
+                creation_changes["parent"] = parent_task.title
 
         await crud_activity_log.log(
             db,
@@ -401,6 +443,11 @@ class TaskService:
                         "old": old_s.name if old_s else None,
                         "new": new_s.name if new_s else None,
                     }
+                    # Set/clear completed_at based on terminal status
+                    if new_s and new_s.is_terminal:
+                        task.completed_at = datetime.now(UTC)
+                    elif old_s and old_s.is_terminal:
+                        task.completed_at = None
                 else:
                     changes[field] = {"old": str(old_value), "new": str(value)}
                 setattr(task, field, value)
@@ -696,3 +743,125 @@ class TaskService:
             )
         await db.flush()
         return tasks
+
+    @staticmethod
+    async def delete_task_with_strategy(
+        db: AsyncSession,
+        task: Task,
+        user_id: UUID,
+        mode: str = "orphan",
+    ) -> dict:
+        """Delete task with strategy for children.
+        mode='cascade': delete all descendants
+        mode='orphan': set children's parent_id to NULL
+        """
+        from app.services.reaction_service import ReactionService
+
+        children = await crud_task.get_children(db, task.id)
+        children_count = len(children)
+        result_info = {"mode": mode, "children_count": children_count}
+
+        if mode == "cascade" and children_count > 0:
+            descendant_ids = await crud_task.get_all_descendant_ids(db, task.id)
+            for did in reversed(descendant_ids):
+                await ReactionService.delete_reactions_for_entity(db, "task", did)
+                await crud_task.remove(db, id=did)
+            result_info["descendants_deleted"] = len(descendant_ids)
+        elif mode == "orphan" and children_count > 0:
+            for child in children:
+                child.parent_id = None
+                child.position = await PositionService.get_end_position(db, child.status_id)
+                db.add(child)
+            await db.flush()
+            result_info["children_orphaned"] = children_count
+
+        await ReactionService.delete_reactions_for_entity(db, "task", task.id)
+
+        changes: dict = {"title": task.title}
+        if mode == "cascade" and children_count > 0:
+            changes["children_deleted"] = children_count
+        elif mode == "orphan" and children_count > 0:
+            changes["children_orphaned"] = children_count
+
+        await crud_activity_log.log(
+            db,
+            project_id=task.project_id,
+            user_id=user_id,
+            action="deleted",
+            entity_type="task",
+            task_id=None,
+            changes=changes,
+        )
+
+        await crud_task.remove(db, id=task.id)
+        return result_info
+
+    @staticmethod
+    async def convert_to_subtask(
+        db: AsyncSession,
+        task: Task,
+        parent_id: UUID,
+        user_id: UUID,
+    ) -> Task:
+        """Convert a root task into a subtask of parent_id."""
+        parent = await TaskService._validate_parent(
+            db, task.id, parent_id, task.board_id
+        )
+        old_parent_id = task.parent_id
+        task.parent_id = parent_id
+        task.position = await PositionService.get_end_position_in_parent(db, parent_id)
+        db.add(task)
+        await db.flush()
+
+        changes: dict = {"parent": {"old": None, "new": parent.title}}
+        if old_parent_id:
+            old_parent = await crud_task.get(db, old_parent_id)
+            changes["parent"]["old"] = old_parent.title if old_parent else str(old_parent_id)
+
+        await crud_activity_log.log(
+            db,
+            project_id=task.project_id,
+            user_id=user_id,
+            action="updated",
+            entity_type="task",
+            task_id=task.id,
+            changes=changes,
+        )
+
+        task_id = task.id
+        await db.commit()
+        db.expunge(task)
+        return await crud_task.get_with_relations(db, task_id)
+
+    @staticmethod
+    async def promote_to_task(
+        db: AsyncSession,
+        task: Task,
+        user_id: UUID,
+    ) -> Task:
+        """Promote a subtask to an independent root task."""
+        if not task.parent_id:
+            raise ValidationError("Task is already a root task")
+
+        old_parent = await crud_task.get(db, task.parent_id)
+        old_parent_title = old_parent.title if old_parent else None
+
+        task.parent_id = None
+        task.position = await PositionService.get_end_position(db, task.status_id)
+        db.add(task)
+        await db.flush()
+
+        await crud_activity_log.log(
+            db,
+            project_id=task.project_id,
+            user_id=user_id,
+            action="updated",
+            entity_type="task",
+            task_id=task.id,
+            changes={"parent": {"old": old_parent_title, "new": None}},
+        )
+
+        task_id = task.id
+        await db.commit()
+        db.expunge(task)
+        return await crud_task.get_with_relations(db, task_id)

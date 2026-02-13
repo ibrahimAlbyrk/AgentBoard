@@ -42,6 +42,7 @@ class TaskUpdate(BaseModel):
     watcher_user_ids: list[UUID] | None = None
     watcher_agent_ids: list[UUID] | None = None
     due_date: datetime | None = None
+    parent_id: UUID | None = None
     cover_type: Literal["image", "color", "gradient"] | None = None
     cover_value: str | None = None
     cover_size: Literal["full", "half"] | None = None
@@ -61,6 +62,31 @@ class WatcherBrief(BaseModel):
     id: UUID
     user: UserBrief | None = None
     agent: AgentBrief | None = None
+
+
+class SubtaskProgress(BaseModel):
+    total: int = 0
+    completed: int = 0
+
+
+class SubtaskBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    status: StatusResponse
+    priority: str
+    position: float
+    completed_at: datetime | None = None
+    assignees: list[AssigneeBrief] = []
+
+
+class TaskDeleteMode(BaseModel):
+    mode: Literal["cascade", "orphan"] = "orphan"
+
+
+class ConvertToSubtask(BaseModel):
+    task_id_to_convert: UUID
 
 
 class TaskResponse(BaseModel):
@@ -89,6 +115,9 @@ class TaskResponse(BaseModel):
     cover_image_url: str | None = None
     comments_count: int = 0
     checklist_progress: ChecklistProgress = ChecklistProgress()
+    subtask_progress: SubtaskProgress = SubtaskProgress()
+    children_count: int = 0
+    children: list[SubtaskBrief] = []
     custom_field_values: list[CustomFieldValueResponse] = []
     reactions: ReactionSummary | None = None
     created_at: datetime
@@ -126,6 +155,17 @@ class TaskResponse(BaseModel):
                 data.__dict__["labels"] = [tl.label for tl in raw if tl.label]
         return data
 
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_subtask_progress(cls, data):
+        if hasattr(data, "children"):
+            kids = data.children or []
+            total = len(kids)
+            completed = sum(1 for c in kids if c.completed_at is not None)
+            data.__dict__["subtask_progress"] = {"total": total, "completed": completed}
+            data.__dict__["children_count"] = total
+        return data
+
 
 def _validate_position(v: float) -> float:
     import math
@@ -134,6 +174,16 @@ def _validate_position(v: float) -> float:
     if v <= 0:
         raise ValueError("position must be positive")
     return v
+
+
+class SubtaskReorder(BaseModel):
+    subtask_id: UUID
+    position: float
+
+    @field_validator("position")
+    @classmethod
+    def validate_position(cls, v: float) -> float:
+        return _validate_position(v)
 
 
 class TaskMove(BaseModel):
@@ -173,6 +223,7 @@ class BulkTaskDelete(BaseModel):
 
 class DashboardTaskResponse(TaskResponse):
     project_name: str = ""
+    parent_title: str | None = None
 
 
 class MyTasksSummary(BaseModel):

@@ -33,6 +33,13 @@ _task_load_options = (
     ),
     selectinload(Task.checklists).selectinload(Checklist.items).selectinload(ChecklistItem.assignee),
     selectinload(Task.custom_field_values),
+    selectinload(Task.children).options(
+        joinedload(Task.status),
+        selectinload(Task.assignees).options(
+            joinedload(TaskAssignee.user),
+            joinedload(TaskAssignee.agent),
+        ),
+    ),
 )
 
 
@@ -59,7 +66,10 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
         skip: int = 0,
         limit: int = 50,
     ) -> list[Task]:
-        query = select(Task).where(Task.board_id == board_id)
+        query = select(Task).where(
+            Task.board_id == board_id,
+            Task.parent_id.is_(None),
+        )
 
         if status_id is not None:
             query = query.where(Task.status_id == status_id)
@@ -105,9 +115,83 @@ class CRUDTask(CRUDBase[Task, TaskCreate, TaskUpdate]):
         self, db: AsyncSession, parent_id: UUID
     ) -> list[Task]:
         result = await db.execute(
-            select(Task).where(Task.parent_id == parent_id)
+            select(Task)
+            .where(Task.parent_id == parent_id)
+            .options(*_task_load_options)
+            .order_by(Task.position)
         )
-        return list(result.scalars().all())
+        return list(result.unique().scalars().all())
+
+    async def get_children_with_relations(
+        self, db: AsyncSession, parent_id: UUID
+    ) -> list[Task]:
+        result = await db.execute(
+            select(Task)
+            .where(Task.parent_id == parent_id)
+            .options(
+                *_task_load_options,
+                selectinload(Task.children),
+            )
+            .order_by(Task.position)
+        )
+        return list(result.unique().scalars().all())
+
+    async def get_all_descendant_ids(
+        self, db: AsyncSession, task_id: UUID, max_depth: int = 10
+    ) -> list[UUID]:
+        """BFS to collect all descendant task IDs."""
+        all_ids: list[UUID] = []
+        current_level = [task_id]
+        for _ in range(max_depth):
+            if not current_level:
+                break
+            result = await db.execute(
+                select(Task.id).where(Task.parent_id.in_(current_level))
+            )
+            child_ids = list(result.scalars().all())
+            all_ids.extend(child_ids)
+            current_level = child_ids
+        return all_ids
+
+    async def get_ancestor_ids(
+        self, db: AsyncSession, task_id: UUID, max_depth: int = 10
+    ) -> list[UUID]:
+        """Walk up parent_id chain."""
+        ancestors: list[UUID] = []
+        current_id = task_id
+        for _ in range(max_depth):
+            result = await db.execute(
+                select(Task.parent_id).where(Task.id == current_id)
+            )
+            pid = result.scalar_one_or_none()
+            if pid is None:
+                break
+            ancestors.append(pid)
+            current_id = pid
+        return ancestors
+
+    async def get_max_position_in_parent(
+        self, db: AsyncSession, parent_id: UUID
+    ) -> float:
+        result = await db.execute(
+            select(func.coalesce(func.max(Task.position), 0.0)).where(
+                Task.parent_id == parent_id
+            )
+        )
+        return result.scalar_one()
+
+    async def count_children_stats(
+        self, db: AsyncSession, task_id: UUID
+    ) -> tuple[int, int]:
+        """Returns (total, completed) counts for direct children."""
+        result = await db.execute(
+            select(
+                func.count(Task.id),
+                func.count(Task.completed_at),
+            ).where(Task.parent_id == task_id)
+        )
+        row = result.one()
+        return row[0], row[1]
 
     async def bulk_update(
         self,

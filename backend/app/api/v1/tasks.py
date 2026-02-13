@@ -14,6 +14,8 @@ from app.schemas.task import (
     BulkTaskDelete,
     BulkTaskMove,
     BulkTaskUpdate,
+    ConvertToSubtask,
+    SubtaskReorder,
     TaskCreate,
     TaskMove,
     TaskResponse,
@@ -168,6 +170,7 @@ async def update_task(
 @router.delete("/{task_id}", status_code=204)
 async def delete_task(
     task_id: UUID,
+    mode: str = Query("orphan", pattern="^(cascade|orphan)$"),
     db: AsyncSession = Depends(get_db),
     board: Board = Depends(check_board_access),
     current_user: User = Depends(get_current_user),
@@ -178,22 +181,17 @@ async def delete_task(
     task_title = task.title
     assignee_user_ids = [a.user_id for a in task.assignees if a.user_id]
     watcher_user_ids = [w.user_id for w in task.watchers if w.user_id]
-    await crud_activity_log.log(
-        db,
-        project_id=board.project_id,
-        user_id=current_user.id,
-        action="deleted",
-        entity_type="task",
-        task_id=None,
-        changes={"title": task_title},
-    )
-    await ReactionService.delete_reactions_for_entity(db, "task", task_id)
-    await crud_task.remove(db, id=task_id)
+
+    # Check if task has children — return 409 if no mode explicitly chosen
+    children_count = len(task.children) if hasattr(task, "children") else 0
+
+    await TaskService.delete_task_with_strategy(db, task, current_user.id, mode)
+
     await manager.broadcast_to_board(str(board.project_id), str(board.id), {
         "type": "task.deleted",
         "project_id": str(board.project_id),
         "board_id": str(board.id),
-        "data": {"task_id": str(task_id)},
+        "data": {"task_id": str(task_id), "mode": mode, "children_count": children_count},
     })
     deleter_name = current_user.full_name or current_user.username
     notified: set[str] = set()
@@ -390,3 +388,154 @@ async def bulk_delete_tasks(
                 if notif and uid_str not in notified_users:
                     notified_users.add(uid_str)
                     await manager.broadcast_to_user(uid_str, {"type": "notification.new"})
+
+
+# ── Subtask endpoints ──────────────────────────────────────────────
+
+
+@router.get("/{task_id}/subtasks", response_model=ResponseBase[list[TaskResponse]])
+async def list_subtasks(
+    task_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    board: Board = Depends(check_board_access),
+    current_user: User = Depends(get_current_user),
+):
+    task = await crud_task.get(db, task_id)
+    if not task or task.board_id != board.id:
+        raise NotFoundError("Task not found")
+    children = await crud_task.get_children_with_relations(db, task_id)
+
+    task_ids = [c.id for c in children]
+    reaction_summaries = await crud_reaction.get_summaries_batch(
+        db, "task", task_ids, current_user_id=current_user.id
+    )
+    responses = []
+    for c in children:
+        resp = TaskResponse.model_validate(c)
+        resp.reactions = reaction_summaries.get(c.id)
+        responses.append(resp)
+    return ResponseBase(data=responses)
+
+
+@router.post("/{task_id}/subtasks", response_model=ResponseBase[TaskResponse], status_code=201)
+async def create_subtask(
+    task_id: UUID,
+    task_in: TaskCreate,
+    db: AsyncSession = Depends(get_db),
+    board: Board = Depends(check_board_access),
+    actor: Actor = Depends(get_current_actor),
+):
+    parent = await crud_task.get(db, task_id)
+    if not parent or parent.board_id != board.id:
+        raise NotFoundError("Parent task not found")
+
+    task_in.parent_id = task_id
+    agent_creator_id = actor.agent.id if actor.is_agent else None
+    task = await TaskService.create_task(
+        db, board.project_id, board.id, actor.user.id, task_in,
+        agent_creator_id=agent_creator_id,
+    )
+    response = TaskResponse.model_validate(task)
+    ws_user = {"id": str(actor.user.id), "username": actor.user.username}
+    if actor.is_agent:
+        ws_user["agent"] = {"id": str(actor.agent.id), "name": actor.agent.name}
+    await manager.broadcast_to_board(str(board.project_id), str(board.id), {
+        "type": "subtask.created",
+        "project_id": str(board.project_id),
+        "board_id": str(board.id),
+        "data": {**response.model_dump(mode="json"), "parent_id": str(task_id)},
+        "user": ws_user,
+    })
+    return ResponseBase(data=response)
+
+
+@router.patch("/{task_id}/subtasks/reorder", response_model=ResponseBase[TaskResponse])
+async def reorder_subtask(
+    task_id: UUID,
+    body: SubtaskReorder,
+    db: AsyncSession = Depends(get_db),
+    board: Board = Depends(check_board_access),
+    current_user: User = Depends(get_current_user),
+):
+    parent = await crud_task.get(db, task_id)
+    if not parent or parent.board_id != board.id:
+        raise NotFoundError("Parent task not found")
+
+    subtask = await crud_task.get(db, body.subtask_id)
+    if not subtask or subtask.parent_id != task_id:
+        raise NotFoundError("Subtask not found under this parent")
+
+    subtask.position = body.position
+    db.add(subtask)
+    await db.flush()
+
+    refreshed = await crud_task.get_with_relations(db, body.subtask_id)
+    response = TaskResponse.model_validate(refreshed)
+    await manager.broadcast_to_board(str(board.project_id), str(board.id), {
+        "type": "subtask.reordered",
+        "project_id": str(board.project_id),
+        "board_id": str(board.id),
+        "data": {"parent_id": str(task_id), "subtask_id": str(body.subtask_id)},
+    })
+    return ResponseBase(data=response)
+
+
+@router.post("/{task_id}/convert-to-subtask", response_model=ResponseBase[TaskResponse])
+async def convert_to_subtask(
+    task_id: UUID,
+    body: ConvertToSubtask,
+    db: AsyncSession = Depends(get_db),
+    board: Board = Depends(check_board_access),
+    current_user: User = Depends(get_current_user),
+):
+    """Convert task_id_to_convert into a subtask of task_id."""
+    parent = await crud_task.get(db, task_id)
+    if not parent or parent.board_id != board.id:
+        raise NotFoundError("Parent task not found")
+
+    child_task = await crud_task.get_with_relations(db, body.task_id_to_convert)
+    if not child_task or child_task.board_id != board.id:
+        raise NotFoundError("Task to convert not found")
+
+    updated = await TaskService.convert_to_subtask(
+        db, child_task, task_id, current_user.id
+    )
+    response = TaskResponse.model_validate(updated)
+    await manager.broadcast_to_board(str(board.project_id), str(board.id), {
+        "type": "subtask.created",
+        "project_id": str(board.project_id),
+        "board_id": str(board.id),
+        "data": {**response.model_dump(mode="json"), "parent_id": str(task_id)},
+    })
+    return ResponseBase(data=response)
+
+
+@router.post("/{task_id}/promote", response_model=ResponseBase[TaskResponse])
+async def promote_subtask(
+    task_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    board: Board = Depends(check_board_access),
+    current_user: User = Depends(get_current_user),
+):
+    """Promote a subtask to an independent root task."""
+    task = await crud_task.get_with_relations(db, task_id)
+    if not task or task.board_id != board.id:
+        raise NotFoundError("Task not found")
+
+    old_parent_id = task.parent_id
+    promoted = await TaskService.promote_to_task(db, task, current_user.id)
+    response = TaskResponse.model_validate(promoted)
+    await manager.broadcast_to_board(str(board.project_id), str(board.id), {
+        "type": "task.created",
+        "project_id": str(board.project_id),
+        "board_id": str(board.id),
+        "data": response.model_dump(mode="json"),
+    })
+    if old_parent_id:
+        await manager.broadcast_to_board(str(board.project_id), str(board.id), {
+            "type": "subtask.deleted",
+            "project_id": str(board.project_id),
+            "board_id": str(board.id),
+            "data": {"parent_id": str(old_parent_id), "subtask_id": str(task_id)},
+        })
+    return ResponseBase(data=response)

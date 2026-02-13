@@ -82,3 +82,21 @@ class PositionService:
         if position is None:
             return await PositionService.get_end_position(db, status_id)
         return position
+
+    @staticmethod
+    async def get_end_position_in_parent(db: AsyncSession, parent_id: UUID) -> float:
+        max_pos = await crud_task.get_max_position_in_parent(db, parent_id)
+        return (max_pos or 0) + PositionService.POSITION_GAP
+
+    @staticmethod
+    async def rebalance_children(db: AsyncSession, parent_id: UUID) -> None:
+        result = await db.execute(
+            select(Task)
+            .where(Task.parent_id == parent_id)
+            .order_by(Task.position)
+        )
+        tasks = list(result.scalars().all())
+        for i, task in enumerate(tasks, start=1):
+            task.position = i * PositionService.POSITION_GAP
+            db.add(task)
+        await db.flush()
