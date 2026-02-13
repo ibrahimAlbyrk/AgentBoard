@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from app.api.deps import check_project_access, get_current_user
 from app.core.database import get_db
 from app.models.agent import Agent
+from app.models.agent_project import AgentProject
 from app.models.board import Board
 from app.models.project import Project
 from app.models.project_member import ProjectMember
@@ -71,9 +72,14 @@ async def get_mentionables(
             })
 
     # Agents
-    agents_q = select(Agent).where(
-        Agent.project_id == project.id,
-        Agent.is_active == True,  # noqa: E712
+    agents_q = (
+        select(Agent)
+        .join(AgentProject, AgentProject.agent_id == Agent.id)
+        .where(
+            AgentProject.project_id == project.id,
+            Agent.is_active == True,  # noqa: E712
+            Agent.deleted_at.is_(None),
+        )
     )
     if q:
         agents_q = agents_q.where(Agent.name.ilike(f"%{q}%"))

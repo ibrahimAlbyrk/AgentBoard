@@ -16,6 +16,9 @@ class APIKey(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE")
     )
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="SET NULL"), nullable=True
+    )
     key_hash: Mapped[str] = mapped_column(
         String(255), unique=True, index=True
     )
@@ -35,3 +38,4 @@ class APIKey(Base):
     )
 
     user = relationship("User", back_populates="api_keys")
+    agent = relationship("Agent")

@@ -27,3 +27,15 @@ class AgentResponse(AgentBrief):
     is_active: bool
     created_at: datetime
     updated_at: datetime | None = None
+    deleted_at: datetime | None = None
+
+
+class ProjectBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+
+
+class AgentWithProjectsResponse(AgentResponse):
+    projects: list[ProjectBrief] = []

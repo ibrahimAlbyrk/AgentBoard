@@ -175,6 +175,8 @@ class TaskService:
         board_id: UUID,
         creator_id: UUID,
         task_in: TaskCreate,
+        *,
+        agent_creator_id: UUID | None = None,
     ) -> Task:
         status_id = task_in.status_id
         if not status_id:
@@ -191,14 +193,18 @@ class TaskService:
         position = await PositionService.get_end_position(db, status_id)
 
         # Validate agent IDs belong to project and are active
-        if task_in.agent_creator_id:
-            agent = await crud_agent.get(db, task_in.agent_creator_id)
-            if not agent or agent.project_id != project_id or not agent.is_active:
+        if agent_creator_id:
+            agent = await crud_agent.get(db, agent_creator_id)
+            if not agent or agent.deleted_at or not agent.is_active:
                 raise ValidationError("Invalid or inactive agent creator")
+            if not await crud_agent.is_in_project(db, agent.id, project_id):
+                raise ValidationError("Agent creator not in this project")
         for aid in task_in.assignee_agent_ids:
             agent = await crud_agent.get(db, aid)
-            if not agent or agent.project_id != project_id or not agent.is_active:
+            if not agent or agent.deleted_at or not agent.is_active:
                 raise ValidationError("Invalid or inactive assignee agent")
+            if not await crud_agent.is_in_project(db, agent.id, project_id):
+                raise ValidationError("Assignee agent not in this project")
 
         # Normalize description to Tiptap JSON + plain text
         desc_doc = normalize_content(task_in.description) if task_in.description is not None else None
@@ -213,7 +219,7 @@ class TaskService:
             description_text=desc_text,
             status_id=status_id,
             priority=task_in.priority,
-            agent_creator_id=task_in.agent_creator_id,
+            agent_creator_id=agent_creator_id,
             due_date=task_in.due_date,
             parent_id=task_in.parent_id,
             position=position,
@@ -244,7 +250,7 @@ class TaskService:
             entity_type="task",
             task_id=task.id,
             changes={"title": task.title},
-            agent_id=task_in.agent_creator_id,
+            agent_id=agent_creator_id,
         )
 
         # Reload to get relationships populated
@@ -387,8 +393,10 @@ class TaskService:
             # Validate agent IDs
             for aid in (assignee_agent_ids or []):
                 agent = await crud_agent.get(db, aid)
-                if not agent or agent.project_id != task.project_id or not agent.is_active:
+                if not agent or agent.deleted_at or not agent.is_active:
                     raise ValidationError("Invalid or inactive assignee agent")
+                if not await crud_agent.is_in_project(db, agent.id, task.project_id):
+                    raise ValidationError("Assignee agent not in this project")
             await _sync_assignees(
                 db, task.id,
                 assignee_user_ids or [],

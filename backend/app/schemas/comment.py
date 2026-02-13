@@ -12,7 +12,6 @@ from .user import UserBrief
 class CommentCreate(BaseModel):
     content: str | dict
     attachment_ids: list[UUID] = []
-    agent_creator_id: UUID | None = None
 
 
 class CommentUpdate(BaseModel):

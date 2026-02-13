@@ -20,7 +20,13 @@ async def list_api_keys(
     current_user: User = Depends(get_current_user),
 ):
     keys = await crud_api_key.get_multi_by_user(db, current_user.id)
-    return ResponseBase(data=[APIKeyResponse.model_validate(k) for k in keys])
+    result = []
+    for k in keys:
+        resp = APIKeyResponse.model_validate(k)
+        if k.agent:
+            resp.agent_name = k.agent.name
+        result.append(resp)
+    return ResponseBase(data=result)
 
 
 @router.post("/", response_model=ResponseBase[APIKeyCreatedResponse], status_code=201)

@@ -78,6 +78,7 @@ app.include_router(websocket.router, prefix="/api/v1")
 app.include_router(attachments.download_router, prefix="/api/v1")
 app.include_router(reactions.task_router, prefix="/api/v1")
 app.include_router(reactions.comment_router, prefix="/api/v1")
+app.include_router(agents.user_router, prefix="/api/v1")
 
 
 @app.on_event("startup")

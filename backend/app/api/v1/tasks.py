@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import check_board_access, get_current_user
+from app.api.deps import Actor, check_board_access, get_current_actor, get_current_user
 from app.core.errors import NotFoundError
 from app.core.database import get_db
 from app.crud import crud_reaction, crud_task
@@ -85,18 +85,23 @@ async def create_task(
     task_in: TaskCreate,
     db: AsyncSession = Depends(get_db),
     board: Board = Depends(check_board_access),
-    current_user: User = Depends(get_current_user),
+    actor: Actor = Depends(get_current_actor),
 ):
+    agent_creator_id = actor.agent.id if actor.is_agent else None
     task = await TaskService.create_task(
-        db, board.project_id, board.id, current_user.id, task_in
+        db, board.project_id, board.id, actor.user.id, task_in,
+        agent_creator_id=agent_creator_id,
     )
     response = TaskResponse.model_validate(task)
+    ws_user = {"id": str(actor.user.id), "username": actor.user.username}
+    if actor.is_agent:
+        ws_user["agent"] = {"id": str(actor.agent.id), "name": actor.agent.name}
     await manager.broadcast_to_board(str(board.project_id), str(board.id), {
         "type": "task.created",
         "project_id": str(board.project_id),
         "board_id": str(board.id),
         "data": response.model_dump(mode="json"),
-        "user": {"id": str(current_user.id), "username": current_user.username},
+        "user": ws_user,
     })
     notified: set[str] = set()
     for uid in _collect_assignee_user_ids(response):
@@ -132,19 +137,22 @@ async def update_task(
     task_in: TaskUpdate,
     db: AsyncSession = Depends(get_db),
     board: Board = Depends(check_board_access),
-    current_user: User = Depends(get_current_user),
+    actor: Actor = Depends(get_current_actor),
 ):
     task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
         raise NotFoundError("Task not found")
-    updated = await TaskService.update_task(db, task, current_user.id, task_in)
+    updated = await TaskService.update_task(db, task, actor.user.id, task_in)
     response = TaskResponse.model_validate(updated)
+    ws_user = {"id": str(actor.user.id), "username": actor.user.username}
+    if actor.is_agent:
+        ws_user["agent"] = {"id": str(actor.agent.id), "name": actor.agent.name}
     await manager.broadcast_to_board(str(board.project_id), str(board.id), {
         "type": "task.updated",
         "project_id": str(board.project_id),
         "board_id": str(board.id),
         "data": response.model_dump(mode="json"),
-        "user": {"id": str(current_user.id), "username": current_user.username},
+        "user": ws_user,
     })
     notified: set[str] = set()
     for uid in _collect_assignee_user_ids(response):
@@ -218,21 +226,24 @@ async def move_task(
     body: TaskMove,
     db: AsyncSession = Depends(get_db),
     board: Board = Depends(check_board_access),
-    current_user: User = Depends(get_current_user),
+    actor: Actor = Depends(get_current_actor),
 ):
     task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
         raise NotFoundError("Task not found")
     moved = await TaskService.move_task(
-        db, task, current_user.id, body.status_id, body.position
+        db, task, actor.user.id, body.status_id, body.position
     )
     response = TaskResponse.model_validate(moved)
+    ws_user = {"id": str(actor.user.id), "username": actor.user.username}
+    if actor.is_agent:
+        ws_user["agent"] = {"id": str(actor.agent.id), "name": actor.agent.name}
     await manager.broadcast_to_board(str(board.project_id), str(board.id), {
         "type": "task.moved",
         "project_id": str(board.project_id),
         "board_id": str(board.id),
         "data": response.model_dump(mode="json"),
-        "user": {"id": str(current_user.id), "username": current_user.username},
+        "user": ws_user,
     })
     notified: set[str] = set()
     for uid in _collect_assignee_user_ids(response):

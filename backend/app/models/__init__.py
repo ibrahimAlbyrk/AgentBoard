@@ -1,5 +1,6 @@
 from app.models.activity_log import ActivityLog
 from app.models.agent import Agent
+from app.models.agent_project import AgentProject
 from app.models.checklist import Checklist
 from app.models.checklist_item import ChecklistItem
 from app.models.custom_field import CustomFieldDefinition
@@ -26,6 +27,7 @@ from app.models.webhook import Webhook
 __all__ = [
     "ActivityLog",
     "Agent",
+    "AgentProject",
     "APIKey",
     "Checklist",
     "ChecklistItem",

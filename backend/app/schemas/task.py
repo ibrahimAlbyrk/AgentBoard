@@ -21,7 +21,6 @@ class TaskCreate(BaseModel):
     priority: Literal["none", "low", "medium", "high", "urgent"] = "none"
     assignee_user_ids: list[UUID] = []
     assignee_agent_ids: list[UUID] = []
-    agent_creator_id: UUID | None = None
     label_ids: list[UUID] = []
     watcher_user_ids: list[UUID] = []
     watcher_agent_ids: list[UUID] = []

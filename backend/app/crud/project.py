@@ -6,6 +6,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.agent_project import AgentProject
 from app.models.board import Board
 from app.models.project import Project
 from app.models.project_member import ProjectMember
@@ -25,7 +26,7 @@ class CRUDProject(CRUDBase[Project, ProjectCreate, ProjectUpdate]):
                 selectinload(Project.boards).selectinload(Board.tasks),
                 selectinload(Project.boards).selectinload(Board.statuses),
                 selectinload(Project.labels),
-                selectinload(Project.agents),
+                selectinload(Project.agent_projects).selectinload(AgentProject.agent),
                 selectinload(Project.tasks),
             )
         )

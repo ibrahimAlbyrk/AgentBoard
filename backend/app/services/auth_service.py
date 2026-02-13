@@ -4,14 +4,14 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import AuthError, DuplicateError
+from app.core.errors import AuthError, DuplicateError, ValidationError
 from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
     generate_api_key,
 )
-from app.crud import crud_api_key, crud_user
+from app.crud import crud_agent, crud_api_key, crud_user
 from app.models.api_key import APIKey
 from app.schemas.api_key import APIKeyCreate
 from app.schemas.user import UserCreate
@@ -74,12 +74,22 @@ class AuthService:
     async def create_api_key(
         db: AsyncSession, user_id: UUID, key_in: APIKeyCreate
     ) -> dict:
+        # Validate agent_id if provided
+        agent_id = key_in.agent_id
+        if agent_id:
+            agent = await crud_agent.get(db, agent_id)
+            if not agent or agent.deleted_at or not agent.is_active:
+                raise ValidationError("Invalid or inactive agent")
+            if agent.created_by != user_id:
+                raise ValidationError("You can only create API keys for your own agents")
+
         raw_key, key_hash = generate_api_key()
         expires_at = None
         if key_in.expires_in_days:
             expires_at = datetime.now(UTC) + timedelta(days=key_in.expires_in_days)
         api_key = APIKey(
             user_id=user_id,
+            agent_id=agent_id,
             key_hash=key_hash,
             name=key_in.name,
             prefix=raw_key[:10],

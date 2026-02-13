@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import check_board_access, get_current_user
+from app.api.deps import Actor, check_board_access, get_current_actor, get_current_user
 from app.core.errors import NotFoundError, PermissionError_, ValidationError
 from app.core.database import get_db
 from app.crud import crud_agent, crud_attachment, crud_comment, crud_reaction, crud_task
@@ -73,17 +73,14 @@ async def create_comment(
     comment_in: CommentCreate,
     db: AsyncSession = Depends(get_db),
     board: Board = Depends(check_board_access),
-    current_user: User = Depends(get_current_user),
+    actor: Actor = Depends(get_current_actor),
 ):
     task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
         raise NotFoundError("Task not found")
 
-    # Validate agent_creator_id if provided
-    if comment_in.agent_creator_id:
-        agent = await crud_agent.get(db, comment_in.agent_creator_id)
-        if not agent or agent.project_id != board.project_id or not agent.is_active:
-            raise ValidationError("Invalid or inactive agent creator")
+    # Auto-fill agent_creator_id from actor
+    agent_creator_id = actor.agent.id if actor.is_agent else None
 
     # Normalize content to Tiptap JSON
     content_doc = normalize_content(comment_in.content)
@@ -91,8 +88,8 @@ async def create_comment(
 
     comment = Comment(
         task_id=task_id,
-        user_id=current_user.id,
-        agent_creator_id=comment_in.agent_creator_id,
+        user_id=actor.user.id,
+        agent_creator_id=agent_creator_id,
         content=content_doc or {"type": "doc", "content": [{"type": "paragraph"}]},
         content_text=content_text,
     )
@@ -110,7 +107,7 @@ async def create_comment(
         await db.flush()
         await db.refresh(comment, ["attachments"])
 
-    commenter_name = current_user.full_name or current_user.username
+    commenter_name = actor.display_name
     preview = content_text[:80] + ("..." if len(content_text) > 80 else "")
     for assignee in task.assignees:
         if not assignee.user_id:
@@ -118,7 +115,7 @@ async def create_comment(
         notif = await NotificationService.create_notification(
             db,
             user_id=assignee.user_id,
-            actor_id=current_user.id,
+            actor_id=actor.user.id,
             project_id=board.project_id,
             type="task_comment",
             title="New Comment",
@@ -136,13 +133,13 @@ async def create_comment(
         notified_mention: set[str] = set()
         for m in user_mentions:
             uid_str = m["id"]
-            if uid_str in notified_mention or uid_str == str(current_user.id):
+            if uid_str in notified_mention or uid_str == str(actor.user.id):
                 continue
             notified_mention.add(uid_str)
             notif = await NotificationService.create_notification(
                 db,
                 user_id=UUID(uid_str),
-                actor_id=current_user.id,
+                actor_id=actor.user.id,
                 project_id=board.project_id,
                 type="mentioned",
                 title="Mentioned in Comment",

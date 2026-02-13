@@ -8,12 +8,10 @@ from .user import UserBrief
 
 class ReactionCreate(BaseModel):
     emoji: str = Field(min_length=1, max_length=32)
-    agent_id: UUID | None = None
 
 
 class ReactionToggle(BaseModel):
     emoji: str = Field(min_length=1, max_length=32)
-    agent_id: UUID | None = None
 
 
 class ReactorBrief(BaseModel):

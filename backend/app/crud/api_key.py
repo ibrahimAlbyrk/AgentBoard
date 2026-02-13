@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.api_key import APIKey
 from app.schemas.api_key import APIKeyCreate, APIKeyResponse
@@ -23,7 +24,9 @@ class CRUDAPIKey(CRUDBase[APIKey, APIKeyCreate, APIKeyResponse]):
         self, db: AsyncSession, user_id: UUID
     ) -> list[APIKey]:
         result = await db.execute(
-            select(APIKey).where(
+            select(APIKey)
+            .options(selectinload(APIKey.agent))
+            .where(
                 APIKey.user_id == user_id,
                 APIKey.is_active == True,  # noqa: E712
             )

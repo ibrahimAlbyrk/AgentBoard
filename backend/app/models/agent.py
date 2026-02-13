@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TZDateTime
@@ -9,15 +9,9 @@ from app.core.database import Base, TZDateTime
 
 class Agent(Base):
     __tablename__ = "agents"
-    __table_args__ = (
-        UniqueConstraint("project_id", "name", name="uq_agents_project_name"),
-    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True, default=uuid.uuid4
-    )
-    project_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE")
     )
     name: Mapped[str] = mapped_column(String(100))
     color: Mapped[str] = mapped_column(String(7))
@@ -34,6 +28,11 @@ class Agent(Base):
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        TZDateTime(), nullable=True
+    )
 
-    project = relationship("Project", back_populates="agents")
     creator = relationship("User")
+    agent_projects = relationship(
+        "AgentProject", back_populates="agent", cascade="all, delete-orphan"
+    )
