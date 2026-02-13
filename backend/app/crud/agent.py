@@ -82,6 +82,19 @@ class CRUDAgent(CRUDBase[Agent, AgentCreate, AgentUpdate]):
             return True
         return False
 
+    async def remove_from_all_projects(
+        self, db: AsyncSession, agent_id: UUID
+    ) -> int:
+        result = await db.execute(
+            select(AgentProject).where(AgentProject.agent_id == agent_id)
+        )
+        rows = result.scalars().all()
+        for ap in rows:
+            await db.delete(ap)
+        if rows:
+            await db.flush()
+        return len(rows)
+
     async def has_any_project(self, db: AsyncSession, agent_id: UUID) -> bool:
         result = await db.execute(
             select(AgentProject).where(AgentProject.agent_id == agent_id).limit(1)

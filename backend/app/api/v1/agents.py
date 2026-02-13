@@ -103,6 +103,7 @@ async def delete_global_agent(
     agent = await crud_agent.get(db, agent_id)
     if not agent or agent.deleted_at or agent.created_by != current_user.id:
         raise NotFoundError("Agent not found")
+    await crud_agent.remove_from_all_projects(db, agent_id)
     await crud_agent.soft_delete(db, agent)
 
 

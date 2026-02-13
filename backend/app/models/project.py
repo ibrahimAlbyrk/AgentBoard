@@ -58,7 +58,7 @@ class Project(Base):
 
     @property
     def agents(self):
-        return [ap.agent for ap in self.agent_projects if not ap.agent.deleted_at]
+        return [ap.agent for ap in self.agent_projects if ap.agent.is_active and not ap.agent.deleted_at]
 
     @property
     def member_count(self) -> int:
