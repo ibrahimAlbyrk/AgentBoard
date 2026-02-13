@@ -495,6 +495,9 @@ class TaskService:
         db.add(task)
         await db.flush()
 
+        # Auto-rebalance if positions got too close from repeated bisections
+        await PositionService.maybe_rebalance(db, new_status_id)
+
         old_status = await crud_status.get(db, old_status_id)
         await crud_activity_log.log(
             db,
