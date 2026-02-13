@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .agent import AgentBrief
 from .attachment import AttachmentResponse
@@ -127,13 +127,34 @@ class TaskResponse(BaseModel):
         return data
 
 
+def _validate_position(v: float) -> float:
+    import math
+    if not math.isfinite(v):
+        raise ValueError("position must be a finite number")
+    if v <= 0:
+        raise ValueError("position must be positive")
+    return v
+
+
 class TaskMove(BaseModel):
     status_id: UUID
     position: float | None = None
 
+    @field_validator("position")
+    @classmethod
+    def validate_position(cls, v: float | None) -> float | None:
+        if v is not None:
+            return _validate_position(v)
+        return v
+
 
 class TaskReorder(BaseModel):
     position: float
+
+    @field_validator("position")
+    @classmethod
+    def validate_position(cls, v: float) -> float:
+        return _validate_position(v)
 
 
 class BulkTaskUpdate(BaseModel):

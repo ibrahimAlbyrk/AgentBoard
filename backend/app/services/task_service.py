@@ -570,8 +570,10 @@ class TaskService:
         new_status_id: UUID,
         position: float | None = None,
     ) -> Task:
-        if position is None:
-            position = await PositionService.get_end_position(db, new_status_id)
+        # Proactive rebalance: check gaps before move, rebalance if needed
+        position = await PositionService.ensure_gap_and_position(
+            db, new_status_id, position
+        )
 
         old_status_id = task.status_id
         task.status_id = new_status_id
@@ -587,9 +589,6 @@ class TaskService:
 
         db.add(task)
         await db.flush()
-
-        # Auto-rebalance if positions got too close from repeated bisections
-        await PositionService.maybe_rebalance(db, new_status_id)
 
         old_status = await crud_status.get(db, old_status_id)
         await crud_activity_log.log(
@@ -673,6 +672,9 @@ class TaskService:
         status_id: UUID,
     ) -> list[Task]:
         from sqlalchemy import select
+
+        # Rebalance target status if needed before bulk insert
+        await PositionService.maybe_rebalance(db, status_id)
 
         result = await db.execute(
             select(Task).where(Task.id.in_(task_ids), Task.project_id == project_id)

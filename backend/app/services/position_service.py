@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud import crud_task
@@ -8,6 +9,7 @@ from app.models.task import Task
 
 class PositionService:
     POSITION_GAP = 1024.0
+    REBALANCE_THRESHOLD = 1.0
 
     @staticmethod
     def calculate_position(
@@ -16,7 +18,7 @@ class PositionService:
         if before is None and after is None:
             return PositionService.POSITION_GAP
         if before is None:
-            return after - PositionService.POSITION_GAP
+            return after / 2.0
         if after is None:
             return before + PositionService.POSITION_GAP
         return (before + after) / 2.0
@@ -26,12 +28,8 @@ class PositionService:
         max_pos = await crud_task.get_max_position(db, status_id)
         return (max_pos or 0) + PositionService.POSITION_GAP
 
-    REBALANCE_THRESHOLD = 1.0
-
     @staticmethod
     async def rebalance(db: AsyncSession, status_id: UUID) -> None:
-        from sqlalchemy import select
-
         result = await db.execute(
             select(Task)
             .where(Task.status_id == status_id)
@@ -44,10 +42,7 @@ class PositionService:
         await db.flush()
 
     @staticmethod
-    async def maybe_rebalance(db: AsyncSession, status_id: UUID) -> bool:
-        """Rebalance column if any adjacent positions are too close."""
-        from sqlalchemy import select
-
+    async def _needs_rebalance(db: AsyncSession, status_id: UUID) -> bool:
         result = await db.execute(
             select(Task.position)
             .where(Task.status_id == status_id)
@@ -60,6 +55,30 @@ class PositionService:
 
         for i in range(len(positions) - 1):
             if positions[i + 1] - positions[i] < PositionService.REBALANCE_THRESHOLD:
-                await PositionService.rebalance(db, status_id)
                 return True
         return False
+
+    @staticmethod
+    async def maybe_rebalance(db: AsyncSession, status_id: UUID) -> bool:
+        if await PositionService._needs_rebalance(db, status_id):
+            await PositionService.rebalance(db, status_id)
+            return True
+        return False
+
+    @staticmethod
+    async def ensure_gap_and_position(
+        db: AsyncSession,
+        status_id: UUID,
+        position: float | None,
+    ) -> float:
+        """Proactive rebalance: if positions are too tight, rebalance first,
+        then (re)calculate the end position. Returns final position to use."""
+        if await PositionService._needs_rebalance(db, status_id):
+            await PositionService.rebalance(db, status_id)
+            # After rebalance, recalculate if no explicit position given
+            if position is None:
+                return await PositionService.get_end_position(db, status_id)
+
+        if position is None:
+            return await PositionService.get_end_position(db, status_id)
+        return position
