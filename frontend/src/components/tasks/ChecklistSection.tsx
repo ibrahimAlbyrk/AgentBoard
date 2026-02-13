@@ -313,7 +313,7 @@ function ChecklistBlock({
           className={`size-6 rounded-md flex items-center justify-center transition-all shrink-0 ${
             confirmDelete
               ? 'text-[var(--priority-urgent)] bg-[var(--priority-urgent)]/10'
-              : 'text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 hover:text-[var(--priority-urgent)]'
+              : 'text-[var(--text-tertiary)] hover:text-[var(--priority-urgent)]'
           }`}
           title={confirmDelete ? 'Click again to confirm delete' : 'Delete checklist'}
         >
