@@ -10,12 +10,14 @@ interface PanelStackAPI {
   push: (id: string) => void
   pop: (id: string) => void
   isTop: (id: string) => boolean
+  isEscSuppressed: () => boolean
   subscribe: (cb: () => void) => () => void
 }
 
 function createPanelStack(): PanelStackAPI {
   const stack: string[] = []
   const listeners = new Set<() => void>()
+  let escSuppressed = false
 
   const notify = () => listeners.forEach((cb) => cb())
 
@@ -28,11 +30,18 @@ function createPanelStack(): PanelStackAPI {
       const idx = stack.lastIndexOf(id)
       if (idx !== -1) {
         stack.splice(idx, 1)
+        // Suppress ESC for the remainder of this event loop tick so the
+        // panel below doesn't catch the same Escape that closed this one
+        escSuppressed = true
+        setTimeout(() => { escSuppressed = false }, 0)
         notify()
       }
     },
     isTop(id) {
       return stack.length > 0 && stack[stack.length - 1] === id
+    },
+    isEscSuppressed() {
+      return escSuppressed
     },
     subscribe(cb) {
       listeners.add(cb)
@@ -108,6 +117,7 @@ function hasOpenRadixOverlay(): boolean {
  * and no Radix overlay (popover/select) is currently open.
  */
 export function usePanelEsc(id: string, active: boolean, onClose: () => void) {
+  const api = usePanelStack()
   const isTop = usePanelLayer(id, active)
 
   useEffect(() => {
@@ -120,11 +130,15 @@ export function usePanelEsc(id: string, active: boolean, onClose: () => void) {
       // those handle ESC internally and shouldn't cascade to the panel
       if (hasOpenRadixOverlay()) return
 
+      // Skip if a panel was just popped (closed) in this same event tick —
+      // prevents the same Escape from cascading to the panel below
+      if (api.isEscSuppressed()) return
+
       e.stopPropagation()
       e.preventDefault()
       onClose()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [active, isTop, onClose])
+  }, [active, isTop, onClose, api])
 }
