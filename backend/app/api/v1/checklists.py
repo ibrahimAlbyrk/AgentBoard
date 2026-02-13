@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import check_board_access, get_current_user
 from app.core.database import get_db
-from app.crud import crud_task
+from app.crud import crud_activity_log, crud_task
 from app.crud.checklist import crud_checklist
 from app.crud.checklist_item import crud_checklist_item
 from app.models.board import Board
@@ -174,10 +174,19 @@ async def delete_item(
     board: Board = Depends(check_board_access),
     current_user: User = Depends(get_current_user),
 ):
-    await _get_checklist_or_404(checklist_id, task_id, db)
+    checklist = await _get_checklist_or_404(checklist_id, task_id, db)
     item = await crud_checklist_item.get(db, item_id)
     if not item or item.checklist_id != checklist_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    await crud_activity_log.log(
+        db,
+        project_id=board.project_id,
+        user_id=current_user.id,
+        action="updated",
+        entity_type="task",
+        task_id=task_id,
+        changes={"checklist_item": f'removed "{item.title}"'},
+    )
     await crud_checklist_item.remove(db, id=item_id)
     await _broadcast_checklist_update(board, task_id)
 

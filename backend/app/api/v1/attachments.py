@@ -8,7 +8,7 @@ from app.api.deps import check_board_access, get_current_user
 from app.core.config import settings
 from app.core.errors import NotFoundError, PermissionError_, ValidationError
 from app.core.database import get_db
-from app.crud import crud_attachment, crud_task
+from app.crud import crud_activity_log, crud_attachment, crud_task
 from app.models.attachment import Attachment
 from app.models.board import Board
 from app.models.user import User
@@ -58,6 +58,16 @@ async def upload_attachment(
     await db.flush()
     await db.refresh(attachment, ["user"])
 
+    await crud_activity_log.log(
+        db,
+        project_id=board.project_id,
+        user_id=current_user.id,
+        action="attached",
+        entity_type="attachment",
+        task_id=task_id,
+        changes={"filename": attachment.filename},
+    )
+
     return ResponseBase(data=AttachmentResponse.model_validate(attachment))
 
 
@@ -93,6 +103,15 @@ async def delete_attachment(
         raise NotFoundError("Attachment not found")
     if attachment.user_id != current_user.id:
         raise PermissionError_("You can only delete your own attachments")
+    await crud_activity_log.log(
+        db,
+        project_id=board.project_id,
+        user_id=current_user.id,
+        action="deleted",
+        entity_type="attachment",
+        task_id=task_id,
+        changes={"filename": attachment.filename},
+    )
     await storage.delete(attachment.file_path)
 
     # Clear cover if this attachment was used as a task's cover image

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import Actor, check_board_access, get_current_actor, get_current_user
 from app.core.errors import NotFoundError
 from app.core.database import get_db
-from app.crud import crud_reaction, crud_task
+from app.crud import crud_activity_log, crud_reaction, crud_task
 from app.models.board import Board
 from app.models.user import User
 from app.schemas.base import PaginatedResponse, PaginationMeta, ResponseBase
@@ -178,6 +178,15 @@ async def delete_task(
     task_title = task.title
     assignee_user_ids = [a.user_id for a in task.assignees if a.user_id]
     watcher_user_ids = [w.user_id for w in task.watchers if w.user_id]
+    await crud_activity_log.log(
+        db,
+        project_id=board.project_id,
+        user_id=current_user.id,
+        action="deleted",
+        entity_type="task",
+        task_id=None,
+        changes={"title": task_title},
+    )
     await ReactionService.delete_reactions_for_entity(db, "task", task_id)
     await crud_task.remove(db, id=task_id)
     await manager.broadcast_to_board(str(board.project_id), str(board.id), {
@@ -349,6 +358,15 @@ async def bulk_delete_tasks(
         if task and task.board_id == board.id:
             task_title = task.title
             assignee_user_ids = [a.user_id for a in task.assignees if a.user_id]
+            await crud_activity_log.log(
+                db,
+                project_id=board.project_id,
+                user_id=current_user.id,
+                action="deleted",
+                entity_type="task",
+                task_id=None,
+                changes={"title": task_title},
+            )
             await crud_task.remove(db, id=task_id)
             await manager.broadcast_to_board(str(board.project_id), str(board.id), {
                 "type": "task.deleted",

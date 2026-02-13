@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import LimitExceededError
-from app.crud import crud_activity_log
+from app.crud import crud_activity_log, crud_task
 from app.crud.checklist import crud_checklist
 from app.crud.checklist_item import crud_checklist_item
 from app.models.checklist import Checklist
@@ -66,11 +66,25 @@ class ChecklistService:
         user_id: UUID,
         body: ChecklistUpdate,
     ) -> Checklist:
+        old_title = checklist.title
         if body.title is not None:
             checklist.title = body.title
         db.add(checklist)
         await db.flush()
         await db.refresh(checklist, ["items"])
+
+        if body.title is not None and body.title != old_title:
+            task = await crud_task.get(db, checklist.task_id)
+            if task:
+                await crud_activity_log.log(
+                    db,
+                    project_id=task.project_id,
+                    user_id=user_id,
+                    action="updated",
+                    entity_type="task",
+                    task_id=task.id,
+                    changes={"checklist": f'renamed "{old_title}" to "{body.title}"'},
+                )
         return checklist
 
     @staticmethod
@@ -83,8 +97,6 @@ class ChecklistService:
         title = checklist.title
         await db.delete(checklist)
         await db.flush()
-
-        from app.crud import crud_task
 
         task = await crud_task.get(db, task_id)
         if task:
@@ -122,6 +134,18 @@ class ChecklistService:
         db.add(item)
         await db.flush()
         await db.refresh(item, ["assignee"])
+
+        task = await crud_task.get(db, checklist.task_id)
+        if task:
+            await crud_activity_log.log(
+                db,
+                project_id=task.project_id,
+                user_id=user_id,
+                action="updated",
+                entity_type="task",
+                task_id=task.id,
+                changes={"checklist_item": f'added "{body.title}"'},
+            )
         return item
 
     @staticmethod
@@ -132,7 +156,12 @@ class ChecklistService:
         body: ChecklistItemUpdate,
     ) -> ChecklistItem:
         update_data = body.model_dump(exclude_unset=True)
+        old_title = item.title
+        changed_fields = []
         for field, value in update_data.items():
+            old_val = getattr(item, field, None)
+            if old_val != value:
+                changed_fields.append(field)
             if field == "is_completed":
                 item.is_completed = value
                 item.completed_at = datetime.now(UTC) if value else None
@@ -141,6 +170,28 @@ class ChecklistService:
         db.add(item)
         await db.flush()
         await db.refresh(item, ["assignee"])
+
+        if changed_fields:
+            checklist_obj = await crud_checklist.get(db, item.checklist_id)
+            if checklist_obj:
+                task = await crud_task.get(db, checklist_obj.task_id)
+                if task:
+                    if "is_completed" in changed_fields:
+                        state = "completed" if item.is_completed else "uncompleted"
+                        desc = f'{state} "{item.title}"'
+                    elif "title" in changed_fields:
+                        desc = f'renamed "{old_title}" to "{item.title}"'
+                    else:
+                        desc = f'updated "{item.title}"'
+                    await crud_activity_log.log(
+                        db,
+                        project_id=task.project_id,
+                        user_id=user_id,
+                        action="updated",
+                        entity_type="task",
+                        task_id=task.id,
+                        changes={"checklist_item": desc},
+                    )
         return item
 
     @staticmethod
@@ -154,4 +205,19 @@ class ChecklistService:
         db.add(item)
         await db.flush()
         await db.refresh(item, ["assignee"])
+
+        checklist_obj = await crud_checklist.get(db, item.checklist_id)
+        if checklist_obj:
+            task = await crud_task.get(db, checklist_obj.task_id)
+            if task:
+                state = "completed" if item.is_completed else "uncompleted"
+                await crud_activity_log.log(
+                    db,
+                    project_id=task.project_id,
+                    user_id=user_id,
+                    action="updated",
+                    entity_type="task",
+                    task_id=task.id,
+                    changes={"checklist_item": f'{state} "{item.title}"'},
+                )
         return item

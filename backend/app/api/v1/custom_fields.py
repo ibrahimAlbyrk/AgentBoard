@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import check_board_access, get_current_user
 from app.core.errors import DuplicateError, NotFoundError
 from app.core.database import get_db
-from app.crud import crud_custom_field_definition, crud_custom_field_value, crud_task
+from app.crud import crud_activity_log, crud_custom_field_definition, crud_custom_field_value, crud_task
 from app.models.board import Board
 from app.models.user import User
 from app.schemas.base import ResponseBase
@@ -23,6 +23,37 @@ from app.services.custom_field_service import CustomFieldService
 from app.services.websocket_manager import manager
 
 router = APIRouter(tags=["Custom Fields"])
+
+
+def _format_field_value(definition, value) -> str | None:
+    """Return a human-readable display string for a custom field value."""
+    ft = definition.field_type
+    if ft == "text" or ft == "url":
+        return value.value_text
+    if ft == "number":
+        return str(value.value_number) if value.value_number is not None else None
+    if ft == "checkbox":
+        return "checked" if value.value_number == 1.0 else "unchecked"
+    if ft == "date":
+        return str(value.value_date) if value.value_date else None
+    if ft == "select":
+        opt_id = value.value_json
+        if isinstance(opt_id, str) and definition.options:
+            match = next((o for o in definition.options if o.get("id") == opt_id), None)
+            return match["label"] if match else opt_id
+        return str(opt_id) if opt_id else None
+    if ft == "multi_select":
+        ids = value.value_json
+        if isinstance(ids, list) and definition.options:
+            opt_map = {o["id"]: o.get("label", o["id"]) for o in definition.options}
+            return ", ".join(opt_map.get(i, i) for i in ids)
+        return str(ids) if ids else None
+    if ft == "person":
+        persons = value.value_json
+        if isinstance(persons, list):
+            return f"{len(persons)} person(s)"
+        return None
+    return str(value.value_text or value.value_number or value.value_json or value.value_date)
 
 
 # ── Definition Endpoints ──
@@ -201,9 +232,38 @@ async def bulk_set_field_values(
     if not task or task.board_id != board.id:
         raise NotFoundError("Task not found")
 
+    # Capture old values for diff
+    old_values_map: dict = {}
+    for v in body.values:
+        defn = await crud_custom_field_definition.get(db, v.field_definition_id)
+        if defn:
+            old_val = await crud_custom_field_value.get_by_task_and_field(db, task_id, v.field_definition_id)
+            old_values_map[v.field_definition_id] = (defn, _format_field_value(defn, old_val) if old_val else None)
+
     results = await CustomFieldService.bulk_set_values(
         db, task_id, board.id, body.values
     )
+
+    # Log changes for each field that actually changed
+    for result in results:
+        fid = result.field_definition_id
+        if fid in old_values_map:
+            defn, old_display = old_values_map[fid]
+            new_display = _format_field_value(defn, result)
+            if old_display != new_display:
+                await crud_activity_log.log(
+                    db,
+                    project_id=board.project_id,
+                    user_id=current_user.id,
+                    action="updated",
+                    entity_type="task",
+                    task_id=task_id,
+                    changes={"custom_field": {
+                        "field": defn.name,
+                        "old": old_display,
+                        "new": new_display,
+                    }},
+                )
 
     # Broadcast task update so field values propagate
     refreshed = await crud_task.get_with_relations(db, task_id)
@@ -242,9 +302,29 @@ async def set_field_value(
     if not definition or definition.board_id != board.id:
         raise NotFoundError("Custom field not found")
 
+    # Capture old value for activity diff
+    old_value = await crud_custom_field_value.get_by_task_and_field(db, task_id, field_id)
+    old_display = _format_field_value(definition, old_value) if old_value else None
+
     result = await CustomFieldService.set_field_value(
         db, task_id, definition, value_in
     )
+
+    new_display = _format_field_value(definition, result)
+    if old_display != new_display:
+        await crud_activity_log.log(
+            db,
+            project_id=board.project_id,
+            user_id=current_user.id,
+            action="updated",
+            entity_type="task",
+            task_id=task_id,
+            changes={"custom_field": {
+                "field": definition.name,
+                "old": old_display,
+                "new": new_display,
+            }},
+        )
 
     # Broadcast task update
     refreshed = await crud_task.get_with_relations(db, task_id)
@@ -276,7 +356,26 @@ async def clear_field_value(
     if not task or task.board_id != board.id:
         raise NotFoundError("Task not found")
 
+    definition = await crud_custom_field_definition.get(db, field_id)
+    old_value = await crud_custom_field_value.get_by_task_and_field(db, task_id, field_id)
+    old_display = _format_field_value(definition, old_value) if definition and old_value else None
+
     await crud_custom_field_value.delete_by_task_and_field(db, task_id, field_id)
+
+    if old_display and definition:
+        await crud_activity_log.log(
+            db,
+            project_id=board.project_id,
+            user_id=current_user.id,
+            action="updated",
+            entity_type="task",
+            task_id=task_id,
+            changes={"custom_field": {
+                "field": definition.name,
+                "old": old_display,
+                "new": None,
+            }},
+        )
 
     # Broadcast task update
     refreshed = await crud_task.get_with_relations(db, task_id)

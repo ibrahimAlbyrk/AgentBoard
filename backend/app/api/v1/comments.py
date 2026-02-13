@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import Actor, check_board_access, get_current_actor, get_current_user
 from app.core.errors import NotFoundError, PermissionError_, ValidationError
 from app.core.database import get_db
-from app.crud import crud_agent, crud_attachment, crud_comment, crud_reaction, crud_task
+from app.crud import crud_activity_log, crud_agent, crud_attachment, crud_comment, crud_reaction, crud_task
 from app.models.board import Board
 from app.models.comment import Comment
 from app.models.user import User
@@ -107,8 +107,20 @@ async def create_comment(
         await db.flush()
         await db.refresh(comment, ["attachments"])
 
-    commenter_name = actor.display_name
     preview = content_text[:80] + ("..." if len(content_text) > 80 else "")
+
+    await crud_activity_log.log(
+        db,
+        project_id=board.project_id,
+        user_id=actor.user.id,
+        action="commented",
+        entity_type="comment",
+        task_id=task_id,
+        changes={"preview": preview},
+        agent_id=agent_creator_id,
+    )
+
+    commenter_name = actor.display_name
     for assignee in task.assignees:
         if not assignee.user_id:
             continue
@@ -223,5 +235,14 @@ async def delete_comment(
         raise NotFoundError("Comment not found")
     if comment.user_id != current_user.id:
         raise PermissionError_("You can only delete your own comments")
+    await crud_activity_log.log(
+        db,
+        project_id=board.project_id,
+        user_id=current_user.id,
+        action="deleted",
+        entity_type="comment",
+        task_id=task_id,
+        changes={},
+    )
     await ReactionService.delete_reactions_for_entity(db, "comment", comment_id)
     await crud_comment.remove(db, id=comment_id)

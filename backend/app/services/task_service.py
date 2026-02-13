@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError, ValidationError
-from app.crud import crud_activity_log, crud_agent, crud_attachment, crud_status, crud_task, crud_user
+from app.crud import crud_activity_log, crud_agent, crud_attachment, crud_label, crud_status, crud_task, crud_user
 from app.models.task import Task
 from app.models.task_assignee import TaskAssignee
 from app.models.task_label import TaskLabel
@@ -38,23 +38,47 @@ FIELD_LABELS = {
     "priority": "priority",
     "status_id": "status",
     "assignees": "assignees",
+    "watchers": "watchers",
+    "labels": "labels",
     "due_date": "due date",
     "cover": "cover",
+    "custom_field": "custom field",
+    "checklist": "checklist",
+    "checklist_item": "checklist item",
 }
 
 
-def _describe_changes(changes: dict, label_changed: bool = False) -> str:
+def _describe_changes(changes: dict) -> str:
     parts = []
     for field, diff in changes.items():
         label = FIELD_LABELS.get(field, field)
-        if isinstance(diff, dict) and "old" in diff and "new" in diff:
+        if field in ("assignees", "watchers"):
+            if isinstance(diff, dict):
+                subs = []
+                for key, verb in [("added", "added"), ("removed", "removed")]:
+                    items = diff.get(key, [])
+                    if items:
+                        names = [i["name"] if isinstance(i, dict) else str(i) for i in items]
+                        subs.append(f'{verb} {", ".join(names)}')
+                parts.append(f'{label}: {"; ".join(subs)}' if subs else f"{label} updated")
+            else:
+                parts.append(f"{label} updated")
+        elif field == "labels":
+            if isinstance(diff, dict):
+                subs = []
+                if diff.get("added"):
+                    subs.append(f'added {", ".join(diff["added"])}')
+                if diff.get("removed"):
+                    subs.append(f'removed {", ".join(diff["removed"])}')
+                parts.append(f'{label}: {"; ".join(subs)}' if subs else f"{label} updated")
+            else:
+                parts.append(f"{label} updated")
+        elif isinstance(diff, dict) and "old" in diff and "new" in diff:
             old = diff["old"] or "none"
             new = diff["new"] or "none"
             parts.append(f"{label}: {old} → {new}")
         else:
             parts.append(f"{label} changed")
-    if label_changed:
-        parts.append("labels updated")
     return ", ".join(parts) if parts else "updated"
 
 
@@ -242,6 +266,15 @@ class TaskService:
                 db, task.id, task_in.watcher_user_ids, task_in.watcher_agent_ids
             )
 
+        creation_changes: dict = {"title": task.title}
+        status_obj = await crud_status.get(db, status_id)
+        if status_obj:
+            creation_changes["status"] = status_obj.name
+        if task_in.priority and task_in.priority != "none":
+            creation_changes["priority"] = task_in.priority
+        if task_in.due_date:
+            creation_changes["due_date"] = str(task_in.due_date)
+
         await crud_activity_log.log(
             db,
             project_id=project_id,
@@ -249,7 +282,7 @@ class TaskService:
             action="created",
             entity_type="task",
             task_id=task.id,
-            changes={"title": task.title},
+            changes=creation_changes,
             agent_id=agent_creator_id,
         )
 
@@ -373,6 +406,17 @@ class TaskService:
                 setattr(task, field, value)
 
         if label_ids is not None:
+            old_label_ids = {tl.label_id for tl in task.labels}
+            new_label_set = set(label_ids)
+            if old_label_ids != new_label_set:
+                label_diff: dict = {"added": [], "removed": []}
+                for lid in new_label_set - old_label_ids:
+                    lbl = await crud_label.get(db, lid)
+                    label_diff["added"].append(lbl.name if lbl else str(lid))
+                for lid in old_label_ids - new_label_set:
+                    tl_obj = next((tl for tl in task.labels if tl.label_id == lid), None)
+                    label_diff["removed"].append(tl_obj.label.name if tl_obj and tl_obj.label else str(lid))
+                changes["labels"] = label_diff
             for tl in list(task.labels):
                 await db.delete(tl)
             await db.flush()
@@ -382,6 +426,27 @@ class TaskService:
 
         watchers_changed = watcher_user_ids is not None or watcher_agent_ids is not None
         if watchers_changed:
+            old_wuids = {w.user_id for w in task.watchers if w.user_id}
+            old_waids = {w.agent_id for w in task.watchers if w.agent_id}
+            new_wuids = set(watcher_user_ids or [])
+            new_waids = set(watcher_agent_ids or [])
+            if old_wuids != new_wuids or old_waids != new_waids:
+                watcher_diff: dict = {"added": [], "removed": []}
+                for uid in new_wuids - old_wuids:
+                    u = await crud_user.get(db, uid)
+                    watcher_diff["added"].append({"type": "user", "name": (u.full_name or u.username) if u else str(uid)})
+                for aid in new_waids - old_waids:
+                    a = await crud_agent.get(db, aid)
+                    watcher_diff["added"].append({"type": "agent", "name": a.name if a else str(aid)})
+                for uid in old_wuids - new_wuids:
+                    obj = next((w for w in task.watchers if w.user_id == uid), None)
+                    name = (obj.user.full_name or obj.user.username) if obj and obj.user else str(uid)
+                    watcher_diff["removed"].append({"type": "user", "name": name})
+                for aid in old_waids - new_waids:
+                    obj = next((w for w in task.watchers if w.agent_id == aid), None)
+                    name = obj.agent.name if obj and obj.agent else str(aid)
+                    watcher_diff["removed"].append({"type": "agent", "name": name})
+                changes["watchers"] = watcher_diff
             await _sync_watchers(
                 db, task.id,
                 watcher_user_ids or [],
@@ -390,6 +455,11 @@ class TaskService:
 
         assignees_changed = assignee_user_ids is not None or assignee_agent_ids is not None
         if assignees_changed:
+            # Compute diff BEFORE sync overwrites
+            old_auids = {a.user_id for a in task.assignees if a.user_id}
+            old_aaids = {a.agent_id for a in task.assignees if a.agent_id}
+            new_auids = set(assignee_user_ids or [])
+            new_aaids = set(assignee_agent_ids or [])
             # Validate agent IDs
             for aid in (assignee_agent_ids or []):
                 agent = await crud_agent.get(db, aid)
@@ -397,12 +467,28 @@ class TaskService:
                     raise ValidationError("Invalid or inactive assignee agent")
                 if not await crud_agent.is_in_project(db, agent.id, task.project_id):
                     raise ValidationError("Assignee agent not in this project")
+            if old_auids != new_auids or old_aaids != new_aaids:
+                assignee_diff: dict = {"added": [], "removed": []}
+                for uid in new_auids - old_auids:
+                    u = await crud_user.get(db, uid)
+                    assignee_diff["added"].append({"type": "user", "name": (u.full_name or u.username) if u else str(uid)})
+                for aid in new_aaids - old_aaids:
+                    a = await crud_agent.get(db, aid)
+                    assignee_diff["added"].append({"type": "agent", "name": a.name if a else str(aid)})
+                for uid in old_auids - new_auids:
+                    obj = next((a for a in task.assignees if a.user_id == uid), None)
+                    name = (obj.user.full_name or obj.user.username) if obj and obj.user else str(uid)
+                    assignee_diff["removed"].append({"type": "user", "name": name})
+                for aid in old_aaids - new_aaids:
+                    obj = next((a for a in task.assignees if a.agent_id == aid), None)
+                    name = obj.agent.name if obj and obj.agent else str(aid)
+                    assignee_diff["removed"].append({"type": "agent", "name": name})
+                changes["assignees"] = assignee_diff
             await _sync_assignees(
                 db, task.id,
                 assignee_user_ids or [],
                 assignee_agent_ids or [],
             )
-            changes["assignees"] = "assignees updated"
 
         if update_data:
             db.add(task)
@@ -419,7 +505,7 @@ class TaskService:
                 changes=changes,
             )
 
-        has_changes = bool(changes) or label_ids is not None
+        has_changes = bool(changes)
 
         # Reload to get fresh assignees/watchers
         refreshed = await crud_task.get_with_relations(db, task.id)
@@ -437,7 +523,6 @@ class TaskService:
             elif refreshed.assignees:
                 detail = _describe_changes(
                     {k: v for k, v in changes.items() if k != "assignees"},
-                    label_ids is not None,
                 )
                 await _notify_assignees(
                     db, refreshed, user_id,
@@ -446,7 +531,7 @@ class TaskService:
                 )
 
             if refreshed.watchers:
-                detail = _describe_changes(changes, label_ids is not None)
+                detail = _describe_changes(changes)
                 await _notify_watchers(
                     db, refreshed, user_id,
                     "task_updated", "Watching: Task Updated",
