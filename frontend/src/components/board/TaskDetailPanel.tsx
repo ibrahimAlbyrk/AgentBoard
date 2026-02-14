@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { formatDistanceToNow, parseISO, isPast, isToday } from 'date-fns'
+import { formatDistanceToNow, parseISO, isPast, isToday, format } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   X,
   Calendar,
   Users,
   Flag,
-  CircleDot,
   Tag,
   MessageSquare,
   Activity,
@@ -26,13 +25,6 @@ import {
   ArrowDownToLine,
   Pencil,
 } from 'lucide-react'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
@@ -54,6 +46,7 @@ import { ReactionBar } from '@/components/reactions/ReactionBar'
 import { CoverPicker } from '@/components/tasks/CoverPicker'
 import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { RichTextRenderer } from '@/components/editor/RichTextRenderer'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { GRADIENT_PRESETS } from '@/lib/cover-presets'
 import { usePanelEsc } from '@/contexts/PanelStackContext'
 import { useConvertToSubtask, usePromoteSubtask } from '@/hooks/useSubtasks'
@@ -177,6 +170,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   const [showLabelManager, setShowLabelManager] = useState(false)
   const [showCoverPicker, setShowCoverPicker] = useState(false)
   const [activeSection, setActiveSection] = useState<FloatingSection | null>(null)
+  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'details'>('overview')
   const [subtaskStack, setSubtaskStack] = useState<string[]>([])
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showTaskPicker, setShowTaskPicker] = useState(false)
@@ -184,7 +178,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   const convertToSubtask = useConvertToSubtask(projectId, boardId)
   const promoteSubtask = usePromoteSubtask(projectId, boardId)
   const panelRef = useRef<HTMLDivElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const tabContentRef = useRef<HTMLDivElement>(null)
 
   const lastTaskRef = useRef<Task | null>(null)
   if (task) lastTaskRef.current = task
@@ -204,6 +198,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
       setEditingTitle(false)
       setEditingDesc(false)
       setActiveSection(null)
+      setActiveTab('overview')
       setSubtaskStack([])
     }
   }, [open])
@@ -264,7 +259,6 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
     })
   }
 
-  const currentPriority = priorities.find((p) => p.value === displayTask.priority) ?? priorities[0]
   const isOverdue = displayTask.due_date && isPast(parseISO(displayTask.due_date)) && !isToday(parseISO(displayTask.due_date))
 
   const ActiveSectionIcon = activeSection ? sectionIcons[activeSection] : null
@@ -429,29 +423,15 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                   </div>
                 </div>
 
-                {/* Scrollable content */}
-                <div ref={scrollRef} className="flex-1 overflow-y-auto relative">
+                {/* Fixed header: Title + Chip Strip */}
+                <div className="px-6 pt-4 pb-3 shrink-0">
                   <motion.div
                     variants={stagger}
                     initial="hidden"
                     animate="visible"
-                    className="px-6 py-5"
                   >
-                    {/* Subtask breadcrumb */}
-                    {subtaskStack.length > 0 && (
-                      <motion.div variants={fadeUp} className="mb-3">
-                        <button
-                          onClick={() => setSubtaskStack((prev) => prev.slice(0, -1))}
-                          className="flex items-center gap-1 text-xs text-[var(--accent-solid)] hover:underline"
-                        >
-                          <ChevronRight className="size-3 rotate-180" />
-                          Back to parent task
-                        </button>
-                      </motion.div>
-                    )}
-
                     {/* Title */}
-                    <motion.div variants={fadeUp} className="mb-6">
+                    <motion.div variants={fadeUp} className="mb-4">
                       {editingTitle ? (
                         <Input
                           autoFocus
@@ -480,298 +460,283 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                       )}
                     </motion.div>
 
-                    {/* Vote + Reactions */}
-                    <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3">
-                      <VoteButton projectId={projectId} boardId={boardId} taskId={displayTask.id} />
+                    {/* Property Chip Strip */}
+                    <motion.div variants={fadeUp} className="flex items-center gap-2 flex-wrap">
+                      <StatusChip
+                        status={displayTask.status}
+                        statuses={statuses}
+                        onUpdate={(statusId) => handleFieldUpdate({ status_id: statusId })}
+                      />
+                      <PriorityChip
+                        priority={displayTask.priority}
+                        onUpdate={(priority) => handleFieldUpdate({ priority })}
+                      />
+                      <AssigneesChip
+                        assignees={displayTask.assignees ?? []}
+                        members={members}
+                        agents={activeAgents}
+                        onUpdate={(userIds, agentIds) => handleFieldUpdate({ assignee_user_ids: userIds, assignee_agent_ids: agentIds })}
+                      />
+                      <DueDateChip
+                        dueDate={displayTask.due_date ?? null}
+                        isOverdue={!!isOverdue}
+                        onUpdate={(date) => handleFieldUpdate({ due_date: date || undefined })}
+                      />
+                      <LabelsChip
+                        taskLabels={displayTask.labels}
+                        allLabels={labels}
+                        onUpdate={(labelIds) => handleFieldUpdate({ label_ids: labelIds })}
+                        onManage={() => setShowLabelManager(true)}
+                      />
                     </motion.div>
-                    <motion.div variants={fadeUp} className="mb-6">
-                      <ReactionBar
-                        entityType="task"
+                  </motion.div>
+                </div>
+
+                {/* Tabs */}
+                <Tabs
+                  value={activeTab}
+                  onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+                  className="flex-1 flex flex-col overflow-hidden"
+                >
+                  <TabsList variant="line" className="px-6 shrink-0 border-b border-[var(--border-subtle)] w-full">
+                    <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
+                    <TabsTrigger value="tasks" className="text-xs gap-1.5">
+                      Tasks
+                      {(displayTask.children_count ?? 0) > 0 && (
+                        <span className="text-[10px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)] px-1.5 py-0.5 rounded-full font-semibold">
+                          {displayTask.children_count}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
+                  </TabsList>
+
+                  <div ref={tabContentRef} className="flex-1 overflow-y-auto">
+                    <TabsContent value="overview" forceMount className="px-6 py-5 mt-0 data-[state=inactive]:hidden">
+                      <motion.div variants={stagger} initial="hidden" animate="visible">
+                        {/* Vote + Reactions */}
+                        <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3">
+                          <VoteButton projectId={projectId} boardId={boardId} taskId={displayTask.id} />
+                        </motion.div>
+                        <motion.div variants={fadeUp} className="mb-6">
+                          <ReactionBar
+                            entityType="task"
+                            projectId={projectId}
+                            boardId={boardId}
+                            taskId={displayTask.id}
+                          />
+                        </motion.div>
+
+                        {/* Description */}
+                        <motion.div variants={fadeUp} className="mb-6">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Sparkles className="size-3.5 text-[var(--text-tertiary)]" />
+                            <span className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+                              Description
+                            </span>
+                          </div>
+                          {editingDesc ? (
+                            <div>
+                              <RichTextEditor
+                                projectId={projectId}
+                                value={typeof displayTask.description === 'string' ? displayTask.description : (displayTask.description as TiptapDoc | null)}
+                                onChange={(doc) => setDescDoc(doc)}
+                                variant="full"
+                                placeholder="Describe this task..."
+                                autoFocus
+                              />
+                              <div className="flex items-center justify-end gap-2 mt-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setDescDoc(null)
+                                    setEditingDesc(false)
+                                  }}
+                                  className="h-7 text-xs"
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    handleDescSave()
+                                  }}
+                                  className="h-7 text-xs"
+                                >
+                                  Save
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              onClick={() => {
+                                setDescDoc(null)
+                                setEditingDesc(true)
+                              }}
+                              className="min-h-[60px] px-4 py-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] cursor-pointer hover:border-[var(--border-strong)] transition-colors text-sm leading-relaxed group"
+                            >
+                              {displayTask.description ? (
+                                <RichTextRenderer content={displayTask.description} />
+                              ) : (
+                                <p className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors">
+                                  Click to add a description...
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </motion.div>
+                      </motion.div>
+                    </TabsContent>
+
+                    <TabsContent value="tasks" forceMount className="px-6 py-5 mt-0 data-[state=inactive]:hidden">
+                      {/* Subtask breadcrumb */}
+                      {subtaskStack.length > 0 && (
+                        <div className="mb-3">
+                          <button
+                            onClick={() => setSubtaskStack((prev) => prev.slice(0, -1))}
+                            className="flex items-center gap-1 text-xs text-[var(--accent-solid)] hover:underline"
+                          >
+                            <ChevronRight className="size-3 rotate-180" />
+                            Back to parent task
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Subtasks */}
+                      <SubtasksSection
+                        projectId={projectId}
+                        boardId={boardId}
+                        taskId={displayTask.id}
+                        onOpenSubtask={(subtask) => {
+                          setSubtaskStack((prev) => [...prev, subtask.id])
+                          setActiveTab('tasks')
+                          tabContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+                        }}
+                      />
+
+                      {/* Checklists */}
+                      <ChecklistSection
                         projectId={projectId}
                         boardId={boardId}
                         taskId={displayTask.id}
                       />
-                    </motion.div>
+                    </TabsContent>
 
-                    {/* Property rows */}
-                    <motion.div
-                      variants={fadeUp}
-                      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] divide-y divide-[var(--border-subtle)] mb-6"
-                    >
-                      {/* Status + Priority group */}
-                      <div className="bg-[var(--accent-solid)]/[0.03]">
-                        {/* Status */}
-                        <PropertyRow icon={CircleDot} label="Status">
-                          <Select
-                            value={displayTask.status.id}
-                            onValueChange={(v) => handleFieldUpdate({ status_id: v })}
-                          >
-                            <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0 [&_[data-slot=select-value]]:overflow-visible">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {statuses.map((s) => (
-                                <SelectItem key={s.id} value={s.id}>
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className="size-2.5 rounded-full shrink-0"
-                                      style={{ backgroundColor: s.color || 'var(--priority-none)', boxShadow: `0 0 0 2px var(--popover), 0 0 0 3.5px ${s.color || 'var(--priority-none)'}` }}
-                                    />
-                                    {s.name}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </PropertyRow>
-
-                        <div className="mx-4 border-t border-[var(--border-subtle)]" />
-
-                        {/* Priority */}
-                        <PropertyRow icon={Flag} label="Priority" iconColor={currentPriority.color}>
-                          <Select
-                            value={displayTask.priority}
-                            onValueChange={(v) => handleFieldUpdate({ priority: v })}
-                          >
-                            <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {priorities.map((p) => (
-                                <SelectItem key={p.value} value={p.value}>
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className="size-2.5 rounded-full"
-                                      style={{ backgroundColor: p.color }}
-                                    />
-                                    {p.label}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </PropertyRow>
-                      </div>
-
-                      {/* Assignees */}
-                      <PropertyRow icon={Users} label="Assignees">
-                        <AssigneesPicker
-                          assignees={displayTask.assignees ?? []}
-                          members={members}
-                          agents={activeAgents}
-                          onUpdate={(userIds, agentIds) => {
-                            handleFieldUpdate({
-                              assignee_user_ids: userIds,
-                              assignee_agent_ids: agentIds,
-                            })
-                          }}
-                        />
-                      </PropertyRow>
-
-                      {/* Watchers */}
-                      <PropertyRow icon={Eye} label="Watchers">
-                        <WatchersPicker
-                          watchers={displayTask.watchers ?? []}
-                          members={members}
-                          agents={activeAgents}
-                          onUpdate={(userIds, agentIds) => {
-                            handleFieldUpdate({
-                              watcher_user_ids: userIds,
-                              watcher_agent_ids: agentIds,
-                            })
-                          }}
-                        />
-                      </PropertyRow>
-
-                      {/* Due date */}
-                      <PropertyRow
-                        icon={Calendar}
-                        label="Due date"
-                        iconColor={isOverdue ? 'var(--priority-urgent)' : undefined}
-                      >
-                        <div className="flex items-center gap-2 flex-1">
-                          <Input
-                            type="date"
-                            value={displayTask.due_date?.split('T')[0] ?? ''}
-                            onChange={(e) =>
-                              handleFieldUpdate({ due_date: e.target.value || undefined })
-                            }
-                            className="border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus-visible:ring-0 focus-visible:shadow-none"
-                          />
-                          {isOverdue && (
-                            <span className="text-[10px] font-semibold text-[var(--priority-urgent)] bg-[var(--priority-urgent)]/10 px-1.5 py-0.5 rounded-md">
-                              OVERDUE
-                            </span>
-                          )}
+                    <TabsContent value="details" forceMount className="px-6 py-5 mt-0 data-[state=inactive]:hidden">
+                      <div className="space-y-4">
+                        {/* Watchers */}
+                        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]">
+                          <PropertyRow icon={Eye} label="Watchers">
+                            <WatchersPicker
+                              watchers={displayTask.watchers ?? []}
+                              members={members}
+                              agents={activeAgents}
+                              onUpdate={(userIds, agentIds) => {
+                                handleFieldUpdate({
+                                  watcher_user_ids: userIds,
+                                  watcher_agent_ids: agentIds,
+                                })
+                              }}
+                            />
+                          </PropertyRow>
                         </div>
-                      </PropertyRow>
 
-                      {/* Cover (only show row when no cover) */}
-                      {!displayTask.cover_type && (
-                        <PropertyRow icon={ImageIcon} label="Cover">
-                          <CoverPicker
-                            task={displayTask}
-                            projectId={projectId}
-                            boardId={boardId}
-                            open={showCoverPicker}
-                            onOpenChange={setShowCoverPicker}
-                          >
-                            <button className="text-sm text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] transition-colors">
-                              Add cover...
-                            </button>
-                          </CoverPicker>
-                        </PropertyRow>
-                      )}
-
-                      {/* Custom Fields */}
-                      <CustomFieldsSection
-                        task={displayTask}
-                        projectId={projectId}
-                        boardId={boardId}
-                        definitions={customFieldDefinitions}
-                      />
-                    </motion.div>
-
-                    {/* Labels */}
-                    <motion.div variants={fadeUp} className="mb-6">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Tag className="size-3.5 text-[var(--text-tertiary)]" />
-                          <span className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
-                            Labels
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => setShowLabelManager(true)}
-                          className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] transition-colors"
-                        >
-                          <Settings2 className="size-3" />
-                          Manage
-                        </button>
-                      </div>
-                      {labels.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {labels.map((label) => {
-                            const active = displayTask.labels.some((l) => l.id === label.id)
-                            return (
-                              <button
-                                key={label.id}
-                                onClick={() => {
-                                  const newIds = active
-                                    ? displayTask.labels.filter((l) => l.id !== label.id).map((l) => l.id)
-                                    : [...displayTask.labels.map((l) => l.id), label.id]
-                                  handleFieldUpdate({ label_ids: newIds })
-                                }}
-                                className="group relative px-2.5 py-1 rounded-lg text-xs font-medium border transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
-                                style={
-                                  active
-                                    ? {
-                                        backgroundColor: label.color,
-                                        borderColor: label.color,
-                                        color: '#fff',
-                                        boxShadow: `0 2px 8px -2px ${label.color}60`,
-                                      }
-                                    : {
-                                        borderColor: `${label.color}40`,
-                                        color: label.color,
-                                        backgroundColor: `${label.color}08`,
-                                      }
-                                }
+                        {/* Cover */}
+                        {!displayTask.cover_type && (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]">
+                            <PropertyRow icon={ImageIcon} label="Cover">
+                              <CoverPicker
+                                task={displayTask}
+                                projectId={projectId}
+                                boardId={boardId}
+                                open={showCoverPicker}
+                                onOpenChange={setShowCoverPicker}
                               >
-                                {label.name}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setShowLabelManager(true)}
-                          className="w-full py-3 rounded-xl border border-dashed border-[var(--border-strong)] text-xs text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] hover:border-[var(--accent-solid)] hover:bg-[var(--accent-muted-bg)] transition-all duration-200"
-                        >
-                          Create labels to categorize this task
-                        </button>
-                      )}
-                    </motion.div>
-
-                    {/* Description */}
-                    <motion.div variants={fadeUp} className="mb-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Sparkles className="size-3.5 text-[var(--text-tertiary)]" />
-                        <span className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
-                          Description
-                        </span>
-                      </div>
-                      {editingDesc ? (
-                        <div>
-                          <RichTextEditor
-                            projectId={projectId}
-                            value={typeof displayTask.description === 'string' ? displayTask.description : (displayTask.description as TiptapDoc | null)}
-                            onChange={(doc) => setDescDoc(doc)}
-                            variant="full"
-                            placeholder="Describe this task..."
-                            autoFocus
-                          />
-                          <div className="flex items-center justify-end gap-2 mt-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setDescDoc(null)
-                                setEditingDesc(false)
-                              }}
-                              className="h-7 text-xs"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                handleDescSave()
-                              }}
-                              className="h-7 text-xs"
-                            >
-                              Save
-                            </Button>
+                                <button className="text-sm text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] transition-colors">
+                                  Add cover...
+                                </button>
+                              </CoverPicker>
+                            </PropertyRow>
                           </div>
-                        </div>
-                      ) : (
-                        <div
-                          onClick={() => {
-                            setDescDoc(null)
-                            setEditingDesc(true)
-                          }}
-                          className="min-h-[60px] px-4 py-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] cursor-pointer hover:border-[var(--border-strong)] transition-colors text-sm leading-relaxed group"
-                        >
-                          {displayTask.description ? (
-                            <RichTextRenderer content={displayTask.description} />
+                        )}
+
+                        {/* Custom Fields */}
+                        {customFieldDefinitions.length > 0 && (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] divide-y divide-[var(--border-subtle)]">
+                            <CustomFieldsSection
+                              task={displayTask}
+                              projectId={projectId}
+                              boardId={boardId}
+                              definitions={customFieldDefinitions}
+                            />
+                          </div>
+                        )}
+
+                        {/* Labels */}
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <Tag className="size-3.5 text-[var(--text-tertiary)]" />
+                              <span className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+                                Labels
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => setShowLabelManager(true)}
+                              className="flex items-center gap-1 text-[11px] text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] transition-colors"
+                            >
+                              <Settings2 className="size-3" />
+                              Manage
+                            </button>
+                          </div>
+                          {labels.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {labels.map((label) => {
+                                const active = displayTask.labels.some((l) => l.id === label.id)
+                                return (
+                                  <button
+                                    key={label.id}
+                                    onClick={() => {
+                                      const newIds = active
+                                        ? displayTask.labels.filter((l) => l.id !== label.id).map((l) => l.id)
+                                        : [...displayTask.labels.map((l) => l.id), label.id]
+                                      handleFieldUpdate({ label_ids: newIds })
+                                    }}
+                                    className="group relative px-2.5 py-1 rounded-lg text-xs font-medium border transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
+                                    style={
+                                      active
+                                        ? {
+                                            backgroundColor: label.color,
+                                            borderColor: label.color,
+                                            color: '#fff',
+                                            boxShadow: `0 2px 8px -2px ${label.color}60`,
+                                          }
+                                        : {
+                                            borderColor: `${label.color}40`,
+                                            color: label.color,
+                                            backgroundColor: `${label.color}08`,
+                                          }
+                                    }
+                                  >
+                                    {label.name}
+                                  </button>
+                                )
+                              })}
+                            </div>
                           ) : (
-                            <p className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors">
-                              Click to add a description...
-                            </p>
+                            <button
+                              onClick={() => setShowLabelManager(true)}
+                              className="w-full py-3 rounded-xl border border-dashed border-[var(--border-strong)] text-xs text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] hover:border-[var(--accent-solid)] hover:bg-[var(--accent-muted-bg)] transition-all duration-200"
+                            >
+                              Create labels to categorize this task
+                            </button>
                           )}
                         </div>
-                      )}
-                    </motion.div>
-
-                    {/* Subtasks */}
-                    <SubtasksSection
-                      projectId={projectId}
-                      boardId={boardId}
-                      taskId={displayTask.id}
-                      onOpenSubtask={(subtask) => {
-                        setSubtaskStack((prev) => [...prev, subtask.id])
-                        scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-                      }}
-                    />
-
-                    {/* Checklists */}
-                    <ChecklistSection
-                      projectId={projectId}
-                      boardId={boardId}
-                      taskId={displayTask.id}
-                    />
-                  </motion.div>
-                </div>
+                      </div>
+                    </TabsContent>
+                  </div>
+                </Tabs>
 
                 {/* Footer timestamps */}
                 <div className="px-6 py-3 border-t border-[var(--border-subtle)] flex items-center gap-4 text-[11px] text-[var(--text-tertiary)] shrink-0 bg-[var(--surface)] rounded-b-[20px]">
@@ -997,6 +962,306 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   )
 }
 
+/* -- Chip Sub-Components -- */
+
+const chipBase = "inline-flex items-center gap-1.5 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-xs font-medium hover:border-[var(--border-strong)] transition-colors cursor-pointer"
+
+function StatusChip({
+  status,
+  statuses,
+  onUpdate,
+}: {
+  status: { id: string; name: string; color: string | null }
+  statuses: { id: string; name: string; color: string | null }[]
+  onUpdate: (statusId: string) => void
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className={chipBase}>
+          <span
+            className="size-2 rounded-full shrink-0"
+            style={{ backgroundColor: status.color || 'var(--priority-none)' }}
+          />
+          {status.name}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" sideOffset={6} className="w-48 p-1 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden">
+        {statuses.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => onUpdate(s.id)}
+            className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-colors ${s.id === status.id ? 'bg-[var(--accent-muted-bg)]' : 'hover:bg-[var(--overlay)]'}`}
+          >
+            <span
+              className="size-2.5 rounded-full shrink-0"
+              style={{ backgroundColor: s.color || 'var(--priority-none)' }}
+            />
+            {s.name}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function PriorityChip({
+  priority,
+  onUpdate,
+}: {
+  priority: Priority
+  onUpdate: (priority: string) => void
+}) {
+  const current = priorities.find((p) => p.value === priority) ?? priorities[0]
+  const PIcon = current.icon
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={chipBase}
+          style={{ borderColor: current.color + '40' }}
+        >
+          <PIcon className="size-3" style={{ color: current.color }} />
+          {current.label}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" sideOffset={6} className="w-44 p-1 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden">
+        {priorities.map((p) => (
+          <button
+            key={p.value}
+            onClick={() => onUpdate(p.value)}
+            className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-colors ${p.value === priority ? 'bg-[var(--accent-muted-bg)]' : 'hover:bg-[var(--overlay)]'}`}
+          >
+            <span className="size-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+            {p.label}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function AssigneesChip({
+  assignees,
+  members,
+  agents,
+  onUpdate,
+}: {
+  assignees: AssigneeBrief[]
+  members: ProjectMember[]
+  agents: Agent[]
+  onUpdate: (userIds: string[], agentIds: string[]) => void
+}) {
+  const MAX_AVATARS = 3
+  const overflow = assignees.length - MAX_AVATARS
+  const userIds = new Set(assignees.filter((i) => i.user).map((i) => i.user!.id))
+  const agentIds = new Set(assignees.filter((i) => i.agent).map((i) => i.agent!.id))
+
+  const toggle = (type: 'user' | 'agent', id: string) => {
+    const newUserIds = new Set(userIds)
+    const newAgentIds = new Set(agentIds)
+    if (type === 'user') {
+      if (newUserIds.has(id)) newUserIds.delete(id)
+      else newUserIds.add(id)
+    } else {
+      if (newAgentIds.has(id)) newAgentIds.delete(id)
+      else newAgentIds.add(id)
+    }
+    onUpdate([...newUserIds], [...newAgentIds])
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className={chipBase}>
+          <Users className="size-3 text-[var(--text-tertiary)]" />
+          {assignees.length > 0 ? (
+            <div className="flex items-center -space-x-1">
+              {assignees.slice(0, MAX_AVATARS).map((a) =>
+                a.user ? (
+                  <Avatar key={a.id} className="size-5 border-2 border-[var(--surface)] ring-0">
+                    <AvatarImage src={a.user.avatar_url || undefined} />
+                    <AvatarFallback className="text-[7px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                      {(a.user.full_name || a.user.username).charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                ) : a.agent ? (
+                  <span
+                    key={a.id}
+                    className="size-5 rounded-full flex items-center justify-center text-[7px] font-bold text-white border-2 border-[var(--surface)] shrink-0"
+                    style={{ backgroundColor: a.agent.color }}
+                  >
+                    {a.agent.name.charAt(0).toUpperCase()}
+                  </span>
+                ) : null,
+              )}
+              {overflow > 0 && (
+                <span className="size-5 rounded-full flex items-center justify-center text-[8px] font-semibold bg-[var(--accent-muted-bg)] text-[var(--accent-solid)] border-2 border-[var(--surface)]">
+                  +{overflow}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[var(--text-tertiary)]">None</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" sideOffset={6} className="w-64 p-0 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden">
+        <div className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
+          <span className="text-xs font-semibold text-[var(--text-secondary)]">Assignees</span>
+        </div>
+        <div className="max-h-56 overflow-y-auto py-1 px-1">
+          {members.map((m) => {
+            const active = userIds.has(m.user.id)
+            return (
+              <button
+                key={m.user.id}
+                onClick={() => toggle('user', m.user.id)}
+                className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg transition-all duration-150 text-left ${active ? 'bg-[var(--accent-muted-bg)]' : 'hover:bg-[var(--overlay)]'}`}
+              >
+                <Avatar className="size-5">
+                  <AvatarImage src={m.user.avatar_url || undefined} />
+                  <AvatarFallback className="text-[9px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                    {(m.user.full_name || m.user.username).charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm flex-1 truncate">{m.user.full_name || m.user.username}</span>
+                {active && <Check className="size-3.5 text-[var(--accent-solid)] shrink-0" />}
+              </button>
+            )
+          })}
+          {agents.length > 0 && (
+            <>
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Agents</div>
+              {agents.map((a) => {
+                const active = agentIds.has(a.id)
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => toggle('agent', a.id)}
+                    className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg transition-all duration-150 text-left ${active ? 'bg-[var(--accent-muted-bg)]' : 'hover:bg-[var(--overlay)]'}`}
+                  >
+                    <span className="size-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ backgroundColor: a.color }}>
+                      {a.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="text-sm flex-1 truncate">{a.name}</span>
+                    {active && <Check className="size-3.5 text-[var(--accent-solid)] shrink-0" />}
+                  </button>
+                )
+              })}
+            </>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function DueDateChip({
+  dueDate,
+  isOverdue,
+  onUpdate,
+}: {
+  dueDate: string | null
+  isOverdue: boolean
+  onUpdate: (date: string) => void
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={chipBase}
+          style={isOverdue ? { borderColor: 'var(--priority-urgent)', color: 'var(--priority-urgent)' } : undefined}
+        >
+          <Calendar className="size-3" style={isOverdue ? { color: 'var(--priority-urgent)' } : { color: 'var(--text-tertiary)' }} />
+          {dueDate ? format(parseISO(dueDate), 'MMM d') : 'No date'}
+          {isOverdue && (
+            <span className="text-[9px] font-bold uppercase">Overdue</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" sideOffset={6} className="w-auto p-3 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl">
+        <Input
+          type="date"
+          value={dueDate?.split('T')[0] ?? ''}
+          onChange={(e) => onUpdate(e.target.value)}
+          className="border-[var(--border-subtle)] bg-[var(--surface)] h-8 text-sm rounded-lg"
+        />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function LabelsChip({
+  taskLabels,
+  allLabels,
+  onUpdate,
+  onManage,
+}: {
+  taskLabels: { id: string; name: string; color: string }[]
+  allLabels: { id: string; name: string; color: string }[]
+  onUpdate: (labelIds: string[]) => void
+  onManage: () => void
+}) {
+  const MAX_DOTS = 4
+  const activeIds = new Set(taskLabels.map((l) => l.id))
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className={chipBase}>
+          <Tag className="size-3 text-[var(--text-tertiary)]" />
+          {taskLabels.length > 0 ? (
+            <div className="flex items-center gap-1">
+              {taskLabels.slice(0, MAX_DOTS).map((l) => (
+                <span key={l.id} className="size-2 rounded-full" style={{ backgroundColor: l.color }} />
+              ))}
+              {taskLabels.length > MAX_DOTS && (
+                <span className="text-[9px] text-[var(--text-tertiary)]">+{taskLabels.length - MAX_DOTS}</span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[var(--text-tertiary)]">None</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" sideOffset={6} className="w-56 p-0 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden">
+        <div className="px-3 py-2.5 border-b border-[var(--border-subtle)] flex items-center justify-between">
+          <span className="text-xs font-semibold text-[var(--text-secondary)]">Labels</span>
+          <button onClick={onManage} className="text-[10px] text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] transition-colors">
+            <Settings2 className="size-3" />
+          </button>
+        </div>
+        <div className="max-h-56 overflow-y-auto py-1 px-1">
+          {allLabels.map((label) => {
+            const active = activeIds.has(label.id)
+            return (
+              <button
+                key={label.id}
+                onClick={() => {
+                  const newIds = active
+                    ? taskLabels.filter((l) => l.id !== label.id).map((l) => l.id)
+                    : [...taskLabels.map((l) => l.id), label.id]
+                  onUpdate(newIds)
+                }}
+                className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg transition-all duration-150 text-left ${active ? 'bg-[var(--accent-muted-bg)]' : 'hover:bg-[var(--overlay)]'}`}
+              >
+                <span className="size-3 rounded-sm" style={{ backgroundColor: label.color }} />
+                <span className="text-sm flex-1 truncate">{label.name}</span>
+                {active && <Check className="size-3.5 text-[var(--accent-solid)] shrink-0" />}
+              </button>
+            )
+          })}
+          {allLabels.length === 0 && (
+            <div className="px-3 py-4 text-xs text-[var(--text-tertiary)] text-center">
+              No labels yet
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 /* -- Property Row -- */
 
 function PropertyRow({
@@ -1181,30 +1446,6 @@ function PersonPicker({
         <span className="text-sm text-[var(--text-tertiary)]">None</span>
       )}
     </div>
-  )
-}
-
-/* -- Assignees Picker -- */
-
-function AssigneesPicker({
-  assignees,
-  members,
-  agents,
-  onUpdate,
-}: {
-  assignees: AssigneeBrief[]
-  members: ProjectMember[]
-  agents: Agent[]
-  onUpdate: (userIds: string[], agentIds: string[]) => void
-}) {
-  return (
-    <PersonPicker
-      items={assignees}
-      members={members}
-      agents={agents}
-      onUpdate={onUpdate}
-      label="Add Assignees"
-    />
   )
 }
 
