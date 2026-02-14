@@ -135,8 +135,8 @@
   --surface: #1b2024;
   --elevated: #282e33;
   --overlay: #333b43;
-  --text-secondary: #8c9bab;
-  --text-tertiary: #6b7a8d;
+  --text-secondary: #9eaebe;
+  --text-tertiary: #7d8fa2;
   --border-subtle: #3d474f;
   --border-strong: #4d5960;
 
@@ -290,15 +290,17 @@
   100% { background-position: 0% 50%; }
 }
 
-@keyframes glow-pulse {
+/* unused — kept for potential future use */
+/* @keyframes glow-pulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
-}
+} */
 
-@keyframes slide-in-right {
+/* unused — kept for potential future use */
+/* @keyframes slide-in-right {
   from { opacity: 0; transform: translateX(12px); }
   to   { opacity: 1; transform: translateX(0); }
-}
+} */
 
 /* ===== Utility Classes ===== */
 .animate-fade-in {
@@ -318,9 +320,7 @@
   animation: gradient-shift 8s ease infinite;
 }
 
-.animate-glow {
-  animation: glow-pulse 2s ease-in-out infinite;
-}
+/* .animate-glow — unused, keyframe commented out above */
 
 .stagger-item {
   animation: fade-in 350ms var(--ease-out) forwards;
