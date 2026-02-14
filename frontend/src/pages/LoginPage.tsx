@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react'
-import { toast } from '@/lib/toast'
 import { AppLogo } from '@/components/shared/AppLogo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,7 +25,7 @@ export function LoginPage() {
 
   const { register, handleSubmit, setError, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    mode: 'onBlur',
+    mode: 'onTouched',
   })
 
   const onSubmit = async (data: FormData) => {
@@ -36,7 +35,6 @@ export function LoginPage() {
       navigate('/dashboard')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed'
-      toast.error(err)
       setError('root', { message })
     } finally {
       setLoading(false)
@@ -98,10 +96,17 @@ export function LoginPage() {
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
+              <button
+                type="button"
+                onClick={() => alert('Password reset is not yet available. Please contact support.')}
+                className="text-xs text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] transition-colors"
+              >
+                Forgot your password?
+              </button>
             </div>
 
             {errors.root && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg flex items-center gap-2">
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg flex items-center gap-2">
                 <AlertCircle className="size-4 shrink-0" />
                 {errors.root.message}
               </div>

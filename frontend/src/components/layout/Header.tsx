@@ -25,6 +25,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useProjectStore } from '@/stores/projectStore'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { useNotifications, useUnreadCount, useMarkRead, useClearNotifications } from '@/hooks/useNotifications'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 // ── Breadcrumb builder ──
@@ -75,20 +76,20 @@ function useBreadcrumbs(): BreadcrumbSegment[] {
 type NotifMeta = { icon: LucideIcon; color: string; bg: string; label: string; category: string }
 
 const NOTIF_TYPE_MAP: Record<string, NotifMeta> = {
-  task_assigned:    { icon: UserPlus,       color: 'text-blue-500',    bg: 'bg-blue-500/10',    label: 'Assigned',       category: 'assignments' },
-  assignee_added:   { icon: UserPlus,       color: 'text-blue-500',    bg: 'bg-blue-500/10',    label: 'Assigned',       category: 'assignments' },
-  assignee_removed: { icon: UserMinus,      color: 'text-red-400',     bg: 'bg-red-400/10',     label: 'Unassigned',     category: 'assignments' },
-  task_updated:     { icon: RefreshCw,      color: 'text-amber-500',   bg: 'bg-amber-500/10',   label: 'Updated',        category: 'updates' },
-  task_moved:       { icon: ArrowRight,     color: 'text-violet-500',  bg: 'bg-violet-500/10',  label: 'Moved',          category: 'updates' },
-  task_deleted:     { icon: Trash2,         color: 'text-red-400',     bg: 'bg-red-400/10',     label: 'Deleted',        category: 'updates' },
-  task_comment:     { icon: MessageSquare,  color: 'text-emerald-500', bg: 'bg-emerald-500/10', label: 'Comment',        category: 'comments' },
-  comment_deleted:  { icon: Trash2,         color: 'text-red-400',     bg: 'bg-red-400/10',     label: 'Comment Deleted', category: 'comments' },
-  task_reaction:    { icon: Heart,          color: 'text-pink-500',    bg: 'bg-pink-500/10',    label: 'Reaction',       category: 'reactions' },
-  mentioned:        { icon: AtSign,         color: 'text-orange-500',  bg: 'bg-orange-500/10',  label: 'Mention',        category: 'mentions' },
-  subtask_created:  { icon: ListPlus,       color: 'text-teal-500',    bg: 'bg-teal-500/10',    label: 'Subtask Added',  category: 'updates' },
-  subtask_deleted:  { icon: ListMinus,      color: 'text-red-400',     bg: 'bg-red-400/10',     label: 'Subtask Removed', category: 'updates' },
-  watcher_added:    { icon: Eye,            color: 'text-blue-400',    bg: 'bg-blue-400/10',    label: 'Watching',       category: 'watching' },
-  watcher_removed:  { icon: EyeOff,         color: 'text-zinc-400',    bg: 'bg-zinc-400/10',    label: 'Unwatched',      category: 'watching' },
+  task_assigned:    { icon: UserPlus,       color: 'text-[var(--info)]',         bg: 'bg-[var(--info-muted)]',       label: 'Assigned',       category: 'assignments' },
+  assignee_added:   { icon: UserPlus,       color: 'text-[var(--info)]',         bg: 'bg-[var(--info-muted)]',       label: 'Assigned',       category: 'assignments' },
+  assignee_removed: { icon: UserMinus,      color: 'text-destructive',           bg: 'bg-destructive/10',            label: 'Unassigned',     category: 'assignments' },
+  task_updated:     { icon: RefreshCw,      color: 'text-[var(--warning)]',      bg: 'bg-[var(--warning-muted)]',    label: 'Updated',        category: 'updates' },
+  task_moved:       { icon: ArrowRight,     color: 'text-[var(--accent-solid)]', bg: 'bg-[var(--accent-solid)]/10',  label: 'Moved',          category: 'updates' },
+  task_deleted:     { icon: Trash2,         color: 'text-destructive',           bg: 'bg-destructive/10',            label: 'Deleted',        category: 'updates' },
+  task_comment:     { icon: MessageSquare,  color: 'text-[var(--success)]',      bg: 'bg-[var(--success-muted)]',    label: 'Comment',        category: 'comments' },
+  comment_deleted:  { icon: Trash2,         color: 'text-destructive',           bg: 'bg-destructive/10',            label: 'Comment Deleted', category: 'comments' },
+  task_reaction:    { icon: Heart,          color: 'text-pink-500',              bg: 'bg-pink-500/10',               label: 'Reaction',       category: 'reactions' },
+  mentioned:        { icon: AtSign,         color: 'text-[var(--warning)]',      bg: 'bg-[var(--warning-muted)]',    label: 'Mention',        category: 'mentions' },
+  subtask_created:  { icon: ListPlus,       color: 'text-[var(--success)]',      bg: 'bg-[var(--success-muted)]',    label: 'Subtask Added',  category: 'updates' },
+  subtask_deleted:  { icon: ListMinus,      color: 'text-destructive',           bg: 'bg-destructive/10',            label: 'Subtask Removed', category: 'updates' },
+  watcher_added:    { icon: Eye,            color: 'text-[var(--info)]',         bg: 'bg-[var(--info-muted)]',       label: 'Watching',       category: 'watching' },
+  watcher_removed:  { icon: EyeOff,         color: 'text-muted-foreground',      bg: 'bg-muted/10',                  label: 'Unwatched',      category: 'watching' },
 }
 
 const FALLBACK_META: NotifMeta = { icon: Bell, color: 'text-[var(--text-tertiary)]', bg: 'bg-foreground/5', label: 'Notification', category: 'other' }
@@ -229,18 +230,24 @@ export function Header({ onMenuClick }: HeaderProps) {
   }
 
   return (
-    <header className="relative z-30 h-12 border-b border-[var(--border-subtle)] bg-background/80 backdrop-blur-xl flex items-center justify-between px-4">
+    <header className="relative z-30 h-14 border-b border-[var(--border-subtle)] bg-background/80 backdrop-blur-xl flex items-center justify-between px-4">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="md:hidden size-10 md:size-8" onClick={onMenuClick}>
+        <Button variant="ghost" size="icon" className="md:hidden size-10 md:size-8" onClick={onMenuClick} aria-label="Open sidebar menu">
           <Menu className="size-4" />
+          <span className="sr-only">Open sidebar menu</span>
         </Button>
 
-        {/* Breadcrumb */}
+        {/* Breadcrumb — mobile: show only last item; sm+: show full */}
         {breadcrumbs.length > 0 && (
-          <nav className="hidden sm:flex items-center gap-1.5 text-sm">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
+            {/* Mobile: just current page */}
+            <span className="sm:hidden text-[var(--text-primary)] font-medium truncate max-w-[180px]">
+              {breadcrumbs[breadcrumbs.length - 1].label}
+            </span>
+            {/* Desktop: full breadcrumb */}
             {breadcrumbs.map((seg, i) => (
-              <div key={seg.path} className="flex items-center gap-1.5">
-                {i > 0 && <ChevronRight className="size-3.5 text-[var(--text-tertiary)]" />}
+              <div key={seg.path} className="hidden sm:flex items-center gap-1.5">
+                {i > 0 && <ChevronRight className="size-3.5 text-[var(--text-tertiary)]" aria-hidden="true" />}
                 {i < breadcrumbs.length - 1 ? (
                   <Link
                     to={seg.path}
@@ -262,16 +269,20 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <Popover>
           <PopoverTrigger asChild>
-            <button className="relative size-10 md:size-8 inline-flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:text-foreground hover:bg-foreground/[0.08] active:bg-foreground/[0.12] active:scale-95 transition-all duration-150 cursor-pointer">
-              <Bell className="size-4" />
+            <button
+              className="relative size-10 md:size-8 inline-flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:text-foreground hover:bg-foreground/[0.08] active:bg-foreground/[0.12] active:scale-95 transition-all duration-150 cursor-pointer"
+              aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+            >
+              <Bell className="size-4" aria-hidden="true" />
               {unreadCount > 0 && (
                 <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[var(--accent-solid)] text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-background">
-                  {unreadCount > 99 ? '99+' : unreadCount}
+                  <span aria-hidden="true">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                  <span className="sr-only">{unreadCount} unread notifications</span>
                 </span>
               )}
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-[380px] p-0">
+          <PopoverContent align="end" className="w-[min(380px,calc(100vw-2rem))] p-0">
             {/* Header */}
             <div className="px-4 pt-3 pb-2">
               <div className="flex items-center justify-between mb-2.5">
@@ -348,6 +359,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             <div className="border-t border-[var(--border-subtle)]" />
 
             {/* Notification list */}
+            <TooltipProvider delayDuration={400}>
             <div className="max-h-[420px] overflow-y-auto">
               {groups.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-[var(--text-tertiary)]">
@@ -394,24 +406,15 @@ export function Header({ onMenuClick }: HeaderProps) {
                         const boardId = n.data?.board_id as string | undefined
                         const isClickable = !!(taskId && boardId && n.project_id)
 
-                        return (
-                          <div
-                            key={n.id}
-                            onClick={() => handleNotifClick(n)}
-                            className={cn(
-                              'group flex gap-3 px-4 py-2.5 transition-colors',
-                              !n.is_read && 'bg-[var(--accent-solid)]/[0.03]',
-                              isClickable && 'cursor-pointer hover:bg-foreground/[0.04]',
-                              isMulti && 'pl-8',
-                            )}
-                          >
+                        const notifContent = (
+                          <>
                             {/* Type icon */}
-                            <div className={cn('mt-0.5 flex-shrink-0 size-7 rounded-lg flex items-center justify-center', meta.bg)}>
+                            <div className={cn('mt-0.5 flex-shrink-0 size-7 rounded-lg flex items-center justify-center', meta.bg)} aria-hidden="true">
                               <Icon className={cn('size-3.5', meta.color)} />
                             </div>
 
                             {/* Content */}
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 text-left">
                               <div className="flex items-center gap-1.5">
                                 <span className={cn(
                                   'text-[10px] font-semibold uppercase tracking-wider',
@@ -423,7 +426,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                                   {timeAgo(n.created_at)}
                                 </span>
                                 {!n.is_read && (
-                                  <span className="size-1.5 rounded-full bg-[var(--accent-solid)] flex-shrink-0" />
+                                  <span className="size-1.5 rounded-full bg-[var(--accent-solid)] flex-shrink-0" aria-hidden="true" />
                                 )}
                               </div>
                               <p className={cn(
@@ -432,9 +435,16 @@ export function Header({ onMenuClick }: HeaderProps) {
                               )}>
                                 {n.title}
                               </p>
-                              <p className="text-xs text-[var(--text-tertiary)] mt-0.5 line-clamp-2 leading-relaxed">
-                                {n.message}
-                              </p>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-xs text-[var(--text-tertiary)] mt-0.5 line-clamp-2 leading-relaxed">
+                                    {n.message}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-[300px]">
+                                  {n.message}
+                                </TooltipContent>
+                              </Tooltip>
                             </div>
 
                             {/* Mark read */}
@@ -442,11 +452,41 @@ export function Header({ onMenuClick }: HeaderProps) {
                               <button
                                 onClick={(e) => { e.stopPropagation(); markRead.mutate({ ids: [n.id] }) }}
                                 className="mt-1 flex-shrink-0 opacity-0 group-hover:opacity-100 text-[var(--text-tertiary)] hover:text-foreground transition-all"
-                                title="Mark as read"
+                                aria-label="Mark as read"
                               >
-                                <Check className="size-3.5" />
+                                <Check className="size-3.5" aria-hidden="true" />
                               </button>
                             )}
+                          </>
+                        )
+
+                        if (isClickable) {
+                          return (
+                            <button
+                              key={n.id}
+                              onClick={() => handleNotifClick(n)}
+                              className={cn(
+                                'group w-full flex gap-3 px-4 py-2.5 transition-colors cursor-pointer hover:bg-foreground/[0.04] focus-visible:outline-2 focus-visible:outline-[var(--accent-solid)] focus-visible:outline-offset-[-2px]',
+                                !n.is_read && 'bg-[var(--accent-solid)]/[0.03]',
+                                isMulti && 'pl-8',
+                              )}
+                              aria-label={`${meta.label}: ${n.title}`}
+                            >
+                              {notifContent}
+                            </button>
+                          )
+                        }
+
+                        return (
+                          <div
+                            key={n.id}
+                            className={cn(
+                              'group flex gap-3 px-4 py-2.5 transition-colors',
+                              !n.is_read && 'bg-[var(--accent-solid)]/[0.03]',
+                              isMulti && 'pl-8',
+                            )}
+                          >
+                            {notifContent}
                           </div>
                         )
                       })}
@@ -455,12 +495,13 @@ export function Header({ onMenuClick }: HeaderProps) {
                 })
               )}
             </div>
+            </TooltipProvider>
           </PopoverContent>
         </Popover>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="relative size-10 md:size-8 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-foreground/[0.12] active:ring-foreground/[0.2] active:scale-95 transition-all duration-150 cursor-pointer">
+            <button className="relative size-10 md:size-8 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-foreground/[0.12] active:ring-foreground/[0.2] active:scale-95 transition-all duration-150 cursor-pointer" aria-label="User menu">
               <Avatar size="sm">
                 <AvatarImage src={user?.avatar_url || undefined} />
                 <AvatarFallback className="text-xs bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">

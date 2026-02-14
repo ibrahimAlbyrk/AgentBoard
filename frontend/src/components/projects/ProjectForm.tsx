@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -33,6 +34,7 @@ interface ProjectFormProps {
 }
 
 export function ProjectForm({ open, onClose, project }: ProjectFormProps) {
+  const navigate = useNavigate()
   const createProject = useCreateProject()
   const updateProject = useUpdateProject()
   const isEditing = !!project
@@ -66,8 +68,14 @@ export function ProjectForm({ open, onClose, project }: ProjectFormProps) {
         await updateProject.mutateAsync({ projectId: project.id, data })
         toast.success('Project updated')
       } else {
-        await createProject.mutateAsync(data)
+        const res = await createProject.mutateAsync(data)
         toast.success('Project created')
+        if (res?.data?.id) {
+          reset({ name: '', description: '', icon: '', color: '#6366f1' })
+          onClose()
+          navigate(`/projects/${res.data.id}`)
+          return
+        }
       }
       reset({ name: '', description: '', icon: '', color: '#6366f1' })
       onClose()

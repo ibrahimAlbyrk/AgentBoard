@@ -5,8 +5,6 @@ import { cn } from '@/lib/utils'
 import { AppLogo } from '@/components/shared/AppLogo'
 import { useProjects } from '@/hooks/useProjects'
 import { useBoards } from '@/hooks/useBoards'
-import { useAuthStore } from '@/stores/authStore'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Project } from '@/types'
 
@@ -137,13 +135,17 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse, onOpenCo
   const location = useLocation()
   const { data: projectsRes } = useProjects()
   const projects = projectsRes?.data ?? []
-  const user = useAuthStore((s) => s.user)
   const [search, setSearch] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
+
+  const [showAll, setShowAll] = useState(false)
 
   const filteredProjects = projects.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   )
+  const PROJECT_LIMIT = 10
+  const displayedProjects = showAll || search ? filteredProjects : filteredProjects.slice(0, PROJECT_LIMIT)
+  const hasMore = !search && filteredProjects.length > PROJECT_LIMIT && !showAll
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -175,8 +177,25 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse, onOpenCo
           )}
         </div>
 
-        {/* Search — hidden when collapsed */}
-        {!collapsed && (
+        {/* Search — collapsed: icon opens command palette; expanded: filter input */}
+        {collapsed ? (
+          <div className="px-3 pt-3 pb-1 flex justify-center">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onOpenCommandPalette?.()}
+                  className="size-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--sidebar-hover)] transition-all"
+                  aria-label="Open search"
+                >
+                  <Search className="size-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                Search
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        ) : (
           <div className="px-3 pt-3 pb-1">
             <div className="flex items-center gap-2 px-3 h-8 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-sm focus-within:border-[var(--accent-solid)] hover:border-[var(--border-strong)] transition-colors">
               <Search className="size-3.5 text-[var(--text-tertiary)] flex-shrink-0" />
@@ -185,7 +204,7 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse, onOpenCo
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
+                placeholder="Filter projects..."
                 className="flex-1 bg-transparent text-foreground placeholder:text-[var(--text-tertiary)] outline-none text-sm min-w-0"
               />
               {search ? (
@@ -217,7 +236,9 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse, onOpenCo
               </p>
             )}
             {navItems.map(({ to, icon: Icon, label }) => {
-              const active = location.pathname === to || (to === '/projects' && location.pathname.startsWith('/projects'))
+              const active = to === '/projects'
+                ? location.pathname === '/projects'
+                : location.pathname === to
 
               if (collapsed) {
                 return (
@@ -281,26 +302,33 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse, onOpenCo
               )}
               {collapsed ? (
                 <div className="flex flex-col items-center gap-0.5">
-                  {filteredProjects.map((p) => (
+                  {displayedProjects.map((p) => (
                     <SidebarProjectItem key={p.id} project={p} onClose={onClose} collapsed />
                   ))}
                 </div>
               ) : (
                 <div className="max-h-[320px] overflow-y-auto space-y-0.5">
-                  {filteredProjects.map((p) => (
+                  {displayedProjects.map((p) => (
                     <SidebarProjectItem key={p.id} project={p} onClose={onClose} />
                   ))}
+                  {hasMore && (
+                    <button
+                      onClick={() => setShowAll(true)}
+                      className="w-full px-3 py-1.5 text-[12px] text-[var(--accent-solid)] hover:underline text-left cursor-pointer"
+                    >
+                      Show all ({filteredProjects.length})
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           )}
         </nav>
 
-        {/* Bottom area: collapse toggle + user */}
+        {/* Bottom area: collapse toggle */}
         <div className="border-t border-[var(--sidebar-border)] flex-shrink-0">
-          {/* Collapse toggle — hidden on mobile overlay */}
           {onToggleCollapse && (
-            <div className={cn('px-3 pt-2', collapsed && 'flex justify-center')}>
+            <div className={cn('px-3 py-2', collapsed && 'flex justify-center')}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -309,64 +337,20 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse, onOpenCo
                       'size-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--sidebar-hover)] transition-all',
                       !collapsed && 'ml-auto'
                     )}
+                    aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                   >
                     {collapsed ? (
-                      <ChevronRight className="size-4" />
+                      <ChevronRight className="size-4" aria-hidden="true" />
                     ) : (
-                      <ChevronLeft className="size-4" />
+                      <ChevronLeft className="size-4" aria-hidden="true" />
                     )}
+                    <span className="sr-only">{collapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side={collapsed ? 'right' : 'top'} sideOffset={8}>
                   {collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 </TooltipContent>
               </Tooltip>
-            </div>
-          )}
-
-          {/* User */}
-          {user && (
-            <div className="p-3">
-              {collapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link
-                      to="/settings"
-                      onClick={onClose}
-                      className="flex justify-center"
-                    >
-                      <Avatar className="size-8">
-                        <AvatarImage src={user.avatar_url || undefined} />
-                        <AvatarFallback className="text-xs bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
-                          {(user.full_name || user.username).charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" sideOffset={8}>
-                    {user.full_name || user.username}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Link
-                  to="/settings"
-                  onClick={onClose}
-                  className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-[var(--sidebar-hover)] transition-colors"
-                >
-                  <Avatar className="size-7">
-                    <AvatarImage src={user.avatar_url || undefined} />
-                    <AvatarFallback className="text-xs bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
-                      {(user.full_name || user.username).charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-foreground truncate">
-                      {user.full_name || user.username}
-                    </p>
-                    <p className="text-[11px] text-[var(--text-tertiary)] truncate">{user.email}</p>
-                  </div>
-                </Link>
-              )}
             </div>
           )}
         </div>

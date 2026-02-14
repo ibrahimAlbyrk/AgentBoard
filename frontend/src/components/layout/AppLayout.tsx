@@ -38,6 +38,7 @@ export function AppLayout() {
         <div
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden transition-opacity duration-150"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 

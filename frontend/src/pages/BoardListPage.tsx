@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, LayoutGrid, ListTodo, Users, Trash2, Pencil, MoreHorizontal, ArrowRight, Bot, Settings } from 'lucide-react'
+import { Plus, LayoutGrid, ListTodo, Users, Trash2, Pencil, MoreHorizontal, ArrowRight, Bot, Settings, SlidersHorizontal, FolderX } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,7 +33,6 @@ import { useProject } from '@/hooks/useProjects'
 import { useCreateBoard, useUpdateBoard, useDeleteBoard } from '@/hooks/useBoards'
 import { AgentManager } from '@/components/agents/AgentManager'
 import { ColorPicker } from '@/components/shared/ColorPicker'
-import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { Board } from '@/types'
 
@@ -53,15 +52,78 @@ export function BoardListPage() {
   const [editColor, setEditColor] = useState('#3B82F6')
   const [showAgents, setShowAgents] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Board | null>(null)
-
-  if (isLoading) return <LoadingSpinner text="Loading project..." />
+  const [boardSort, setBoardSort] = useState<'name' | 'tasks' | 'updated'>('name')
 
   const project = projectRes?.data
-  if (!project) {
-    return <div className="text-center py-16 text-[var(--text-secondary)]">Project not found</div>
+  const boards = project?.boards ?? []
+
+  const sortedBoards = useMemo(() => {
+    const list = [...boards]
+    switch (boardSort) {
+      case 'name':
+        return list.sort((a, b) => a.name.localeCompare(b.name))
+      case 'tasks':
+        return list.sort((a, b) => (b.task_count ?? 0) - (a.task_count ?? 0))
+      case 'updated':
+        return list.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      default:
+        return list
+    }
+  }, [boards, boardSort])
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="size-8 skeleton rounded-lg" />
+            <div className="space-y-1.5">
+              <div className="h-5 w-40 skeleton" />
+              <div className="h-3 w-64 skeleton" />
+            </div>
+          </div>
+          <div className="h-9 w-28 skeleton rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-card border border-[var(--border-subtle)] rounded-2xl overflow-hidden">
+              <div className="h-1.5 skeleton rounded-none" />
+              <div className="p-5 space-y-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="size-11 skeleton rounded-xl" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-4 w-3/4 skeleton" />
+                    <div className="h-3 w-1/2 skeleton" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <div className="h-6 w-14 skeleton rounded-full" />
+                  <div className="h-6 w-14 skeleton rounded-full" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
-  const boards = project.boards ?? []
+  if (!project) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="size-14 rounded-2xl bg-[var(--destructive)]/8 flex items-center justify-center mb-5">
+          <FolderX className="size-6 text-[var(--destructive)]" />
+        </div>
+        <h1 className="text-base font-semibold text-foreground mb-1">Project not found</h1>
+        <p className="text-[13px] text-[var(--text-secondary)] mb-5 max-w-xs">
+          This project may have been deleted or you don&apos;t have access.
+        </p>
+        <Button onClick={() => navigate('/dashboard')} className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)]">
+          Go to Dashboard
+        </Button>
+      </div>
+    )
+  }
 
   const handleCreate = async () => {
     if (!boardName.trim()) return
@@ -110,7 +172,7 @@ export function BoardListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="text-2xl">{project.icon || '📋'}</span>
           <div>
@@ -120,7 +182,23 @@ export function BoardListPage() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-[13px] text-[var(--text-secondary)]">
+                <SlidersHorizontal className="size-3.5" />
+                Sort: {{ name: 'Name', tasks: 'Tasks', updated: 'Last Updated' }[boardSort]}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              {(['name', 'tasks', 'updated'] as const).map((key) => (
+                <DropdownMenuItem key={key} onClick={() => setBoardSort(key)}>
+                  {{ name: 'Name', tasks: 'Task Count', updated: 'Last Updated' }[key]}
+                  {boardSort === key && <span className="ml-auto text-[var(--accent-solid)]">&#8226;</span>}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="outline"
             onClick={() => setShowAgents(true)}
@@ -208,7 +286,7 @@ export function BoardListPage() {
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {boards.map((board) => {
+          {sortedBoards.map((board) => {
             const color = board.color || '#3B82F6'
             const rgb = hexToRgb(color)
             return (
@@ -234,7 +312,7 @@ export function BoardListPage() {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-[16px] text-foreground truncate leading-tight">{board.name}</h3>
+                      <h2 className="font-semibold text-base text-foreground truncate leading-tight">{board.name}</h2>
                       {board.description && (
                         <p className="text-[13px] text-[var(--text-secondary)] line-clamp-2 mt-1">{board.description}</p>
                       )}
@@ -360,7 +438,7 @@ export function BoardListPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmedDelete} className="bg-red-500 hover:bg-red-600">
+            <AlertDialogAction onClick={handleConfirmedDelete} className="bg-destructive hover:bg-destructive/90">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

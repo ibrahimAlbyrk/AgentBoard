@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { hexToRgb } from '@/lib/utils'
+import { cn, hexToRgb } from '@/lib/utils'
 import type { Project } from '@/types'
 
 interface ProjectCardProps {
@@ -48,7 +48,10 @@ export function ProjectCard({ project, onEdit, onArchive, onDelete }: ProjectCar
 
   return (
     <div
-      className="stagger-item group relative bg-card rounded-2xl cursor-pointer overflow-hidden transition-all duration-300 border border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
+      className={cn(
+        'stagger-item group relative bg-card rounded-2xl cursor-pointer overflow-hidden transition-all duration-300 border border-[var(--border-subtle)] hover:border-[var(--border-strong)]',
+        project.is_archived && 'opacity-60',
+      )}
       onClick={() => navigate(`/projects/${project.id}`)}
       style={{
         '--project-color': color,

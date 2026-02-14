@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FolderKanban, Plus, Search, SlidersHorizontal, Archive, ArchiveRestore } from 'lucide-react'
 import { toast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
@@ -23,8 +24,8 @@ import { useProjects, useDeleteProject } from '@/hooks/useProjects'
 import { api } from '@/lib/api-client'
 import { ProjectCard } from '@/components/projects/ProjectCard'
 import { ProjectForm } from '@/components/projects/ProjectForm'
-import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { PageHeader } from '@/components/shared/PageHeader'
 import type { Project } from '@/types'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -37,12 +38,30 @@ const SORT_LABELS: Record<SortKey, string> = {
 }
 
 export function ProjectsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [showCreate, setShowCreate] = useState(false)
   const [editProject, setEditProject] = useState<Project | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null)
   const [showArchived, setShowArchived] = useState(false)
-  const [search, setSearch] = useState('')
-  const [sort, setSort] = useState<SortKey>('recent')
+
+  const search = searchParams.get('q') ?? ''
+  const sort = (searchParams.get('sort') as SortKey) || 'recent'
+
+  const setSearch = useCallback((value: string) => {
+    setSearchParams((prev) => {
+      if (value) prev.set('q', value)
+      else prev.delete('q')
+      return prev
+    }, { replace: true })
+  }, [setSearchParams])
+
+  const setSort = useCallback((value: SortKey) => {
+    setSearchParams((prev) => {
+      if (value !== 'recent') prev.set('sort', value)
+      else prev.delete('sort')
+      return prev
+    }, { replace: true })
+  }, [setSearchParams])
 
   const { data: projectsRes, isLoading } = useProjects({ include_archived: showArchived })
   const projects = projectsRes?.data ?? []
@@ -109,29 +128,53 @@ export function ProjectsPage() {
     }
   }
 
-  if (isLoading) return <LoadingSpinner text="Loading projects..." />
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <div className="h-7 w-32 skeleton" />
+            <div className="h-4 w-56 skeleton mt-2" />
+          </div>
+          <div className="h-9 w-32 skeleton rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-card border border-[var(--border-subtle)] rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="size-10 skeleton rounded-xl" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-4 w-3/4 skeleton" />
+                  <div className="h-3 w-1/2 skeleton" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="h-6 w-16 skeleton rounded-full" />
+                <div className="h-6 w-16 skeleton rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[26px] font-bold tracking-tight">Projects</h1>
-          <p className="text-[var(--text-secondary)] text-sm mt-0.5">
-            Manage and organize your team's work
-          </p>
-        </div>
+      <PageHeader title="Projects" description="Manage and organize your team's work">
         <Button
+          variant="accent"
           onClick={() => setShowCreate(true)}
-          className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)] shadow-[0_0_16px_-4px_var(--glow)] transition-all"
+          className="shadow-[0_0_16px_-4px_var(--glow)] transition-all"
         >
           <Plus className="size-4" />
           New Project
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Toolbar: search + filters */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[var(--text-tertiary)]" />
           <Input
@@ -223,7 +266,7 @@ export function ProjectsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmedDelete} className="bg-red-500 hover:bg-red-600">
+            <AlertDialogAction onClick={handleConfirmedDelete} className="bg-destructive hover:bg-destructive/90">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

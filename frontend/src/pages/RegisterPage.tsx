@@ -26,6 +26,19 @@ const schema = z
 
 type FormData = z.infer<typeof schema>
 
+function getPasswordStrength(password: string): { level: number; label: string; color: string } {
+  let score = 0
+  if (password.length >= 8) score++
+  if (/[A-Z]/.test(password)) score++
+  if (/[0-9]/.test(password)) score++
+  if (/[^A-Za-z0-9]/.test(password)) score++
+
+  if (score <= 1) return { level: 1, label: 'Weak', color: 'bg-red-500' }
+  if (score <= 2) return { level: 2, label: 'Medium', color: 'bg-yellow-500' }
+  if (score <= 3) return { level: 3, label: 'Strong', color: 'bg-green-500' }
+  return { level: 4, label: 'Very strong', color: 'bg-emerald-400' }
+}
+
 export function RegisterPage() {
   const navigate = useNavigate()
   const registerUser = useAuthStore((s) => s.register)
@@ -33,10 +46,13 @@ export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
 
-  const { register, handleSubmit, setError, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setError, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     mode: 'onBlur',
   })
+
+  const passwordValue = watch('password', '')
+  const strength = passwordValue ? getPasswordStrength(passwordValue) : null
 
   const onSubmit = async (data: FormData) => {
     setLoading(true)
@@ -47,10 +63,10 @@ export function RegisterPage() {
         full_name: data.full_name,
         password: data.password,
       })
-      navigate('/dashboard')
+      toast.success('Welcome to AgentBoard! Redirecting...')
+      setTimeout(() => navigate('/dashboard'), 800)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Registration failed'
-      toast.error(err)
       setError('root', { message })
     } finally {
       setLoading(false)
@@ -110,7 +126,7 @@ export function RegisterPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-[var(--text-secondary)] text-xs font-medium uppercase tracking-wider">Password</Label>
                 <div className="relative">
@@ -155,8 +171,24 @@ export function RegisterPage() {
               </div>
             </div>
 
+            {strength && (
+              <div className="space-y-1.5">
+                <div className="flex gap-1 h-1.5">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 rounded-full transition-colors ${
+                        i <= strength.level ? strength.color : 'bg-[var(--border-subtle)]'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-[var(--text-tertiary)]">{strength.label}</p>
+              </div>
+            )}
+
             {errors.root && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg flex items-center gap-2">
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg flex items-center gap-2">
                 <AlertCircle className="size-4 shrink-0" />
                 {errors.root.message}
               </div>
