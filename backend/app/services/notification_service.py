@@ -74,6 +74,9 @@ class NotificationService:
         db.add(notif)
         await db.flush()
 
+        # Broadcast real-time notification via WebSocket
+        await NotificationService._broadcast_to_user(user_id)
+
         # trigger email if user opted in
         prefs = await NotificationService.get_user_prefs(db, user_id)
         if prefs.email_enabled and prefs.email_digest == "instant":
@@ -85,6 +88,15 @@ class NotificationService:
                 )
 
         return notif
+
+    @staticmethod
+    async def _broadcast_to_user(user_id: UUID) -> None:
+        """Send notification.new event to user's WS channel."""
+        try:
+            from app.services.websocket_manager import manager
+            await manager.broadcast_to_user(str(user_id), {"type": "notification.new"})
+        except Exception:
+            logger.debug("WS broadcast failed for user %s (not connected?)", user_id)
 
     @staticmethod
     def _dispatch_email(*, to: str, title: str, message: str, notification_type: str) -> None:

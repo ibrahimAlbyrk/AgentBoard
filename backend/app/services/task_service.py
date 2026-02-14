@@ -637,6 +637,24 @@ class TaskService:
                     f'{updater_name} updated "{task.title}" — {detail}',
                 )
 
+        # Notify parent task's assignees/watchers about subtask changes
+        if has_changes and refreshed and refreshed.parent_id:
+            parent_with_rels = await crud_task.get_with_relations(db, refreshed.parent_id)
+            if parent_with_rels:
+                updater = updater or await crud_user.get(db, user_id)
+                updater_name = (updater.full_name or updater.username) if updater else "Someone"
+                detail = _describe_changes(changes)
+                await _notify_assignees(
+                    db, parent_with_rels, user_id,
+                    "task_updated", "Subtask Updated",
+                    f'{updater_name} updated subtask "{task.title}" — {detail}',
+                )
+                await _notify_watchers(
+                    db, parent_with_rels, user_id,
+                    "task_updated", "Watching: Subtask Updated",
+                    f'{updater_name} updated subtask "{task.title}" — {detail}',
+                )
+
         # Notify newly @mentioned users
         if newly_mentioned_ids:
             mention_updater = await crud_user.get(db, user_id)
@@ -725,6 +743,21 @@ class TaskService:
                 "task_moved", "Watching: Task Moved",
                 f'{mover_name} moved "{task.title}" to {new_status_name}',
             )
+
+        # Notify parent task's assignees/watchers about subtask status change
+        if refreshed and refreshed.parent_id:
+            parent_with_rels = await crud_task.get_with_relations(db, refreshed.parent_id)
+            if parent_with_rels:
+                await _notify_assignees(
+                    db, parent_with_rels, user_id,
+                    "task_updated", "Subtask Moved",
+                    f'{mover_name} moved subtask "{task.title}" to {new_status_name}',
+                )
+                await _notify_watchers(
+                    db, parent_with_rels, user_id,
+                    "task_updated", "Watching: Subtask Moved",
+                    f'{mover_name} moved subtask "{task.title}" to {new_status_name}',
+                )
 
         task_id = task.id
         await db.commit()

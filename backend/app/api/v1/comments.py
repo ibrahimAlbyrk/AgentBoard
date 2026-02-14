@@ -15,7 +15,6 @@ from app.schemas.comment import CommentCreate, CommentResponse, CommentUpdate
 from app.services.content_service import extract_mentions, extract_plain_text, normalize_content
 from app.services.notification_service import NotificationService
 from app.services.reaction_service import ReactionService
-from app.services.websocket_manager import manager
 
 router = APIRouter(
     prefix="/projects/{project_id}/boards/{board_id}/tasks/{task_id}/comments",
@@ -137,9 +136,6 @@ async def create_comment(
         )
         if notif:
             notified_uids.add(str(assignee.user_id))
-            await manager.broadcast_to_user(str(assignee.user_id), {
-                "type": "notification.new",
-            })
     # Notify watchers (skip already notified assignees and self)
     for watcher in task.watchers:
         if not watcher.user_id or watcher.user_id == actor.user.id:
@@ -158,9 +154,6 @@ async def create_comment(
         )
         if notif:
             notified_uids.add(str(watcher.user_id))
-            await manager.broadcast_to_user(str(watcher.user_id), {
-                "type": "notification.new",
-            })
 
     # Notify @mentioned users in comment
     if content_doc:
@@ -181,8 +174,6 @@ async def create_comment(
                 message=f'{commenter_name} mentioned you in a comment on "{task.title}"',
                 data={"task_id": str(task_id), "board_id": str(board.id)},
             )
-            if notif:
-                await manager.broadcast_to_user(uid_str, {"type": "notification.new"})
 
     await NotificationService.fire_webhooks(
         db, board.project_id, "comment.created",
@@ -243,8 +234,6 @@ async def update_comment(
                 message=f'{commenter_name} mentioned you in a comment on "{task.title if task else "a task"}"',
                 data={"task_id": str(task_id), "board_id": str(board.id)},
             )
-            if notif:
-                await manager.broadcast_to_user(uid_str, {"type": "notification.new"})
 
     return ResponseBase(data=CommentResponse.model_validate(comment))
 
@@ -292,7 +281,6 @@ async def delete_comment(
             )
             if notif:
                 notified_uids.add(str(a.user_id))
-                await manager.broadcast_to_user(str(a.user_id), {"type": "notification.new"})
         for w in task.watchers:
             if not w.user_id or w.user_id == current_user.id or str(w.user_id) in notified_uids:
                 continue
@@ -308,7 +296,6 @@ async def delete_comment(
             )
             if notif:
                 notified_uids.add(str(w.user_id))
-                await manager.broadcast_to_user(str(w.user_id), {"type": "notification.new"})
 
     await ReactionService.delete_reactions_for_entity(db, "comment", comment_id)
     await crud_comment.remove(db, id=comment_id)
