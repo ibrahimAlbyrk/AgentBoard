@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation, useParams, Link } from 'react-router-dom'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import {
   Bell, LogOut, User, Menu, Check, CheckCheck, Trash2,
   UserPlus, UserMinus, RefreshCw, ArrowRight, MessageSquare,
-  Heart, AtSign, ListPlus, ListMinus, Eye, EyeOff, ChevronDown,
+  Heart, AtSign, ListPlus, ListMinus, Eye, EyeOff, ChevronDown, ChevronRight,
   Filter, type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -22,9 +22,53 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { useAuthStore } from '@/stores/authStore'
+import { useProjectStore } from '@/stores/projectStore'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { useNotifications, useUnreadCount, useMarkRead, useClearNotifications } from '@/hooks/useNotifications'
 import { cn } from '@/lib/utils'
+
+// ── Breadcrumb builder ──
+
+interface BreadcrumbSegment {
+  label: string
+  path: string
+}
+
+function useBreadcrumbs(): BreadcrumbSegment[] {
+  const location = useLocation()
+  const { projectId, boardId } = useParams()
+  const currentProject = useProjectStore((s) => s.currentProject)
+  const currentBoard = useProjectStore((s) => s.currentBoard)
+
+  return useMemo(() => {
+    const path = location.pathname
+    const segments: BreadcrumbSegment[] = []
+
+    if (path === '/dashboard' || path === '/') {
+      segments.push({ label: 'Dashboard', path: '/dashboard' })
+    } else if (path === '/settings') {
+      segments.push({ label: 'Settings', path: '/settings' })
+    } else if (path.startsWith('/projects')) {
+      segments.push({ label: 'Projects', path: '/projects' })
+
+      if (projectId) {
+        const projectName = currentProject?.id === projectId
+          ? currentProject.name
+          : 'Project'
+        segments.push({ label: projectName, path: `/projects/${projectId}` })
+
+        if (boardId) {
+          const boardName = currentBoard?.id === boardId
+            ? currentBoard.name
+            : 'Board'
+          segments.push({ label: boardName, path: `/projects/${projectId}/boards/${boardId}` })
+        }
+      }
+    }
+
+    return segments
+  }, [location.pathname, projectId, boardId, currentProject, currentBoard])
+}
 
 // ── Notification type → icon + color mapping ──
 
@@ -95,9 +139,8 @@ function groupNotifications(items: NotifItem[]): NotifGroup[] {
   let current: NotifGroup | null = null
 
   for (const item of items) {
-    const taskId = (item.data?.task_id as string) ?? null
-    // Group consecutive items with same task_id (only if task_id exists)
-    if (taskId && current?.taskId === taskId) {
+    const taskId: string | null = (item.data?.task_id as string) ?? null
+    if (taskId !== null && current !== null && current.taskId === taskId) {
       current.items.push(item)
       if (!item.is_read) current.hasUnread = true
     } else {
@@ -136,6 +179,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { data: unreadData } = useUnreadCount()
   const markRead = useMarkRead()
   const clearAll = useClearNotifications()
+  const breadcrumbs = useBreadcrumbs()
 
   const [tab, setTab] = useState<'all' | 'unread'>('all')
   const [category, setCategory] = useState<FilterKey>('all')
@@ -187,9 +231,30 @@ export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="relative z-30 h-12 border-b border-[var(--border-subtle)] bg-background/80 backdrop-blur-xl flex items-center justify-between px-4">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="md:hidden size-8" onClick={onMenuClick}>
+        <Button variant="ghost" size="icon" className="md:hidden size-10 md:size-8" onClick={onMenuClick}>
           <Menu className="size-4" />
         </Button>
+
+        {/* Breadcrumb */}
+        {breadcrumbs.length > 0 && (
+          <nav className="hidden sm:flex items-center gap-1.5 text-sm">
+            {breadcrumbs.map((seg, i) => (
+              <div key={seg.path} className="flex items-center gap-1.5">
+                {i > 0 && <ChevronRight className="size-3.5 text-[var(--text-tertiary)]" />}
+                {i < breadcrumbs.length - 1 ? (
+                  <Link
+                    to={seg.path}
+                    className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    {seg.label}
+                  </Link>
+                ) : (
+                  <span className="text-[var(--text-primary)] font-medium">{seg.label}</span>
+                )}
+              </div>
+            ))}
+          </nav>
+        )}
       </div>
 
       <div className="flex items-center gap-1.5">
@@ -197,7 +262,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <Popover>
           <PopoverTrigger asChild>
-            <button className="relative size-8 inline-flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:text-foreground hover:bg-foreground/[0.08] active:bg-foreground/[0.12] active:scale-95 transition-all duration-150 cursor-pointer">
+            <button className="relative size-10 md:size-8 inline-flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:text-foreground hover:bg-foreground/[0.08] active:bg-foreground/[0.12] active:scale-95 transition-all duration-150 cursor-pointer">
               <Bell className="size-4" />
               {unreadCount > 0 && (
                 <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[var(--accent-solid)] text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-background">
@@ -395,7 +460,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="relative size-8 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-foreground/[0.12] active:ring-foreground/[0.2] active:scale-95 transition-all duration-150 cursor-pointer">
+            <button className="relative size-10 md:size-8 inline-flex items-center justify-center rounded-full hover:ring-2 hover:ring-foreground/[0.12] active:ring-foreground/[0.2] active:scale-95 transition-all duration-150 cursor-pointer">
               <Avatar size="sm">
                 <AvatarImage src={user?.avatar_url || undefined} />
                 <AvatarFallback className="text-xs bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
