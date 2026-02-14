@@ -1,5 +1,5 @@
 import { formatDistanceToNow, parseISO } from 'date-fns'
-import { Plus, Pencil, ArrowRight, Trash2, MessageSquare, Paperclip } from 'lucide-react'
+import { Plus, Pencil, ArrowRight, Trash2, MessageSquare, Paperclip, Clock } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useTaskActivity } from '@/hooks/useActivity'
 import type { ActivityLog } from '@/types'
@@ -127,10 +127,10 @@ function formatChanges(log: ActivityLog): string {
 function ActionIcon({ action }: { action: string }) {
   const Icon = actionIcons[action] ?? Pencil
   const colors: Record<string, string> = {
-    created: 'bg-emerald-500/15 text-emerald-500',
-    updated: 'bg-blue-500/15 text-blue-500',
+    created: 'bg-[var(--success)]/15 text-[var(--success)]',
+    updated: 'bg-[var(--info)]/15 text-[var(--info)]',
     moved: 'bg-amber-500/15 text-amber-500',
-    deleted: 'bg-red-500/15 text-red-500',
+    deleted: 'bg-destructive/15 text-destructive',
     commented: 'bg-violet-500/15 text-violet-500',
     attached: 'bg-cyan-500/15 text-cyan-500',
   }
@@ -147,17 +147,29 @@ export function TaskActivity({ projectId, taskId }: TaskActivityProps) {
 
   if (isLoading) {
     return (
-      <p className="text-sm text-[var(--text-tertiary)] text-center py-4">
-        Loading activity...
-      </p>
+      <div className="space-y-3 py-2">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="flex gap-3 py-3">
+            <div className="size-7 skeleton rounded-full shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="h-3.5 w-20 skeleton" />
+                <div className="h-3 w-16 skeleton" />
+              </div>
+              <div className="h-3 w-3/4 skeleton" />
+            </div>
+          </div>
+        ))}
+      </div>
     )
   }
 
   if (logs.length === 0) {
     return (
-      <p className="text-sm text-[var(--text-tertiary)] text-center py-4">
-        No activity yet
-      </p>
+      <div className="flex flex-col items-center gap-2 py-8 text-[var(--text-tertiary)]">
+        <Clock className="size-8 opacity-40" />
+        <p className="text-sm">No activity recorded yet.</p>
+      </div>
     )
   }
 

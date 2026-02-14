@@ -1,19 +1,15 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { formatDistanceToNow, parseISO } from 'date-fns'
-import { Upload, File, Trash2, Download, X, Loader2 } from 'lucide-react'
+import { Upload, File, Trash2, Download, Loader2, Paperclip } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAttachments, useUploadAttachment, useDeleteAttachment } from '@/hooks/useAttachments'
 import { useAuthStore } from '@/stores/authStore'
+import { ImageLightbox } from '@/components/shared/ImageLightbox'
+import { formatFileSize } from '@/lib/format'
 import type { Attachment } from '@/types'
 import { toast } from '@/lib/toast'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 interface TaskAttachmentsProps {
   projectId: string
@@ -56,19 +52,6 @@ export function TaskAttachments({ projectId, boardId, taskId }: TaskAttachmentsP
     })
   }
 
-  useEffect(() => {
-    if (!lightboxSrc) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        e.preventDefault()
-        setLightboxSrc(null)
-      }
-    }
-    document.addEventListener('keydown', handler, true)
-    return () => document.removeEventListener('keydown', handler, true)
-  }, [lightboxSrc])
-
   const isImage = (mime: string) => mime.startsWith('image/')
 
   return (
@@ -110,11 +93,24 @@ export function TaskAttachments({ projectId, boardId, taskId }: TaskAttachmentsP
       </div>
 
       {isLoading && (
-        <p className="text-sm text-[var(--text-tertiary)] text-center py-4">Loading attachments...</p>
+        <div className="space-y-2">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border-subtle)]">
+              <div className="size-10 skeleton rounded-lg shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3.5 w-32 skeleton" />
+                <div className="h-2.5 w-48 skeleton" />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {attachments.length === 0 && !isLoading && (
-        <p className="text-sm text-[var(--text-tertiary)] text-center py-4">No attachments yet</p>
+        <div className="flex flex-col items-center gap-2 py-6 text-[var(--text-tertiary)]">
+          <Paperclip className="size-8 opacity-40" />
+          <p className="text-sm">No files attached. Drag and drop or click to upload.</p>
+        </div>
       )}
 
       {/* File list */}
@@ -183,26 +179,7 @@ export function TaskAttachments({ projectId, boardId, taskId }: TaskAttachmentsP
         ))}
       </div>
 
-      {/* Lightbox */}
-      {lightboxSrc && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm"
-          onClick={() => setLightboxSrc(null)}
-        >
-          <button
-            className="absolute top-4 right-4 size-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-            onClick={() => setLightboxSrc(null)}
-          >
-            <X className="size-5" />
-          </button>
-          <img
-            src={lightboxSrc}
-            alt="Preview"
-            className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   )
 }

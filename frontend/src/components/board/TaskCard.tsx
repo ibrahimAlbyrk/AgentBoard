@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Calendar, MessageCircle, ListTree, ChevronRight, ChevronDown } from 'lucide-react'
-import { formatDistanceToNow, isPast, parseISO } from 'date-fns'
+import { formatDistanceToNow, isPast, parseISO, format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { GRADIENT_PRESETS } from '@/lib/cover-presets'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Task } from '@/types'
 
 const priorityBorderColors: Record<string, string> = {
@@ -42,7 +43,15 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
       style={{
         borderLeftColor: priorityBorderColors[task.priority] || 'var(--border-subtle)',
         ...(isDragOverlay && {
@@ -53,12 +62,13 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
         'bg-card border border-[var(--border-subtle)] border-l-[3px] rounded-xl cursor-pointer',
         compact ? 'p-2.5' : 'p-3.5',
         !isDragOverlay && 'hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-4px_var(--glow)] hover:border-[var(--border-strong)] transition-[box-shadow,border-color,translate] duration-200',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-solid)] focus-visible:ring-offset-1',
       )}
     >
       {/* Cover */}
       {showCover && (
         <div
-          className="rounded-t-[9px] -mx-3.5 -mt-3.5 mb-3 overflow-hidden bg-[var(--overlay)]"
+          className="rounded-t-lg -mx-3.5 -mt-3.5 mb-3 overflow-hidden bg-[var(--overlay)]"
           style={{
             height: coverHeight,
             boxShadow: task.cover_type !== 'image' ? 'inset 0 -1px 0 0 rgba(0,0,0,0.06)' : undefined,
@@ -115,14 +125,14 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
                 a.user ? (
                   <Avatar key={a.id} className="size-5 ring-2 ring-card">
                     <AvatarImage src={a.user.avatar_url || undefined} />
-                    <AvatarFallback className="text-[8px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                    <AvatarFallback className="text-[9px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
                       {(a.user.full_name || a.user.username).charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 ) : a.agent ? (
                   <span
                     key={a.id}
-                    className="size-5 rounded-full ring-2 ring-card flex items-center justify-center text-[8px] font-bold text-white shrink-0"
+                    className="size-5 rounded-full ring-2 ring-card flex items-center justify-center text-[9px] font-bold text-white shrink-0"
                     style={{ backgroundColor: a.agent.color }}
                   >
                     {a.agent.name.charAt(0).toUpperCase()}
@@ -130,7 +140,7 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
                 ) : null
               )}
               {extraAssignees > 0 && (
-                <span className="size-5 rounded-full ring-2 ring-card bg-[var(--overlay)] flex items-center justify-center text-[8px] font-semibold text-[var(--text-tertiary)] shrink-0">
+                <span className="size-5 rounded-full ring-2 ring-card bg-[var(--overlay)] flex items-center justify-center text-[9px] font-semibold text-[var(--text-tertiary)] shrink-0">
                   +{extraAssignees}
                 </span>
               )}
@@ -169,7 +179,7 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
             </div>
           )}
 
-          {/* Checklist progress bar */}
+          {/* Checklist progress bar (green) */}
           {task.checklist_progress && task.checklist_progress.total > 0 && (() => {
             const { total, completed } = task.checklist_progress
             const pct = (completed / total) * 100
@@ -181,18 +191,18 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
                     className="h-full rounded-full transition-all duration-300"
                     style={{
                       width: `${pct}%`,
-                      backgroundColor: allDone ? 'rgb(16, 185, 129)' : 'var(--accent-solid)',
+                      backgroundColor: allDone ? 'rgb(16, 185, 129)' : 'rgb(34, 197, 94)',
                     }}
                   />
                 </div>
-                <span className={`text-[10px] font-medium tabular-nums ${allDone ? 'text-emerald-500' : 'text-[var(--text-tertiary)]'}`}>
+                <span className={`text-[10px] font-medium tabular-nums ${allDone ? 'text-[var(--success)]' : 'text-[var(--text-tertiary)]'}`}>
                   {completed}/{total}
                 </span>
               </div>
             )
           })()}
 
-          {/* Subtask progress bar */}
+          {/* Subtask progress bar (blue) */}
           {task.subtask_progress && task.subtask_progress.total > 0 && (() => {
             const { total, completed } = task.subtask_progress
             const pct = (completed / total) * 100
@@ -205,11 +215,11 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
                     className="h-full rounded-full transition-all duration-300"
                     style={{
                       width: `${pct}%`,
-                      backgroundColor: allDone ? 'rgb(16, 185, 129)' : 'var(--accent-solid)',
+                      backgroundColor: allDone ? 'rgb(16, 185, 129)' : 'rgb(59, 130, 246)',
                     }}
                   />
                 </div>
-                <span className={`text-[10px] font-medium tabular-nums ${allDone ? 'text-emerald-500' : 'text-[var(--text-tertiary)]'}`}>
+                <span className={`text-[10px] font-medium tabular-nums ${allDone ? 'text-[var(--success)]' : 'text-[var(--text-tertiary)]'}`}>
                   {completed}/{total}
                 </span>
               </div>
@@ -236,15 +246,24 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {task.due_date && (
-                    <span
-                      className={cn(
-                        'flex items-center gap-1 text-[11px] font-medium',
-                        isOverdue ? 'text-[var(--priority-urgent)]' : 'text-[var(--text-tertiary)]'
-                      )}
-                    >
-                      <Calendar className="size-3" />
-                      {formatDistanceToNow(parseISO(task.due_date), { addSuffix: true })}
-                    </span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            className={cn(
+                              'flex items-center gap-1 text-[11px] font-medium',
+                              isOverdue ? 'text-[var(--priority-urgent)]' : 'text-[var(--text-tertiary)]'
+                            )}
+                          >
+                            <Calendar className="size-3" />
+                            {formatDistanceToNow(parseISO(task.due_date), { addSuffix: true })}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Due: {format(parseISO(task.due_date), 'MMMM d, yyyy')}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                   {task.comments_count > 0 && (
                     <span className="flex items-center gap-1 text-[11px] font-medium text-[var(--text-tertiary)]">
@@ -256,7 +275,7 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
                     <span className="flex items-center gap-1 text-[11px] font-medium text-[var(--text-tertiary)]">
                       {task.reactions.groups.slice(0, 2).map((g) => (
                         <span key={g.emoji} className="flex items-center gap-0.5">
-                          <span className="text-xs">{g.emoji}</span>
+                          <span className="text-sm">{g.emoji}</span>
                           <span>{g.count}</span>
                         </span>
                       ))}
@@ -273,14 +292,14 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
                       a.user ? (
                         <Avatar key={a.id} className="size-5 ring-2 ring-card">
                           <AvatarImage src={a.user.avatar_url || undefined} />
-                          <AvatarFallback className="text-[8px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
+                          <AvatarFallback className="text-[9px] bg-[var(--accent-muted-bg)] text-[var(--accent-solid)]">
                             {(a.user.full_name || a.user.username).charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       ) : a.agent ? (
                         <span
                           key={a.id}
-                          className="size-5 rounded-full ring-2 ring-card flex items-center justify-center text-[8px] font-bold text-white shrink-0"
+                          className="size-5 rounded-full ring-2 ring-card flex items-center justify-center text-[9px] font-bold text-white shrink-0"
                           style={{ backgroundColor: a.agent.color }}
                         >
                           {a.agent.name.charAt(0).toUpperCase()}
@@ -288,7 +307,7 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
                       ) : null
                     )}
                     {extraAssignees > 0 && (
-                      <span className="size-5 rounded-full ring-2 ring-card bg-[var(--overlay)] flex items-center justify-center text-[8px] font-semibold text-[var(--text-tertiary)] shrink-0">
+                      <span className="size-5 rounded-full ring-2 ring-card bg-[var(--overlay)] flex items-center justify-center text-[9px] font-semibold text-[var(--text-tertiary)] shrink-0">
                         +{extraAssignees}
                       </span>
                     )}

@@ -72,7 +72,7 @@ export function SubtasksSection({ projectId, boardId, taskId, onOpenSubtask }: S
             Subtasks
           </span>
           {total > 0 && (
-            <span className={`text-[10px] font-medium tabular-nums ml-1 ${completed === total ? 'text-emerald-500' : 'text-[var(--text-tertiary)]'}`}>
+            <span className={`text-[10px] font-medium tabular-nums ml-1 ${completed === total ? 'text-[var(--success)]' : 'text-[var(--text-tertiary)]'}`}>
               {completed}/{total}
             </span>
           )}
@@ -247,6 +247,7 @@ interface SubtaskRowProps {
 
 function SubtaskRow({ subtask, projectId, boardId, onOpen }: SubtaskRowProps) {
   const deleteTask = useDeleteTask(projectId, boardId)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: subtask.id })
 
   const style = {
@@ -328,13 +329,23 @@ function SubtaskRow({ subtask, projectId, boardId, onOpen }: SubtaskRowProps) {
           </span>
         )}
 
-        {/* Delete */}
+        {/* Delete — click again to confirm */}
         <button
           onClick={(e) => {
             e.stopPropagation()
+            if (!confirmDelete) {
+              setConfirmDelete(true)
+              setTimeout(() => setConfirmDelete(false), 3000)
+              return
+            }
             deleteTask.mutate({ taskId: subtask.id, mode: subtask.children_count > 0 ? undefined : 'orphan' })
           }}
-          className="shrink-0 opacity-0 group-hover:opacity-100 text-[var(--text-tertiary)] hover:text-[var(--priority-urgent)] transition-all"
+          className={`shrink-0 transition-all ${
+            confirmDelete
+              ? 'opacity-100 text-[var(--priority-urgent)]'
+              : 'opacity-0 group-hover:opacity-100 text-[var(--text-tertiary)] hover:text-[var(--priority-urgent)]'
+          }`}
+          title={confirmDelete ? 'Click again to confirm delete' : 'Delete subtask'}
         >
           <Trash2 className="size-3" />
         </button>

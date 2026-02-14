@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { formatDistanceToNow, parseISO, isPast, isToday, format } from 'date-fns'
+import { formatDistanceToNow, parseISO, isPast, isToday, format, addDays, addWeeks } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   X,
-  Calendar,
+  Calendar as CalendarIcon,
   Users,
   Flag,
   Tag,
@@ -24,10 +24,15 @@ import {
   ArrowUpFromLine,
   ArrowDownToLine,
   Pencil,
+  Copy,
+  CalendarDays,
+  XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
+import { Calendar } from '@/components/ui/calendar'
+import * as FocusScope from '@radix-ui/react-focus-scope'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useProjectStore } from '@/stores/projectStore'
 import { useUpdateTask, useDeleteTask } from '@/hooks/useTasks'
@@ -174,6 +179,8 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   const [subtaskStack, setSubtaskStack] = useState<string[]>([])
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showTaskPicker, setShowTaskPicker] = useState(false)
+  const [savedField, setSavedField] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState(false)
   const deleteTask = useDeleteTask(projectId, boardId)
   const convertToSubtask = useConvertToSubtask(projectId, boardId)
   const promoteSubtask = usePromoteSubtask(projectId, boardId)
@@ -228,6 +235,18 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
   }, [onClose, activeSection, closeSidePanel])
   usePanelEsc('task-detail', open, stableOnClose)
 
+  const showSaved = useCallback((field: string) => {
+    setSavedField(field)
+    setTimeout(() => setSavedField(null), 1200)
+  }, [])
+
+  const handleCopyId = useCallback(() => {
+    if (!displayTask) return
+    navigator.clipboard.writeText(displayTask.id)
+    setCopiedId(true)
+    setTimeout(() => setCopiedId(false), 1500)
+  }, [displayTask])
+
   if (!displayTask) return null
 
   const handleTitleSave = () => {
@@ -246,9 +265,11 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
     setEditingDesc(false)
   }
 
-  const handleFieldUpdate = (data: Record<string, unknown>) => {
+  const handleFieldUpdate = (data: Record<string, unknown>, field?: string) => {
     if (!displayTask) return
-    updateTask.mutate({ taskId: displayTask.id, data })
+    updateTask.mutate({ taskId: displayTask.id, data }, {
+      onSuccess: () => { if (field) showSaved(field) },
+    })
   }
 
   const handleRemoveCover = () => {
@@ -267,7 +288,12 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
     <>
     <AnimatePresence mode="wait">
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-8"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="task-detail-title"
+        >
           {/* Overlay */}
           <motion.div
             className="absolute inset-0 bg-black/30"
@@ -279,20 +305,22 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
             onClick={handleFullClose}
           />
 
+          {/* Focus trap */}
+          <FocusScope.Root trapped loop asChild>
           {/* Wrapper: vertical stack — panels row + floating bar */}
-          <div className="relative z-10 flex flex-col items-center">
+          <div className="relative z-10 flex flex-col items-center w-full sm:w-auto">
             {/* Container — both panels in flex row, layout animation smoothly recenters */}
             <motion.div
               layout="position"
               transition={{ type: 'spring', damping: 36, stiffness: 280, mass: 0.8 }}
               exit={{ opacity: 0, scale: 0.97, y: 14, transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } }}
-              className="flex items-start gap-3 max-h-[min(78vh,760px)]"
+              className="flex flex-col sm:flex-row items-start gap-3 max-h-[min(90vh,760px)] sm:max-h-[min(78vh,760px)] w-full sm:w-auto"
             >
               {/* Task Detail Island */}
-              <div className="relative flex flex-col items-center">
+              <div className="relative flex flex-col items-center w-full sm:w-auto">
               <motion.div
                 ref={panelRef}
-                className="relative w-[520px] max-h-[min(78vh,760px)] flex flex-col bg-[var(--elevated)] overflow-hidden"
+                className="relative w-full sm:w-[520px] max-h-[min(90vh,760px)] sm:max-h-[min(78vh,760px)] flex flex-col bg-[var(--elevated)] overflow-hidden"
                 style={{
                   borderRadius: '20px',
                   boxShadow: [
@@ -366,9 +394,18 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                 {/* Top bar */}
                 <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--border-subtle)]">
                   <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-                    <span className="font-mono bg-[var(--surface)] px-2 py-0.5 rounded-md border border-[var(--border-subtle)]">
+                    <button
+                      onClick={handleCopyId}
+                      title={copiedId ? 'Copied!' : `Copy ID: ${displayTask.id}`}
+                      className="inline-flex items-center gap-1 font-mono bg-[var(--surface)] px-2 py-0.5 rounded-md border border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--elevated)] transition-all duration-150 cursor-pointer"
+                    >
+                      {copiedId ? (
+                        <Check className="size-2.5 text-green-500" />
+                      ) : (
+                        <Copy className="size-2.5" />
+                      )}
                       {displayTask.id.slice(0, 8).toUpperCase()}
-                    </span>
+                    </button>
                     <ChevronRight className="size-3" />
                     <span>{displayTask.status.name}</span>
                     {displayTask.parent_id && (
@@ -433,28 +470,46 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                     {/* Title */}
                     <motion.div variants={fadeUp} className="mb-4">
                       {editingTitle ? (
-                        <Input
-                          autoFocus
-                          value={title}
-                          onChange={(e) => setTitle(e.target.value)}
-                          onBlur={handleTitleSave}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleTitleSave()
-                            if (e.key === 'Escape') setEditingTitle(false)
-                          }}
-                          className="text-[22px] font-bold bg-transparent border-0 border-b-2 border-[var(--accent-solid)] rounded-none px-0 py-1 focus-visible:ring-0 focus-visible:shadow-none tracking-tight"
-                        />
+                        <div>
+                          <Input
+                            autoFocus
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleTitleSave()
+                              if (e.key === 'Escape') setEditingTitle(false)
+                            }}
+                            className="text-[22px] font-bold bg-transparent border-0 border-b-2 border-[var(--accent-solid)] rounded-none px-0 py-1 focus-visible:ring-0 focus-visible:shadow-none tracking-tight"
+                          />
+                          <div className="flex items-center justify-end gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditingTitle(false)}
+                              className="h-7 text-xs"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleTitleSave}
+                              className="h-7 text-xs"
+                            >
+                              Save
+                            </Button>
+                          </div>
+                        </div>
                       ) : (
                         <div
-                          className="group cursor-pointer"
+                          className="group cursor-pointer rounded-lg px-2 py-1 -mx-2 -my-1 hover:bg-[var(--surface)] transition-all duration-200"
                           onClick={() => {
                             setTitle(displayTask.title)
                             setEditingTitle(true)
                           }}
                         >
-                          <h2 className="text-[22px] font-bold tracking-tight hover:text-[var(--accent-solid)] transition-colors duration-200 leading-snug">
+                          <h2 id="task-detail-title" className="text-[22px] font-bold tracking-tight transition-colors duration-200 leading-snug flex items-center gap-2">
                             {displayTask.title}
-                            <Pencil className="size-3 ml-1.5 opacity-0 group-hover:opacity-40 inline-block transition-opacity" />
+                            <Pencil className="size-3.5 shrink-0 opacity-0 group-hover:opacity-50 transition-opacity text-[var(--text-tertiary)]" />
                           </h2>
                         </div>
                       )}
@@ -465,28 +520,33 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                       <StatusChip
                         status={displayTask.status}
                         statuses={statuses}
-                        onUpdate={(statusId) => handleFieldUpdate({ status_id: statusId })}
+                        onUpdate={(statusId) => handleFieldUpdate({ status_id: statusId }, 'status')}
+                        saved={savedField === 'status'}
                       />
                       <PriorityChip
                         priority={displayTask.priority}
-                        onUpdate={(priority) => handleFieldUpdate({ priority })}
+                        onUpdate={(priority) => handleFieldUpdate({ priority }, 'priority')}
+                        saved={savedField === 'priority'}
                       />
                       <AssigneesChip
                         assignees={displayTask.assignees ?? []}
                         members={members}
                         agents={activeAgents}
-                        onUpdate={(userIds, agentIds) => handleFieldUpdate({ assignee_user_ids: userIds, assignee_agent_ids: agentIds })}
+                        onUpdate={(userIds, agentIds) => handleFieldUpdate({ assignee_user_ids: userIds, assignee_agent_ids: agentIds }, 'assignees')}
+                        saved={savedField === 'assignees'}
                       />
                       <DueDateChip
                         dueDate={displayTask.due_date ?? null}
                         isOverdue={!!isOverdue}
-                        onUpdate={(date) => handleFieldUpdate({ due_date: date || undefined })}
+                        onUpdate={(date) => handleFieldUpdate({ due_date: date || undefined }, 'due_date')}
+                        saved={savedField === 'due_date'}
                       />
                       <LabelsChip
                         taskLabels={displayTask.labels}
                         allLabels={labels}
-                        onUpdate={(labelIds) => handleFieldUpdate({ label_ids: labelIds })}
+                        onUpdate={(labelIds) => handleFieldUpdate({ label_ids: labelIds }, 'labels')}
                         onManage={() => setShowLabelManager(true)}
+                        saved={savedField === 'labels'}
                       />
                     </motion.div>
                   </motion.div>
@@ -785,7 +845,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="w-[380px] max-h-[min(78vh,760px)] flex flex-col bg-[var(--elevated)] overflow-hidden shrink-0"
+                  className="hidden sm:flex w-[380px] max-h-[min(78vh,760px)] flex-col bg-[var(--elevated)] overflow-hidden shrink-0"
                   style={{
                     borderRadius: '20px',
                     boxShadow: [
@@ -917,6 +977,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
               </div>
             </motion.div>
           </div>
+          </FocusScope.Root>
         </div>
       )}
     </AnimatePresence>
@@ -966,14 +1027,34 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
 
 const chipBase = "inline-flex items-center gap-1.5 bg-[var(--surface)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-xs font-medium hover:border-[var(--border-strong)] transition-colors cursor-pointer"
 
+function SavedIndicator({ show }: { show: boolean }) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.span
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.5 }}
+          transition={{ duration: 0.2 }}
+          className="inline-flex items-center"
+        >
+          <Check className="size-3 text-green-500" />
+        </motion.span>
+      )}
+    </AnimatePresence>
+  )
+}
+
 function StatusChip({
   status,
   statuses,
   onUpdate,
+  saved,
 }: {
   status: { id: string; name: string; color: string | null }
   statuses: { id: string; name: string; color: string | null }[]
   onUpdate: (statusId: string) => void
+  saved?: boolean
 }) {
   return (
     <Popover>
@@ -984,6 +1065,7 @@ function StatusChip({
             style={{ backgroundColor: status.color || 'var(--priority-none)' }}
           />
           {status.name}
+          <SavedIndicator show={!!saved} />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={6} className="w-48 p-1 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden">
@@ -1008,9 +1090,11 @@ function StatusChip({
 function PriorityChip({
   priority,
   onUpdate,
+  saved,
 }: {
   priority: Priority
   onUpdate: (priority: string) => void
+  saved?: boolean
 }) {
   const current = priorities.find((p) => p.value === priority) ?? priorities[0]
   const PIcon = current.icon
@@ -1023,6 +1107,7 @@ function PriorityChip({
         >
           <PIcon className="size-3" style={{ color: current.color }} />
           {current.label}
+          <SavedIndicator show={!!saved} />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={6} className="w-44 p-1 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden">
@@ -1046,11 +1131,13 @@ function AssigneesChip({
   members,
   agents,
   onUpdate,
+  saved,
 }: {
   assignees: AssigneeBrief[]
   members: ProjectMember[]
   agents: Agent[]
   onUpdate: (userIds: string[], agentIds: string[]) => void
+  saved?: boolean
 }) {
   const MAX_AVATARS = 3
   const overflow = assignees.length - MAX_AVATARS
@@ -1104,6 +1191,7 @@ function AssigneesChip({
           ) : (
             <span className="text-[var(--text-tertiary)]">None</span>
           )}
+          <SavedIndicator show={!!saved} />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={6} className="w-64 p-0 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden">
@@ -1161,32 +1249,91 @@ function DueDateChip({
   dueDate,
   isOverdue,
   onUpdate,
+  saved,
 }: {
   dueDate: string | null
   isOverdue: boolean
   onUpdate: (date: string) => void
+  saved?: boolean
 }) {
+  const [open, setOpen] = useState(false)
+  const selectedDate = dueDate ? parseISO(dueDate) : undefined
+
+  const handleSelect = (date: Date | undefined) => {
+    if (date) {
+      onUpdate(format(date, 'yyyy-MM-dd'))
+      setOpen(false)
+    }
+  }
+
+  const handleQuickDate = (date: Date) => {
+    onUpdate(format(date, 'yyyy-MM-dd'))
+    setOpen(false)
+  }
+
+  const handleClear = () => {
+    onUpdate('')
+    setOpen(false)
+  }
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           className={chipBase}
           style={isOverdue ? { borderColor: 'var(--priority-urgent)', color: 'var(--priority-urgent)' } : undefined}
         >
-          <Calendar className="size-3" style={isOverdue ? { color: 'var(--priority-urgent)' } : { color: 'var(--text-tertiary)' }} />
+          <CalendarIcon className="size-3" style={isOverdue ? { color: 'var(--priority-urgent)' } : { color: 'var(--text-tertiary)' }} />
           {dueDate ? format(parseISO(dueDate), 'MMM d') : 'No date'}
           {isOverdue && (
             <span className="text-[9px] font-bold uppercase">Overdue</span>
           )}
+          <SavedIndicator show={!!saved} />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={6} className="w-auto p-3 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl">
-        <Input
-          type="date"
-          value={dueDate?.split('T')[0] ?? ''}
-          onChange={(e) => onUpdate(e.target.value)}
-          className="border-[var(--border-subtle)] bg-[var(--surface)] h-8 text-sm rounded-lg"
+      <PopoverContent align="start" sideOffset={6} className="w-auto p-0 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl">
+        {/* Quick date buttons */}
+        <div className="flex items-center gap-1.5 px-3 pt-3 pb-1">
+          <button
+            onClick={() => handleQuickDate(new Date())}
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-[var(--surface)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--elevated)] transition-colors"
+          >
+            <CalendarDays className="size-3" />
+            Today
+          </button>
+          <button
+            onClick={() => handleQuickDate(addDays(new Date(), 1))}
+            className="px-2 py-1 rounded-md text-[11px] font-medium bg-[var(--surface)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--elevated)] transition-colors"
+          >
+            Tomorrow
+          </button>
+          <button
+            onClick={() => handleQuickDate(addWeeks(new Date(), 1))}
+            className="px-2 py-1 rounded-md text-[11px] font-medium bg-[var(--surface)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--elevated)] transition-colors"
+          >
+            Next week
+          </button>
+        </div>
+
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={handleSelect}
+          defaultMonth={selectedDate}
         />
+
+        {/* Remove date button */}
+        {dueDate && (
+          <div className="px-3 pb-3 pt-0">
+            <button
+              onClick={handleClear}
+              className="flex items-center gap-1.5 w-full justify-center px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--priority-urgent)] hover:bg-[var(--priority-urgent)]/10 border border-[var(--border-subtle)] transition-colors"
+            >
+              <XCircle className="size-3" />
+              Remove date
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   )
@@ -1197,11 +1344,13 @@ function LabelsChip({
   allLabels,
   onUpdate,
   onManage,
+  saved,
 }: {
   taskLabels: { id: string; name: string; color: string }[]
   allLabels: { id: string; name: string; color: string }[]
   onUpdate: (labelIds: string[]) => void
   onManage: () => void
+  saved?: boolean
 }) {
   const MAX_DOTS = 4
   const activeIds = new Set(taskLabels.map((l) => l.id))
@@ -1222,6 +1371,7 @@ function LabelsChip({
           ) : (
             <span className="text-[var(--text-tertiary)]">None</span>
           )}
+          <SavedIndicator show={!!saved} />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={6} className="w-56 p-0 bg-[var(--elevated)] border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden">

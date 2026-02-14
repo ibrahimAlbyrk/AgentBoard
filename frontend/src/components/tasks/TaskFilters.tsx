@@ -155,7 +155,7 @@ function toggleInArray<T>(arr: T[], val: T): T[] {
 
 export function TaskFilters() {
   const { members, labels, agents } = useProjectStore()
-  const { setFilters, clearFilters, filters, hasActiveFilters } = useBoardStore()
+  const { setFilters, clearFilters, filters, hasActiveFilters, tasksByStatus, getFilteredTasks } = useBoardStore()
   const [search, setSearch] = useState(filters.search)
 
   const debouncedSearch = useCallback(
@@ -171,6 +171,15 @@ export function TaskFilters() {
   }, [search, debouncedSearch])
 
   const filtersActive = hasActiveFilters()
+
+  const totalTaskCount = useMemo(() => {
+    return Object.values(tasksByStatus).reduce((sum, tasks) => sum + tasks.length, 0)
+  }, [tasksByStatus])
+
+  const filteredTaskCount = useMemo(() => {
+    if (!filtersActive) return totalTaskCount
+    return Object.keys(tasksByStatus).reduce((sum, statusId) => sum + getFilteredTasks(statusId).length, 0)
+  }, [tasksByStatus, filtersActive, getFilteredTasks, totalTaskCount])
 
   const assigneeCount = filters.assigneeUserIds.length + filters.assigneeAgentIds.length + (filters.unassigned ? 1 : 0)
 
@@ -479,20 +488,25 @@ export function TaskFilters() {
           </div>
         </FilterPill>
 
-        {/* Clear all */}
+        {/* Filter feedback + Clear all */}
         {filtersActive && (
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => {
-              clearFilters()
-              setSearch('')
-            }}
-            className="text-[var(--text-secondary)] hover:text-foreground hover:bg-[var(--surface)] transition-colors text-[12px] h-7 ml-0.5"
-          >
-            <X className="size-3" />
-            Clear all
-          </Button>
+          <>
+            <span className="text-[11px] text-[var(--text-tertiary)] font-medium tabular-nums">
+              Showing {filteredTaskCount} of {totalTaskCount} tasks
+            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => {
+                clearFilters()
+                setSearch('')
+              }}
+              className="text-[var(--text-secondary)] hover:text-foreground hover:bg-[var(--surface)] transition-colors text-[12px] h-7 ml-0.5"
+            >
+              <X className="size-3" />
+              Clear all
+            </Button>
+          </>
         )}
       </div>
 

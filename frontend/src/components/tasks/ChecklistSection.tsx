@@ -293,7 +293,7 @@ function ChecklistBlock({
         )}
 
         {total > 0 && (
-          <span className={`text-[11px] font-medium tabular-nums shrink-0 ${allDone ? 'text-emerald-500' : 'text-[var(--text-tertiary)]'}`}>
+          <span className={`text-[11px] font-medium tabular-nums shrink-0 ${allDone ? 'text-[var(--success)]' : 'text-[var(--text-tertiary)]'}`}>
             {completed}/{total}
           </span>
         )}
@@ -462,6 +462,7 @@ function ChecklistItemRow({
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState(item.title)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const isChecked = item.is_completed
 
@@ -663,12 +664,26 @@ function ChecklistItemRow({
         </Popover>
       )}
 
-      {/* Delete */}
+      {/* Delete — click again to confirm */}
       <button
-        onClick={() => deleteItem.mutate({ checklistId, itemId: item.id })}
-        className="size-4 flex items-center justify-center opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity shrink-0"
+        onClick={() => {
+          if (!confirmDelete) {
+            setConfirmDelete(true)
+            setTimeout(() => setConfirmDelete(false), 3000)
+            return
+          }
+          deleteItem.mutate({ checklistId, itemId: item.id })
+        }}
+        className={`size-4 flex items-center justify-center transition-all shrink-0 ${
+          confirmDelete
+            ? 'opacity-100'
+            : 'opacity-0 group-hover:opacity-50 hover:!opacity-100'
+        }`}
+        title={confirmDelete ? 'Click again to confirm' : 'Delete item'}
       >
-        <X className="size-3 text-[var(--text-tertiary)] hover:text-[var(--priority-urgent)] transition-colors" />
+        <X className={`size-3 transition-colors ${
+          confirmDelete ? 'text-[var(--priority-urgent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--priority-urgent)]'
+        }`} />
       </button>
     </>
   )

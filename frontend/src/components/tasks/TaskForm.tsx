@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from '@/lib/toast'
+import { formatFileSize } from '@/lib/format'
 import { Tag, Paperclip, X, File as FileIcon, Loader2, Check, Users } from 'lucide-react'
 import { usePanelLayer } from '@/contexts/PanelStackContext'
 import {
@@ -31,14 +32,10 @@ import type { Priority, TiptapDoc } from '@/types'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+const TITLE_MAX_LENGTH = 200
 
 const schema = z.object({
-  title: z.string().min(1, 'Title is required'),
+  title: z.string().min(1, 'Title is required').max(TITLE_MAX_LENGTH, `Title must be under ${TITLE_MAX_LENGTH} characters`),
   due_date: z.string().optional(),
 })
 
@@ -82,10 +79,13 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
+
+  const titleValue = watch('title', '')
 
   // Reset all form state when dialog closes
   useEffect(() => {
@@ -170,9 +170,16 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault()
+      handleSubmit(onSubmit)()
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="bg-[var(--elevated)] border-[var(--border-subtle)] sm:max-w-[500px]">
+      <DialogContent className="bg-[var(--elevated)] border-[var(--border-subtle)] sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle
             className="text-lg tracking-tight"
@@ -181,15 +188,21 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
             New Task
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-4">
           <div className="space-y-1.5">
-            <span className="text-xs text-[var(--text-tertiary)] font-medium">Title</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--text-tertiary)] font-medium">Title</span>
+              <span className={`text-[10px] tabular-nums ${titleValue.length > TITLE_MAX_LENGTH ? 'text-destructive' : 'text-[var(--text-tertiary)]'}`}>
+                {titleValue.length}/{TITLE_MAX_LENGTH}
+              </span>
+            </div>
             <Input
               id="task-title"
               placeholder="Task title"
+              maxLength={TITLE_MAX_LENGTH}
               {...register('title')}
               aria-invalid={!!errors.title}
-              className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors"
+              className={`bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition-colors ${errors.title ? 'border-destructive focus-visible:ring-destructive/40' : ''}`}
             />
             {errors.title && (
               <p className="text-sm text-destructive">{errors.title.message}</p>
@@ -462,6 +475,9 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
           </div>
 
           <DialogFooter className="pt-2">
+            <span className="text-[10px] text-[var(--text-tertiary)] mr-auto hidden sm:inline">
+              {navigator.platform.includes('Mac') ? '\u2318' : 'Ctrl'}+Enter to create
+            </span>
             <Button type="button" variant="outline" onClick={onClose} className="border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface)]">
               Cancel
             </Button>

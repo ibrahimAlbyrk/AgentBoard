@@ -1,23 +1,20 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { formatDistanceToNow, parseISO } from 'date-fns'
-import { Send, Paperclip, X, File, Download, Loader2 } from 'lucide-react'
+import { Send, Paperclip, X, File, Download, Loader2, Pencil, Trash2, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { useComments, useCreateComment } from '@/hooks/useComments'
+import { useComments, useCreateComment, useUpdateComment, useDeleteComment } from '@/hooks/useComments'
 import { useUploadAttachment } from '@/hooks/useAttachments'
+import { useAuthStore } from '@/stores/authStore'
 import { ReactionBar } from '@/components/reactions/ReactionBar'
 import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { RichTextRenderer } from '@/components/editor/RichTextRenderer'
-import type { Attachment, TiptapDoc } from '@/types'
+import { ImageLightbox } from '@/components/shared/ImageLightbox'
+import { formatFileSize } from '@/lib/format'
+import type { Attachment, TiptapDoc, Comment } from '@/types'
 import { toast } from '@/lib/toast'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 interface TaskCommentsProps {
   projectId: string
@@ -28,14 +25,30 @@ interface TaskCommentsProps {
 export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) {
   const { data: commentsRes, isLoading } = useComments(projectId, boardId, taskId)
   const createComment = useCreateComment(projectId, boardId, taskId)
+  const updateComment = useUpdateComment(projectId, boardId, taskId)
+  const deleteComment = useDeleteComment(projectId, boardId, taskId)
   const uploadAttachment = useUploadAttachment(projectId, boardId, taskId)
+  const currentUser = useAuthStore((s) => s.user)
   const [content, setContent] = useState<TiptapDoc | null>(null)
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([])
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState<TiptapDoc | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const commentsEndRef = useRef<HTMLDivElement>(null)
+  const prevCountRef = useRef(0)
 
   const comments = commentsRes?.data ?? []
+
+  // Auto-scroll when a new comment is added
+  useEffect(() => {
+    if (comments.length > prevCountRef.current && prevCountRef.current > 0) {
+      commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+    prevCountRef.current = comments.length
+  }, [comments.length])
 
   const handleUploadFile = useCallback((file: File) => {
     if (file.size > MAX_FILE_SIZE) {
@@ -79,18 +92,32 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
     )
   }
 
-  useEffect(() => {
-    if (!lightboxSrc) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        e.preventDefault()
-        setLightboxSrc(null)
-      }
+  const handleEditSave = (comment: Comment) => {
+    if (!editContent) return
+    updateComment.mutate(
+      { commentId: comment.id, data: { content: editContent } },
+      {
+        onSuccess: () => {
+          setEditingId(null)
+          setEditContent(null)
+        },
+      },
+    )
+  }
+
+  const handleDelete = (commentId: string) => {
+    if (confirmDeleteId !== commentId) {
+      setConfirmDeleteId(commentId)
+      setTimeout(() => setConfirmDeleteId(null), 3000)
+      return
     }
-    document.addEventListener('keydown', handler, true)
-    return () => document.removeEventListener('keydown', handler, true)
-  }, [lightboxSrc])
+    deleteComment.mutate(commentId, {
+      onSuccess: () => setConfirmDeleteId(null),
+    })
+  }
+
+  const isOwnComment = (comment: Comment) =>
+    currentUser?.id === comment.user.id && !comment.agent_creator
 
   const isImage = (mime: string) => mime.startsWith('image/')
 
@@ -178,21 +205,34 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
       </div>
 
       {isLoading && (
-        <p className="text-sm text-[var(--text-tertiary)] text-center py-4">
-          Loading comments...
-        </p>
+        <div className="space-y-3 py-2">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="flex gap-3 py-3">
+              <div className="size-7 skeleton rounded-full shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="h-3.5 w-20 skeleton" />
+                  <div className="h-3 w-16 skeleton" />
+                </div>
+                <div className="h-3 w-full skeleton" />
+                <div className="h-3 w-2/3 skeleton" />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {comments.length === 0 && !isLoading && (
-        <p className="text-sm text-[var(--text-tertiary)] text-center py-4">
-          No comments yet
-        </p>
+        <div className="flex flex-col items-center gap-2 py-8 text-[var(--text-tertiary)]">
+          <MessageSquare className="size-8 opacity-40" />
+          <p className="text-sm">No comments yet. Be the first to share your thoughts.</p>
+        </div>
       )}
 
       <div className="space-y-1">
         {comments.map((comment, index) => (
           <div key={comment.id}>
-            <div className="flex gap-3 py-3">
+            <div className="group/comment flex gap-3 py-3">
               {comment.agent_creator ? (
                 <span
                   className="size-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
@@ -225,10 +265,81 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
                   {comment.is_edited && (
                     <span className="text-[10px] text-[var(--text-tertiary)]">(edited)</span>
                   )}
+
+                  {/* Edit / Delete buttons — only for own comments */}
+                  {isOwnComment(comment) && editingId !== comment.id && (
+                    <div className="flex items-center gap-0.5 ml-auto opacity-0 group-hover/comment:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => {
+                          setEditingId(comment.id)
+                          setEditContent(
+                            typeof comment.content === 'string'
+                              ? null
+                              : (comment.content as TiptapDoc),
+                          )
+                        }}
+                        className="size-6 rounded-md flex items-center justify-center text-[var(--text-tertiary)] hover:text-foreground hover:bg-[var(--elevated)] transition-all"
+                        title="Edit comment"
+                      >
+                        <Pencil className="size-3" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(comment.id)}
+                        className={`size-6 rounded-md flex items-center justify-center transition-all ${
+                          confirmDeleteId === comment.id
+                            ? 'text-[var(--priority-urgent)] bg-[var(--priority-urgent)]/10'
+                            : 'text-[var(--text-tertiary)] hover:text-[var(--priority-urgent)]'
+                        }`}
+                        title={
+                          confirmDeleteId === comment.id
+                            ? 'Click again to confirm'
+                            : 'Delete comment'
+                        }
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="mt-1">
-                  <RichTextRenderer content={comment.content} className="text-sm" />
-                </div>
+
+                {/* Comment body — edit mode or display */}
+                {editingId === comment.id ? (
+                  <div className="mt-2 space-y-2">
+                    <RichTextEditor
+                      projectId={projectId}
+                      value={editContent}
+                      onChange={(doc) => setEditContent(doc)}
+                      onSubmit={() => handleEditSave(comment)}
+                      variant="compact"
+                      placeholder="Edit your comment..."
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleEditSave(comment)}
+                        disabled={!editContent || updateComment.isPending}
+                        className="h-6 px-2.5 text-xs"
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingId(null)
+                          setEditContent(null)
+                        }}
+                        className="h-6 px-2.5 text-xs"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1">
+                    <RichTextRenderer content={comment.content} className="text-sm" />
+                  </div>
+                )}
 
                 {/* Comment attachments */}
                 {comment.attachments?.length > 0 && (
@@ -281,28 +392,10 @@ export function TaskComments({ projectId, boardId, taskId }: TaskCommentsProps) 
             )}
           </div>
         ))}
+        <div ref={commentsEndRef} />
       </div>
 
-      {/* Lightbox */}
-      {lightboxSrc && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm"
-          onClick={() => setLightboxSrc(null)}
-        >
-          <button
-            className="absolute top-4 right-4 size-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-            onClick={() => setLightboxSrc(null)}
-          >
-            <X className="size-5" />
-          </button>
-          <img
-            src={lightboxSrc}
-            alt="Preview"
-            className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   )
 }

@@ -68,7 +68,7 @@ export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholder
           style={{ height: placeholderHeight }}
         >
           <div
-            className="absolute inset-0 rounded-[10px]"
+            className="absolute inset-0 rounded-lg"
             style={{
               boxShadow: 'inset 0 0 16px -4px var(--accent-solid)',
               animation: 'glow-pulse 2s ease-in-out infinite',

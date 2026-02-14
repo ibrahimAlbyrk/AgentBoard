@@ -11,9 +11,12 @@ import {
   type DragMoveEvent,
   MeasuringStrategy,
   PointerSensor,
+  KeyboardSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useProjectStore } from '@/stores/projectStore'
 import { useBoardStore } from '@/stores/boardStore'
 import { useMoveTask } from '@/hooks/useTasks'
@@ -172,7 +175,9 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
   const prevDelta = useRef({ x: 0, y: 0 })
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
   )
 
   // Measure droppables once before drag starts — MeasuringStrategy.Always causes
@@ -382,11 +387,27 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
     ? (Object.values(tasksByStatus).flat().find(t => t.id === activeTask.id) ?? activeTask)
     : null
 
+  const announcements = useMemo(() => ({
+    onDragStart({ active }: { active: { id: string | number } }) {
+      return `Picked up task ${active.id}`
+    },
+    onDragOver({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) {
+      return over ? `Task ${active.id} is over ${over.id}` : `Task ${active.id} is not over a droppable area`
+    },
+    onDragEnd({ active, over }: { active: { id: string | number }; over: { id: string | number } | null }) {
+      return over ? `Task ${active.id} was dropped on ${over.id}` : `Task ${active.id} was dropped`
+    },
+    onDragCancel({ active }: { active: { id: string | number } }) {
+      return `Dragging was cancelled. Task ${active.id} was dropped`
+    },
+  }), [])
+
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={kanbanCollision}
       measuring={measuring}
+      accessibility={{ announcements }}
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragOver={handleDragOver}

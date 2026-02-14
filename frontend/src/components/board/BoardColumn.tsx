@@ -1,7 +1,8 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useCallback, useRef } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Plus, Filter, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { SortableTaskCard } from './SortableTaskCard'
 import { useBoardStore } from '@/stores/boardStore'
 import type { Status, Task } from '@/types'
@@ -38,7 +39,7 @@ function DropPlaceholder({ height }: { height: number }) {
       />
       {/* Pulsing inner glow */}
       <div
-        className="absolute inset-0 rounded-[10px]"
+        className="absolute inset-0 rounded-lg"
         style={{
           boxShadow: 'inset 0 0 16px -4px var(--accent-solid)',
           animation: 'glow-pulse 2s ease-in-out infinite',
@@ -53,26 +54,54 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status.id}` })
   const filtersActive = useBoardStore((s) => s.hasActiveFilters())
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const columnRef = useRef<HTMLDivElement>(null)
+
+  const handleColumnKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    const container = columnRef.current
+    if (!container) return
+
+    const focusable = Array.from(container.querySelectorAll<HTMLElement>('[role="button"][tabindex="0"]'))
+    if (focusable.length === 0) return
+
+    const currentIdx = focusable.indexOf(document.activeElement as HTMLElement)
+    if (currentIdx === -1) return
+
+    e.preventDefault()
+    const nextIdx = e.key === 'ArrowDown'
+      ? Math.min(currentIdx + 1, focusable.length - 1)
+      : Math.max(currentIdx - 1, 0)
+    focusable[nextIdx]?.focus()
+  }, [])
 
   if (isCollapsed) {
     return (
-      <div
-        onClick={() => setIsCollapsed(false)}
-        className="w-10 flex-shrink-0 bg-[var(--surface)]/60 rounded-xl border border-[var(--border-subtle)] flex flex-col items-center py-3 cursor-pointer hover:bg-[var(--surface)] transition-all duration-300"
-      >
-        <ChevronsRight className="size-3.5 text-[var(--text-tertiary)] mb-2 flex-shrink-0" />
-        <span className="text-xs font-medium text-[var(--text-secondary)] [writing-mode:vertical-lr] rotate-180">
-          {status.name}
-        </span>
-        <span className="mt-2 text-xs text-[var(--text-tertiary)] bg-[var(--overlay)] rounded-full size-5 flex items-center justify-center">
-          {tasks.length}
-        </span>
-      </div>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              onClick={() => setIsCollapsed(false)}
+              className="w-12 flex-shrink-0 bg-[var(--surface)]/60 rounded-xl border border-[var(--border-subtle)] flex flex-col items-center py-3 cursor-pointer hover:bg-[var(--surface)] hover:border-[var(--border-strong)] transition-all duration-300 min-h-[120px]"
+            >
+              <ChevronsRight className="size-3.5 text-[var(--text-tertiary)] mb-2 flex-shrink-0" />
+              <span className="text-xs font-medium text-[var(--text-secondary)] [writing-mode:vertical-lr] rotate-180">
+                {status.name}
+              </span>
+              <span className="mt-2 text-xs text-[var(--text-tertiary)] bg-[var(--overlay)] rounded-full size-5 flex items-center justify-center">
+                {tasks.length}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {status.name} — {tasks.length} task{tasks.length !== 1 ? 's' : ''}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     )
   }
 
   return (
-    <div className="min-w-[280px] w-[300px] max-w-[360px] flex-shrink-0 flex flex-col transition-all duration-300">
+    <div className="min-w-[280px] flex-1 max-w-[360px] flex-shrink-0 flex flex-col transition-all duration-300">
       <div className="flex items-center justify-between px-1 py-2 mb-2">
         <div className="flex items-center gap-2">
           <span
@@ -87,14 +116,15 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setIsCollapsed(true)}
-            className="size-6 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--overlay)] transition-all duration-150"
+            className="size-7 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--overlay)] transition-all duration-150"
             title="Collapse column"
           >
             <ChevronsLeft className="size-3.5" />
           </button>
           <button
             onClick={onAddTask}
-            className="size-6 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] hover:bg-[var(--accent-muted-bg)] transition-all duration-150"
+            className="size-7 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] hover:bg-[var(--accent-muted-bg)] transition-all duration-150"
+            title="Add task"
           >
             <Plus className="size-3.5" />
           </button>
@@ -102,7 +132,10 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
       </div>
 
       <div
-        ref={setNodeRef}
+        ref={(el) => { setNodeRef(el); (columnRef as React.MutableRefObject<HTMLDivElement | null>).current = el }}
+        onKeyDown={handleColumnKeyDown}
+        role="listbox"
+        aria-label={`${status.name} tasks`}
         className={`rounded-xl p-2 space-y-2 min-h-[120px] transition-all duration-200 ${
           isOver
             ? 'border border-[var(--accent-solid)]/40 bg-[var(--accent-muted-bg)] shadow-[inset_0_0_20px_-8px_var(--glow)]'
@@ -132,14 +165,23 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
         </SortableContext>
 
         {tasks.length === 0 && placeholderIdx < 0 && (
-          <div className="flex flex-col items-center justify-center h-20 border border-dashed border-[var(--border-subtle)] rounded-lg text-[13px] text-[var(--text-tertiary)] gap-1">
+          <div className="flex flex-col items-center justify-center h-20 border border-dashed border-[var(--border-subtle)] rounded-lg text-[13px] text-[var(--text-tertiary)] gap-1.5">
             {filtersActive ? (
               <>
                 <Filter className="size-3.5 opacity-50" />
                 <span>No matching tasks</span>
               </>
             ) : (
-              <span>No tasks</span>
+              <>
+                <span>Drop tasks here or click + to create</span>
+                <button
+                  onClick={onAddTask}
+                  className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-solid)] hover:text-[var(--accent-solid-hover)] transition-colors"
+                >
+                  <Plus className="size-3" />
+                  Add task
+                </button>
+              </>
             )}
           </div>
         )}
