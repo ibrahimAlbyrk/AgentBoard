@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { toast } from '@/lib/toast'
-import { Copy, Plus, Trash2, Key, Bell, BellOff, Monitor, Mail, VolumeX, Bot, Pencil, Check, X, Eye, EyeOff, User } from 'lucide-react'
+import { Copy, Plus, Trash2, Key, Bell, BellOff, Monitor, Mail, VolumeX, Bot, Pencil, Check, X, Eye, EyeOff, User, Upload, Lock, Save, FolderPlus } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,6 +30,7 @@ import { useMyAgents, useCreateGlobalAgent, useUpdateGlobalAgent, useDeleteGloba
 import { useNotificationPreferences, useUpdateNotificationPreferences } from '@/hooks/useNotifications'
 import { useProjects } from '@/hooks/useProjects'
 import type { NotificationPreferences } from '@/types/user'
+import { PageHeader } from '@/components/shared/PageHeader'
 import type { AgentWithProjects } from '@/types/agent'
 
 interface ApiKeyEntry {
@@ -47,7 +48,21 @@ export function SettingsPage() {
   const setUser = useAuthStore((s) => s.setUser)
   const [fullName, setFullName] = useState(user?.full_name ?? '')
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url ?? '')
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  // m23: dirty state tracking
+  const profileIsDirty = fullName !== (user?.full_name ?? '') || avatarUrl !== (user?.avatar_url ?? '')
+  const [pendingTab, setPendingTab] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState('profile')
+
+  // B21: Change Password state
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({})
 
   const [apiKeys, setApiKeys] = useState<ApiKeyEntry[]>([])
   const [keysLoaded, setKeysLoaded] = useState(false)
@@ -56,6 +71,8 @@ export function SettingsPage() {
   const [newKeyAgentId, setNewKeyAgentId] = useState<string>('')
   const [createdKey, setCreatedKey] = useState('')
   const [creatingKey, setCreatingKey] = useState(false)
+  // m22: API key delete confirmation
+  const [deleteKeyTarget, setDeleteKeyTarget] = useState<ApiKeyEntry | null>(null)
   const { data: myAgentsRes } = useMyAgents()
   const myAgents = myAgentsRes?.data ?? []
 
@@ -75,11 +92,64 @@ export function SettingsPage() {
     try {
       const res = await api.updateMe({ full_name: fullName, avatar_url: avatarUrl || undefined })
       setUser(res.data)
+      setAvatarPreview(null)
       toast.success('Profile updated')
     } catch (err) {
       toast.error(err)
     } finally {
       setSaving(false)
+    }
+  }
+
+  // B22: Avatar file upload handler
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      setAvatarPreview(dataUrl)
+      setAvatarUrl(dataUrl)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  // B21: Change Password handler
+  const handleChangePassword = async () => {
+    const errors: Record<string, string> = {}
+    if (!currentPassword) errors.currentPassword = 'Current password is required'
+    if (!newPassword) errors.newPassword = 'New password is required'
+    else if (newPassword.length < 8) errors.newPassword = 'Must be at least 8 characters'
+    if (newPassword !== confirmPassword) errors.confirmPassword = 'Passwords do not match'
+    setPasswordErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
+    setChangingPassword(true)
+    try {
+      await api.changePassword({ current_password: currentPassword, new_password: newPassword })
+      toast.success('Password changed')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setPasswordErrors({})
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to change password'
+      if (message.toLowerCase().includes('current') || message.toLowerCase().includes('incorrect')) {
+        setPasswordErrors({ currentPassword: 'Current password is incorrect' })
+      } else {
+        toast.error(err)
+      }
+    } finally {
+      setChangingPassword(false)
     }
   }
 
@@ -109,32 +179,54 @@ export function SettingsPage() {
     }
   }
 
-  const handleDeleteKey = async (id: string) => {
+  // m22: Delete key with confirmation
+  const handleDeleteKey = async () => {
+    if (!deleteKeyTarget) return
     try {
-      await api.deleteApiKey(id)
-      setApiKeys((prev) => prev.filter((k) => k.id !== id))
+      await api.deleteApiKey(deleteKeyTarget.id)
+      setApiKeys((prev) => prev.filter((k) => k.id !== deleteKeyTarget.id))
       toast.success('API key deleted')
     } catch (err) {
       toast.error(err)
+    } finally {
+      setDeleteKeyTarget(null)
+    }
+  }
+
+  // m23: Tab change with dirty check
+  const handleTabChange = (value: string) => {
+    if (profileIsDirty && activeTab === 'profile') {
+      setPendingTab(value)
+      return
+    }
+    setActiveTab(value)
+    if (value === 'api-keys') loadKeys()
+  }
+
+  const handleDiscardChanges = () => {
+    setFullName(user?.full_name ?? '')
+    setAvatarUrl(user?.avatar_url ?? '')
+    setAvatarPreview(null)
+    if (pendingTab) {
+      setActiveTab(pendingTab)
+      if (pendingTab === 'api-keys') loadKeys()
+      setPendingTab(null)
     }
   }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-[26px] font-bold tracking-tight">Settings</h1>
-        <p className="text-[var(--text-secondary)] text-sm mt-0.5">Manage your account preferences</p>
-      </div>
+      <PageHeader title="Settings" description="Manage your account preferences" />
 
-      <Tabs defaultValue="profile">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="bg-[var(--surface)] border border-[var(--border-subtle)] sticky top-0 z-10">
           <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="api-keys" onClick={loadKeys}>API Keys</TabsTrigger>
+          <TabsTrigger value="api-keys">API Keys</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile" className="mt-6">
+        <TabsContent value="profile" className="mt-6 space-y-6">
           <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6 space-y-5">
             <div>
               <h2 className="text-base font-semibold text-foreground">Profile</h2>
@@ -151,33 +243,64 @@ export function SettingsPage() {
                   className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors"
                 />
               </div>
+
+              {/* B22: Avatar upload + URL input */}
               <div className="space-y-2">
-                <Label htmlFor="avatar_url" className="text-[13px]">Avatar URL</Label>
+                <Label className="text-[13px]">Avatar</Label>
                 <div className="flex items-center gap-4">
-                  <div className="size-16 rounded-full bg-[var(--surface)] border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center shrink-0">
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt="Avatar preview"
-                        className="size-full object-cover"
-                        onError={(e) => { e.currentTarget.style.display = 'none' }}
-                        onLoad={(e) => { e.currentTarget.style.display = 'block' }}
-                      />
-                    ) : (
-                      <User className="size-6 text-[var(--text-tertiary)]" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <Input
-                      id="avatar_url"
-                      value={avatarUrl}
-                      onChange={(e) => setAvatarUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors"
+                  <div className="relative group shrink-0">
+                    <div className="size-16 rounded-full bg-[var(--surface)] border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center">
+                      {(avatarPreview || avatarUrl) ? (
+                        <img
+                          src={avatarPreview || avatarUrl}
+                          alt="Avatar preview"
+                          className="size-full object-cover"
+                          onError={(e) => { e.currentTarget.style.display = 'none' }}
+                          onLoad={(e) => { e.currentTarget.style.display = 'block' }}
+                        />
+                      ) : (
+                        <User className="size-6 text-[var(--text-tertiary)]" />
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    >
+                      <Upload className="size-4 text-white" />
+                    </button>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
                     />
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => avatarInputRef.current?.click()}
+                      className="text-xs"
+                    >
+                      <Upload className="size-3.5" />
+                      Upload Image
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-[var(--text-tertiary)]">or paste URL</span>
+                      <Input
+                        value={avatarPreview ? '' : avatarUrl}
+                        onChange={(e) => { setAvatarUrl(e.target.value); setAvatarPreview(null) }}
+                        placeholder="https://..."
+                        disabled={!!avatarPreview}
+                        className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors h-8 text-xs flex-1"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
+
               <div className="space-y-2">
                 <Label className="text-[13px]">Email</Label>
                 <Input value={user?.email ?? ''} disabled className="opacity-60" />
@@ -190,10 +313,72 @@ export function SettingsPage() {
               </div>
               <Button
                 onClick={handleProfileSave}
-                disabled={saving}
+                disabled={saving || !profileIsDirty}
                 className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)] shadow-[0_0_16px_-4px_var(--glow)] transition-all"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+
+          {/* B21: Change Password */}
+          <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6 space-y-5">
+            <div>
+              <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                <Lock className="size-4" />
+                Change Password
+              </h2>
+              <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">Update your account password</p>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="current_password" className="text-[13px]">Current Password</Label>
+                <Input
+                  id="current_password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => { setCurrentPassword(e.target.value); setPasswordErrors((p) => ({ ...p, currentPassword: '' })) }}
+                  placeholder="Enter current password"
+                  className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors"
+                />
+                {passwordErrors.currentPassword && (
+                  <p className="text-xs text-destructive">{passwordErrors.currentPassword}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_password" className="text-[13px]">New Password</Label>
+                <Input
+                  id="new_password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setPasswordErrors((p) => ({ ...p, newPassword: '' })) }}
+                  placeholder="Enter new password"
+                  className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors"
+                />
+                {passwordErrors.newPassword && (
+                  <p className="text-xs text-destructive">{passwordErrors.newPassword}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm_password" className="text-[13px]">Confirm New Password</Label>
+                <Input
+                  id="confirm_password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setPasswordErrors((p) => ({ ...p, confirmPassword: '' })) }}
+                  placeholder="Confirm new password"
+                  className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors"
+                />
+                {passwordErrors.confirmPassword && (
+                  <p className="text-xs text-destructive">{passwordErrors.confirmPassword}</p>
+                )}
+              </div>
+              <Button
+                onClick={handleChangePassword}
+                disabled={changingPassword || (!currentPassword && !newPassword && !confirmPassword)}
+                variant="outline"
+              >
+                {changingPassword ? 'Changing...' : 'Change Password'}
               </Button>
             </div>
           </div>
@@ -254,10 +439,11 @@ export function SettingsPage() {
                         </p>
                       </div>
                     </div>
+                    {/* m22: Delete via confirmation instead of immediate */}
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      onClick={() => handleDeleteKey(key.id)}
+                      onClick={() => setDeleteKeyTarget(key)}
                       className="hover:bg-[var(--destructive)]/10 shrink-0"
                     >
                       <Trash2 className="size-3.5 text-destructive" />
@@ -267,6 +453,24 @@ export function SettingsPage() {
               </div>
             )}
           </div>
+
+          {/* m22: Delete API key confirmation dialog */}
+          <AlertDialog open={!!deleteKeyTarget} onOpenChange={(open) => !open && setDeleteKeyTarget(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete API Key</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Delete "{deleteKeyTarget?.name}"? Any applications using this key will lose access immediately. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteKey} className="bg-destructive hover:bg-destructive/90">
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Dialog open={showCreateKey} onOpenChange={setShowCreateKey}>
             <DialogContent>
@@ -382,6 +586,24 @@ export function SettingsPage() {
           <AgentsSettings />
         </TabsContent>
       </Tabs>
+
+      {/* m23: Unsaved changes warning dialog */}
+      <AlertDialog open={!!pendingTab} onOpenChange={(open) => !open && setPendingTab(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes in your profile. Discard them?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDiscardChanges}>
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -395,11 +617,12 @@ const PRESET_COLORS = [
 function AgentsSettings() {
   const [deleteTarget, setDeleteTarget] = useState<AgentWithProjects | null>(null)
   const [showDeleted, setShowDeleted] = useState(false)
-  // Always fetch with include_deleted=true so we can show the toggle count
   const { data: agentsRes, isLoading } = useMyAgents(true)
   const createAgent = useCreateGlobalAgent()
   const updateAgent = useUpdateGlobalAgent()
   const deleteAgent = useDeleteGlobalAgent()
+  const { data: projectsData } = useProjects({ per_page: 100 })
+  const allProjects = projectsData?.data ?? []
 
   const agents = agentsRes?.data ?? []
   const activeAgents = agents.filter((a) => !a.deleted_at)
@@ -411,6 +634,9 @@ function AgentsSettings() {
   const [editingAgent, setEditingAgent] = useState<AgentWithProjects | null>(null)
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState('')
+  // m25: project assignment state for edit dialog
+  const [editProjectIds, setEditProjectIds] = useState<string[]>([])
+  const [showProjectPicker, setShowProjectPicker] = useState(false)
 
   const resetAdd = () => {
     setShowAdd(false)
@@ -433,6 +659,8 @@ function AgentsSettings() {
     setEditingAgent(agent)
     setEditName(agent.name)
     setEditColor(agent.color)
+    setEditProjectIds(agent.projects.map((p) => p.id))
+    setShowProjectPicker(false)
   }
 
   const handleEdit = async () => {
@@ -442,6 +670,28 @@ function AgentsSettings() {
         agentId: editingAgent.id,
         data: { name: editName.trim(), color: editColor },
       })
+
+      // m25: Sync project assignments
+      const currentIds = new Set(editingAgent.projects.map((p) => p.id))
+      const targetIds = new Set(editProjectIds)
+      const toLink = editProjectIds.filter((id) => !currentIds.has(id))
+      const toUnlink = editingAgent.projects.filter((p) => !targetIds.has(p.id)).map((p) => p.id)
+
+      for (const projectId of toLink) {
+        try {
+          await api.linkAgentToProject(projectId, editingAgent.id)
+        } catch {
+          // ignore if already linked
+        }
+      }
+      for (const projectId of toUnlink) {
+        try {
+          await api.deleteAgent(projectId, editingAgent.id)
+        } catch {
+          // ignore if already removed
+        }
+      }
+
       toast.success('Agent updated')
       setEditingAgent(null)
     } catch (err) {
@@ -470,6 +720,14 @@ function AgentsSettings() {
     } finally {
       setDeleteTarget(null)
     }
+  }
+
+  const toggleProjectForEdit = (projectId: string) => {
+    setEditProjectIds((prev) =>
+      prev.includes(projectId)
+        ? prev.filter((id) => id !== projectId)
+        : [...prev, projectId]
+    )
   }
 
   if (isLoading) {
@@ -586,7 +844,7 @@ function AgentsSettings() {
                     <p className="text-sm font-medium text-foreground truncate">{agent.name}</p>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                       agent.is_active
-                        ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                        ? 'bg-[var(--success)]/10 text-[var(--success)]'
                         : 'bg-foreground/5 text-[var(--text-tertiary)]'
                     }`}>
                       {agent.is_active ? 'Active' : 'Inactive'}
@@ -667,10 +925,10 @@ function AgentsSettings() {
         </div>
       )}
 
-      {/* Edit dialog */}
+      {/* Edit dialog — m25: includes project assignment */}
       {editingAgent && (
         <Dialog open={!!editingAgent} onOpenChange={(v) => !v && setEditingAgent(null)}>
-          <DialogContent className="bg-[var(--elevated)] border-[var(--border-subtle)] sm:max-w-[380px]">
+          <DialogContent className="bg-[var(--elevated)] border-[var(--border-subtle)] sm:max-w-[420px]">
             <DialogHeader>
               <DialogTitle>Edit Agent</DialogTitle>
             </DialogHeader>
@@ -701,6 +959,64 @@ function AgentsSettings() {
                   ))}
                 </div>
               </div>
+
+              {/* m25: Project assignment */}
+              <div className="space-y-1.5">
+                <span className="text-xs text-[var(--text-tertiary)] font-medium">Projects</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {editProjectIds.map((pid) => {
+                    const proj = allProjects.find((p) => p.id === pid)
+                    return (
+                      <span
+                        key={pid}
+                        className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-[var(--accent-muted-bg)] text-[var(--accent-solid)] font-medium"
+                      >
+                        {proj?.name ?? pid.slice(0, 8)}
+                        <button
+                          type="button"
+                          onClick={() => toggleProjectForEdit(pid)}
+                          className="hover:text-destructive transition-colors"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setShowProjectPicker(!showProjectPicker)}
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-dashed border-[var(--border-subtle)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:border-[var(--border-strong)] transition-colors"
+                  >
+                    <FolderPlus className="size-3" />
+                    Add Project
+                  </button>
+                </div>
+                {showProjectPicker && (
+                  <div className="mt-1.5 max-h-36 overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)]">
+                    {allProjects.filter((p) => !editProjectIds.includes(p.id)).length === 0 ? (
+                      <p className="text-[11px] text-[var(--text-tertiary)] px-3 py-2 text-center">
+                        {allProjects.length === 0 ? 'No projects available' : 'All projects assigned'}
+                      </p>
+                    ) : (
+                      allProjects
+                        .filter((p) => !editProjectIds.includes(p.id))
+                        .map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => { toggleProjectForEdit(p.id); setShowProjectPicker(false) }}
+                            className="flex items-center gap-2 w-full px-3 py-2 text-left text-[13px] hover:bg-foreground/[0.03] transition-colors"
+                          >
+                            <span className="size-5 rounded flex items-center justify-center text-[10px] font-bold shrink-0" style={{ backgroundColor: p.color || '#6366F1', color: '#fff' }}>
+                              {p.icon || p.name.charAt(0).toUpperCase()}
+                            </span>
+                            <span className="font-medium text-foreground truncate">{p.name}</span>
+                          </button>
+                        ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditingAgent(null)}>Cancel</Button>
@@ -723,7 +1039,7 @@ function AgentsSettings() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmedDelete} className="bg-red-500 hover:bg-red-600">
+            <AlertDialogAction onClick={handleConfirmedDelete} className="bg-destructive hover:bg-destructive/90">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -756,39 +1072,62 @@ const DEFAULT_PREFS: NotificationPreferences = {
   email_digest: 'off',
 }
 
+// m24: Batched notification preferences with "Save Preferences" button
 function NotificationSettings() {
   const { data: prefs, isLoading } = useNotificationPreferences()
   const updatePrefs = useUpdateNotificationPreferences()
   const { data: projectsData } = useProjects({ per_page: 100 })
   const projects = projectsData?.data ?? []
 
-  const current: NotificationPreferences = prefs ?? DEFAULT_PREFS
+  const server: NotificationPreferences = prefs ?? DEFAULT_PREFS
+  const [local, setLocal] = useState<NotificationPreferences | null>(null)
+
+  // Sync local state when server data loads/changes
+  useEffect(() => {
+    if (prefs) setLocal(prefs)
+  }, [prefs])
+
+  const current = local ?? server
+
+  // Track dirty state by comparing serialized values
+  const isDirty = useMemo(() => {
+    if (!local || !prefs) return false
+    return JSON.stringify(local) !== JSON.stringify(prefs)
+  }, [local, prefs])
 
   const toggle = useCallback(
     (key: keyof NotificationPreferences) => {
-      const updated = { ...current, [key]: !current[key] }
-      updatePrefs.mutate(updated, {
-        onSuccess: () => toast.success('Preferences saved'),
-        onError: () => toast.error('Failed to save'),
+      setLocal((prev) => {
+        const base = prev ?? server
+        return { ...base, [key]: !base[key] }
       })
     },
-    [current, updatePrefs],
+    [server],
   )
-
 
   const toggleMuteProject = useCallback(
     (projectId: string) => {
-      const muted = current.muted_projects.includes(projectId)
-        ? current.muted_projects.filter((id) => id !== projectId)
-        : [...current.muted_projects, projectId]
-      const updated = { ...current, muted_projects: muted }
-      updatePrefs.mutate(updated, {
-        onSuccess: () => toast.success('Preferences saved'),
-        onError: () => toast.error('Failed to save'),
+      setLocal((prev) => {
+        const base = prev ?? server
+        const muted = base.muted_projects.includes(projectId)
+          ? base.muted_projects.filter((id) => id !== projectId)
+          : [...base.muted_projects, projectId]
+        return { ...base, muted_projects: muted }
       })
     },
-    [current, updatePrefs],
+    [server],
   )
+
+  const handleSave = () => {
+    updatePrefs.mutate(current, {
+      onSuccess: () => toast.success('Preferences saved'),
+      onError: () => toast.error('Failed to save'),
+    })
+  }
+
+  const handleDiscard = () => {
+    setLocal(prefs ?? DEFAULT_PREFS)
+  }
 
   const requestDesktopPermission = useCallback(async () => {
     if (!('Notification' in window)) {
@@ -821,6 +1160,27 @@ function NotificationSettings() {
 
   return (
     <div className="space-y-6">
+      {/* m24: Sticky save bar when dirty */}
+      {isDirty && (
+        <div className="sticky top-12 z-20 flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-[var(--accent-solid)]/30 bg-[var(--accent-muted-bg)] backdrop-blur-sm">
+          <p className="text-[13px] font-medium text-[var(--accent-solid)]">You have unsaved changes</p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleDiscard}>
+              Discard
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={updatePrefs.isPending}
+              className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)]"
+            >
+              <Save className="size-3.5" />
+              {updatePrefs.isPending ? 'Saving...' : 'Save Preferences'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Event Toggles */}
       <div className="bg-card border border-[var(--border-subtle)] rounded-xl p-6">
         <div className="mb-5">
@@ -961,10 +1321,9 @@ function NotificationSettings() {
             description="Receive emails for notifications"
             checked={current.email_enabled}
             onToggle={() => {
-              const updated = { ...current, email_enabled: !current.email_enabled, email_digest: !current.email_enabled ? 'instant' as const : 'off' as const }
-              updatePrefs.mutate(updated, {
-                onSuccess: () => toast.success('Preferences saved'),
-                onError: () => toast.error('Failed to save'),
+              setLocal((prev) => {
+                const base = prev ?? server
+                return { ...base, email_enabled: !base.email_enabled, email_digest: !base.email_enabled ? 'instant' as const : 'off' as const }
               })
             }}
           />
@@ -975,10 +1334,7 @@ function NotificationSettings() {
                 <button
                   key={mode}
                   onClick={() => {
-                    updatePrefs.mutate({ ...current, email_digest: mode }, {
-                      onSuccess: () => toast.success('Preferences saved'),
-                      onError: () => toast.error('Failed to save'),
-                    })
+                    setLocal((prev) => ({ ...(prev ?? server), email_digest: mode }))
                   }}
                   className={`px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
                     current.email_digest === mode
