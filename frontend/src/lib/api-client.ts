@@ -548,7 +548,7 @@ class APIClient {
   }
 
   async getDashboardStats() {
-    return this.request<APIResponse<{ in_progress: number; overdue: number }>>('/dashboard/stats')
+    return this.request<APIResponse<{ in_progress: number; overdue: number; total_tasks: number }>>('/dashboard/stats')
   }
 
   async getMyTasks() {
@@ -628,6 +628,13 @@ class APIClient {
   async updateMe(data: { full_name?: string; avatar_url?: string }) {
     return this.request<APIResponse<User>>('/users/me', {
       method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async changePassword(data: { current_password: string; new_password: string }) {
+    return this.request<APIResponse<{ message: string }>>('/users/me/password', {
+      method: 'PUT',
       body: JSON.stringify(data),
     })
   }

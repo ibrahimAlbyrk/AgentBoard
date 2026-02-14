@@ -71,7 +71,7 @@
 
   /* Priority */
   --priority-urgent: #EF4444;
-  --priority-high: #F59E0B;
+  --priority-high: #F97316;
   --priority-medium: #EAB308;
   --priority-low: #3B82F6;
   --priority-none: #A1A1AA;
@@ -136,7 +136,7 @@
   --elevated: #282e33;
   --overlay: #333b43;
   --text-secondary: #9eaebe;
-  --text-tertiary: #7d8fa2;
+  --text-tertiary: #8c9bab;
   --border-subtle: #3d474f;
   --border-strong: #4d5960;
 
@@ -148,7 +148,7 @@
   --info-muted: #579dff/12;
 
   --priority-urgent: #f87171;
-  --priority-high: #facc15;
+  --priority-high: #fb923c;
   --priority-medium: #fde68a;
   --priority-low: #579dff;
   --priority-none: #6b7a8d;
@@ -368,7 +368,7 @@
 
 /* ===== Card hover glow ===== */
 .card-hover {
-  transition: all 200ms var(--ease-out);
+  transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
 }
 .card-hover:hover {
   transform: translateY(-2px);
@@ -435,19 +435,19 @@
 }
 
 .agentboard-toast-title {
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  line-height: 1.4 !important;
-  letter-spacing: -0.01em !important;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
 }
 .agentboard-toast-description {
-  font-size: 12px !important;
-  opacity: 0.7 !important;
-  line-height: 1.4 !important;
-  margin-top: 2px !important;
+  font-size: 12px;
+  opacity: 0.7;
+  line-height: 1.4;
+  margin-top: 2px;
 }
 .agentboard-toast-icon {
-  margin-right: 2px !important;
+  margin-right: 2px;
 }
 
 /* Success: subtle green left accent */
@@ -488,4 +488,13 @@
 }
 .agentboard-toast--info .agentboard-toast-icon {
   color: #3b82f6 !important;
+}
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

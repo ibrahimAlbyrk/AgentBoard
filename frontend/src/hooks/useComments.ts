@@ -21,3 +21,28 @@ export function useCreateComment(projectId: string, boardId: string, taskId: str
     },
   })
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function useUpdateComment(projectId: string, boardId: string, taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mutationFn: ({ commentId, data }: { commentId: string; data: { content: any } }) =>
+      api.updateComment(projectId, boardId, taskId, commentId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['comments', projectId, boardId, taskId] })
+    },
+  })
+}
+
+export function useDeleteComment(projectId: string, boardId: string, taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (commentId: string) =>
+      api.deleteComment(projectId, boardId, taskId, commentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['comments', projectId, boardId, taskId] })
+      qc.invalidateQueries({ queryKey: ['activity', projectId, taskId] })
+    },
+  })
+}
