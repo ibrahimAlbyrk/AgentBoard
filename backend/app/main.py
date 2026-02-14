@@ -47,6 +47,7 @@ from app.api.v1 import (
     statuses,
     tasks,
     users,
+    webhooks,
     websocket,
 )
 
@@ -71,6 +72,7 @@ for router_module in [
     custom_fields,
     mentionables,
     dashboard,
+    webhooks,
 ]:
     app.include_router(router_module.router, prefix="/api/v1")
 
