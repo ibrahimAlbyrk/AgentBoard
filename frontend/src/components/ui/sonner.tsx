@@ -31,6 +31,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           title: 'agentboard-toast-title',
           description: 'agentboard-toast-description',
           icon: 'agentboard-toast-icon',
+          closeButton: 'agentboard-toast-close',
           success: 'agentboard-toast--success',
           error: 'agentboard-toast--error',
           warning: 'agentboard-toast--warning',
@@ -40,6 +41,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           fontFamily: "'General Sans', system-ui, -apple-system, sans-serif",
         },
       }}
+      closeButton
       gap={8}
       visibleToasts={3}
       offset={16}

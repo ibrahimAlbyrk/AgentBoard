@@ -394,6 +394,46 @@
   --toast-shadow: 0 8px 32px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(140,155,171,0.1);
 }
 
+/* Close button — tiny red pill in top-right corner, hover-reveal */
+.agentboard-toast-close {
+  position: absolute !important;
+  top: -6px !important;
+  right: -6px !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: scale(0.5) !important;
+  width: 18px !important;
+  height: 18px !important;
+  border: none !important;
+  border-radius: 50% !important;
+  background: #ef4444 !important;
+  color: #fff !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  opacity: 0 !important;
+  box-shadow: 0 1px 4px rgba(239,68,68,0.4) !important;
+  transition: opacity 0.2s cubic-bezier(0.2,0.8,0.2,1), transform 0.2s cubic-bezier(0.2,0.8,0.2,1) !important;
+  cursor: pointer !important;
+}
+.agentboard-toast:hover .agentboard-toast-close {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+}
+.agentboard-toast-close:hover {
+  background: #dc2626 !important;
+  transform: scale(1.15) !important;
+  box-shadow: 0 2px 8px rgba(239,68,68,0.5) !important;
+}
+.agentboard-toast-close:active {
+  transform: scale(0.9) !important;
+}
+.agentboard-toast-close svg {
+  width: 10px !important;
+  height: 10px !important;
+  stroke-width: 2.5 !important;
+}
+
 .agentboard-toast-title {
   font-size: 13px !important;
   font-weight: 500 !important;
