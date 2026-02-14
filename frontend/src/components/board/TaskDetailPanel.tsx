@@ -492,6 +492,19 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                   </motion.div>
                 </div>
 
+                {/* Subtask breadcrumb — always visible above tabs */}
+                {subtaskStack.length > 0 && (
+                  <div className="px-6 pb-2 shrink-0">
+                    <button
+                      onClick={() => setSubtaskStack((prev) => prev.slice(0, -1))}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent-solid)] hover:text-[var(--accent-solid-hover)] bg-[var(--accent-muted-bg)] hover:bg-[var(--accent-solid)]/15 px-2.5 py-1.5 rounded-lg transition-all duration-150 group"
+                    >
+                      <ChevronRight className="size-3 rotate-180 transition-transform group-hover:-translate-x-0.5" />
+                      Back to parent task
+                    </button>
+                  </div>
+                )}
+
                 {/* Tabs */}
                 <Tabs
                   value={activeTab}
@@ -590,19 +603,6 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                     </TabsContent>
 
                     <TabsContent value="tasks" forceMount className="px-6 py-5 mt-0 data-[state=inactive]:hidden">
-                      {/* Subtask breadcrumb */}
-                      {subtaskStack.length > 0 && (
-                        <div className="mb-3">
-                          <button
-                            onClick={() => setSubtaskStack((prev) => prev.slice(0, -1))}
-                            className="flex items-center gap-1 text-xs text-[var(--accent-solid)] hover:underline"
-                          >
-                            <ChevronRight className="size-3 rotate-180" />
-                            Back to parent task
-                          </button>
-                        </div>
-                      )}
-
                       {/* Subtasks */}
                       <SubtasksSection
                         projectId={projectId}
