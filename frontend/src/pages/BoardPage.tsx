@@ -111,9 +111,9 @@ export function BoardPage() {
   const agents = project.agents ?? []
 
   return (
-    <div className="flex flex-col -m-6 min-h-full">
-      {/* Sticky header */}
-      <div className="sticky top-0 z-20 px-6 py-4 border-b border-[var(--border-subtle)] bg-background/80 backdrop-blur-xl">
+    <div className="flex flex-col -m-6" style={{ height: 'calc(100% + 3rem)' }}>
+      {/* Board header */}
+      <div className="shrink-0 px-6 py-4 border-b border-[var(--border-subtle)] bg-background">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <span className="text-xl">{project.icon || '📋'}</span>
@@ -180,8 +180,8 @@ export function BoardPage() {
         <TaskFilters />
       </div>
 
-      {/* Board area: grows vertically, scrolls horizontally */}
-      <div className="flex-1">
+      {/* Board area: fills remaining space, scrolls independently */}
+      <div className="flex-1 min-h-0 overflow-auto">
         <KanbanBoard
           onTaskClick={setSelectedTask}
           onAddTask={handleAddTask}

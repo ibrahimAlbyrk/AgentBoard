@@ -185,7 +185,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   }
 
   return (
-    <header className="h-12 border-b border-[var(--border-subtle)] bg-background/80 backdrop-blur-xl flex items-center justify-between px-4">
+    <header className="relative z-30 h-12 border-b border-[var(--border-subtle)] bg-background/80 backdrop-blur-xl flex items-center justify-between px-4">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" className="md:hidden size-8" onClick={onMenuClick}>
           <Menu className="size-4" />
