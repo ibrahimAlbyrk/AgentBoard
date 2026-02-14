@@ -692,6 +692,13 @@ const DEFAULT_PREFS: NotificationPreferences = {
   task_comment: true,
   task_reaction: true,
   mentioned: true,
+  subtask_created: true,
+  subtask_deleted: true,
+  watcher_added: true,
+  watcher_removed: true,
+  assignee_added: true,
+  assignee_removed: true,
+  comment_deleted: true,
   self_notifications: true,
   desktop_enabled: false,
   muted_projects: [],
@@ -901,7 +908,7 @@ function NotificationSettings() {
         <div className="space-y-4">
           <ToggleRow
             label="Enable email notifications"
-            description="Receive an email for each notification instantly"
+            description="Receive emails for notifications"
             checked={current.email_enabled}
             onToggle={() => {
               const updated = { ...current, email_enabled: !current.email_enabled, email_digest: !current.email_enabled ? 'instant' as const : 'off' as const }
@@ -911,6 +918,29 @@ function NotificationSettings() {
               })
             }}
           />
+          {current.email_enabled && (
+            <div className="ml-4 mt-2 flex items-center gap-2 text-sm">
+              <span className="text-[var(--text-secondary)]">Delivery:</span>
+              {(['instant', 'daily'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    updatePrefs.mutate({ ...current, email_digest: mode }, {
+                      onSuccess: () => toast.success('Preferences saved'),
+                      onError: () => toast.error('Failed to save'),
+                    })
+                  }}
+                  className={`px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+                    current.email_digest === mode
+                      ? 'bg-[var(--accent-solid)] text-white'
+                      : 'bg-foreground/5 text-[var(--text-secondary)] hover:bg-foreground/10'
+                  }`}
+                >
+                  {mode === 'instant' ? 'Instant' : 'Daily Digest'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

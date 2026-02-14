@@ -79,16 +79,36 @@ export function useWebSocket(projectId: string, boardId: string) {
       invalidateActivity()
     }
 
-    const handleNotification = () => {
+    const handleNotification = async () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] })
 
-      if ('Notification' in window && Notification.permission === 'granted') {
-        const prefs = queryClient.getQueryData<import('@/types/user').NotificationPreferences>(
-          ['notification-preferences'],
-        )
-        if (prefs?.desktop_enabled) {
-          new Notification('AgentBoard', { body: 'You have a new notification', icon: '/favicon.ico' })
+      // Fetch the latest notification for rich content
+      try {
+        const res = await import('@/lib/api-client').then(m => m.api.listNotifications({ per_page: 1 }))
+        const latest = res?.data?.[0]
+        const body = latest?.title
+          ? `${latest.title}${latest.message ? ': ' + latest.message : ''}`
+          : 'You have a new notification'
+        const shortBody = body.length > 120 ? body.slice(0, 117) + '...' : body
+
+        // In-app toast
+        toast.info(shortBody, { duration: 4000 })
+
+        // Desktop notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          const prefs = queryClient.getQueryData<import('@/types/user').NotificationPreferences>(
+            ['notification-preferences'],
+          )
+          if (prefs?.desktop_enabled) {
+            new Notification(latest?.title ?? 'AgentBoard', {
+              body: latest?.message ?? 'You have a new notification',
+              icon: '/favicon.ico',
+            })
+          }
         }
+      } catch {
+        toast.info('You have a new notification')
       }
     }
 
