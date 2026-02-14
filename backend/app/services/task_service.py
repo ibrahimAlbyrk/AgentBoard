@@ -369,6 +369,23 @@ class TaskService:
                     data={"task_id": str(task.id), "board_id": str(task.board_id)},
                 )
 
+        # Notify parent task's assignees/watchers about new subtask
+        if task_in.parent_id and task:
+            parent_with_rels = await crud_task.get_with_relations(db, task_in.parent_id)
+            if parent_with_rels:
+                creator = await crud_user.get(db, creator_id)
+                creator_name = (creator.full_name or creator.username) if creator else "Someone"
+                await _notify_assignees(
+                    db, parent_with_rels, creator_id,
+                    "subtask_created", "New Subtask",
+                    f'{creator_name} added subtask "{task.title}" to "{parent_with_rels.title}"',
+                )
+                await _notify_watchers(
+                    db, parent_with_rels, creator_id,
+                    "subtask_created", "Watching: New Subtask",
+                    f'{creator_name} added subtask "{task.title}" to "{parent_with_rels.title}"',
+                )
+
         return task
 
     @staticmethod
@@ -499,6 +516,26 @@ class TaskService:
                 watcher_user_ids or [],
                 watcher_agent_ids or [],
             )
+            # Notify newly added/removed watchers
+            if old_wuids != new_wuids:
+                actor = await crud_user.get(db, user_id)
+                actor_name = (actor.full_name or actor.username) if actor else "Someone"
+                for uid in new_wuids - old_wuids:
+                    await NotificationService.create_notification(
+                        db, user_id=uid, actor_id=user_id,
+                        project_id=task.project_id, type="watcher_added",
+                        title="Watching Task",
+                        message=f'{actor_name} added you as watcher on "{task.title}"',
+                        data={"task_id": str(task.id), "board_id": str(task.board_id)},
+                    )
+                for uid in old_wuids - new_wuids:
+                    await NotificationService.create_notification(
+                        db, user_id=uid, actor_id=user_id,
+                        project_id=task.project_id, type="watcher_removed",
+                        title="Removed from Watchers",
+                        message=f'{actor_name} removed you from watchers on "{task.title}"',
+                        data={"task_id": str(task.id), "board_id": str(task.board_id)},
+                    )
 
         assignees_changed = assignee_user_ids is not None or assignee_agent_ids is not None
         if assignees_changed:
@@ -536,6 +573,26 @@ class TaskService:
                 assignee_user_ids or [],
                 assignee_agent_ids or [],
             )
+            # Notify newly added/removed assignees
+            if old_auids != new_auids:
+                actor = await crud_user.get(db, user_id)
+                actor_name = (actor.full_name or actor.username) if actor else "Someone"
+                for uid in new_auids - old_auids:
+                    await NotificationService.create_notification(
+                        db, user_id=uid, actor_id=user_id,
+                        project_id=task.project_id, type="assignee_added",
+                        title="Task Assigned",
+                        message=f'{actor_name} assigned you to "{task.title}"',
+                        data={"task_id": str(task.id), "board_id": str(task.board_id)},
+                    )
+                for uid in old_auids - new_auids:
+                    await NotificationService.create_notification(
+                        db, user_id=uid, actor_id=user_id,
+                        project_id=task.project_id, type="assignee_removed",
+                        title="Unassigned from Task",
+                        message=f'{actor_name} removed you from "{task.title}"',
+                        data={"task_id": str(task.id), "board_id": str(task.board_id)},
+                    )
 
         if update_data:
             db.add(task)
@@ -560,23 +617,18 @@ class TaskService:
         if has_changes and refreshed:
             updater = await crud_user.get(db, user_id)
             updater_name = (updater.full_name or updater.username) if updater else "Someone"
+            non_assignee_changes = {k: v for k, v in changes.items() if k not in ("assignees", "watchers")}
 
-            if assignees_changed and refreshed.assignees:
-                await _notify_assignees(
-                    db, refreshed, user_id,
-                    "task_assigned", "Task Assigned",
-                    f'{updater_name} assigned you to "{task.title}"',
-                )
-            elif refreshed.assignees:
-                detail = _describe_changes(
-                    {k: v for k, v in changes.items() if k != "assignees"},
-                )
+            # Notify existing assignees about non-assignee changes (skip if only assignees/watchers changed)
+            if non_assignee_changes and refreshed.assignees:
+                detail = _describe_changes(non_assignee_changes)
                 await _notify_assignees(
                     db, refreshed, user_id,
                     "task_updated", "Task Updated",
                     f'{updater_name} updated "{task.title}" — {detail}',
                 )
 
+            # Notify watchers about all changes (skip assignees to avoid dups — handled by _notify_watchers)
             if refreshed.watchers:
                 detail = _describe_changes(changes)
                 await _notify_watchers(
@@ -757,6 +809,7 @@ class TaskService:
         """
         from app.services.reaction_service import ReactionService
 
+        task_title = task.title
         children = await crud_task.get_children(db, task.id)
         children_count = len(children)
         result_info = {"mode": mode, "children_count": children_count}
@@ -793,6 +846,50 @@ class TaskService:
             changes=changes,
         )
 
+        # Notify assignees and watchers before deletion
+        deleter = await crud_user.get(db, user_id)
+        deleter_name = (deleter.full_name or deleter.username) if deleter else "Someone"
+        notified: set[UUID] = set()
+        for a in task.assignees:
+            if not a.user_id or a.user_id == user_id:
+                continue
+            await NotificationService.create_notification(
+                db, user_id=a.user_id, actor_id=user_id,
+                project_id=task.project_id, type="task_deleted",
+                title="Task Deleted",
+                message=f'{deleter_name} deleted "{task_title}"',
+                data={"task_id": str(task.id), "board_id": str(task.board_id)},
+            )
+            notified.add(a.user_id)
+        for w in task.watchers:
+            if not w.user_id or w.user_id in notified or w.user_id == user_id:
+                continue
+            await NotificationService.create_notification(
+                db, user_id=w.user_id, actor_id=user_id,
+                project_id=task.project_id, type="task_deleted",
+                title="Watching: Task Deleted",
+                message=f'{deleter_name} deleted "{task_title}"',
+                data={"task_id": str(task.id), "board_id": str(task.board_id)},
+            )
+            notified.add(w.user_id)
+
+        # Notify parent task stakeholders if this was a subtask
+        if task.parent_id:
+            parent_with_rels = await crud_task.get_with_relations(db, task.parent_id)
+            if parent_with_rels:
+                await _notify_assignees(
+                    db, parent_with_rels, user_id,
+                    "subtask_deleted", "Subtask Deleted",
+                    f'{deleter_name} deleted subtask "{task_title}" from "{parent_with_rels.title}"',
+                )
+                await _notify_watchers(
+                    db, parent_with_rels, user_id,
+                    "subtask_deleted", "Watching: Subtask Deleted",
+                    f'{deleter_name} deleted subtask "{task_title}" from "{parent_with_rels.title}"',
+                )
+
+        result_info["notified_uids"] = [str(uid) for uid in notified]
+
         await crud_task.remove(db, id=task.id)
         return result_info
 
@@ -828,6 +925,22 @@ class TaskService:
             changes=changes,
         )
 
+        # Notify new parent's assignees/watchers
+        parent_with_rels = await crud_task.get_with_relations(db, parent_id)
+        if parent_with_rels:
+            actor = await crud_user.get(db, user_id)
+            actor_name = (actor.full_name or actor.username) if actor else "Someone"
+            await _notify_assignees(
+                db, parent_with_rels, user_id,
+                "subtask_created", "New Subtask",
+                f'{actor_name} converted "{task.title}" into subtask of "{parent_with_rels.title}"',
+            )
+            await _notify_watchers(
+                db, parent_with_rels, user_id,
+                "subtask_created", "Watching: New Subtask",
+                f'{actor_name} converted "{task.title}" into subtask of "{parent_with_rels.title}"',
+            )
+
         task_id = task.id
         await db.commit()
         db.expunge(task)
@@ -860,6 +973,23 @@ class TaskService:
             task_id=task.id,
             changes={"parent": {"old": old_parent_title, "new": None}},
         )
+
+        # Notify old parent's assignees/watchers about subtask leaving
+        if old_parent:
+            old_parent_with_rels = await crud_task.get_with_relations(db, old_parent.id)
+            if old_parent_with_rels:
+                actor = await crud_user.get(db, user_id)
+                actor_name = (actor.full_name or actor.username) if actor else "Someone"
+                await _notify_assignees(
+                    db, old_parent_with_rels, user_id,
+                    "subtask_deleted", "Subtask Promoted",
+                    f'{actor_name} promoted subtask "{task.title}" from "{old_parent_with_rels.title}" to independent task',
+                )
+                await _notify_watchers(
+                    db, old_parent_with_rels, user_id,
+                    "subtask_deleted", "Watching: Subtask Promoted",
+                    f'{actor_name} promoted subtask "{task.title}" from "{old_parent_with_rels.title}" to independent task',
+                )
 
         task_id = task.id
         await db.commit()

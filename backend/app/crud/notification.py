@@ -56,6 +56,18 @@ class CRUDNotification(
         )
         await db.flush()
 
+    async def mark_read_batch(
+        self, db: AsyncSession, notification_ids: list[UUID]
+    ) -> None:
+        if not notification_ids:
+            return
+        await db.execute(
+            update(Notification)
+            .where(Notification.id.in_(notification_ids))
+            .values(is_read=True)
+        )
+        await db.flush()
+
     async def mark_all_read(
         self, db: AsyncSession, user_id: UUID
     ) -> None:

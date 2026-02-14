@@ -113,6 +113,10 @@ async def create_task(
         if w.user and str(w.user.id) not in notified:
             notified.add(str(w.user.id))
             await manager.broadcast_to_user(str(w.user.id), {"type": "notification.new"})
+    await NotificationService.fire_webhooks(
+        db, board.project_id, "task.created",
+        {"task_id": str(task.id), "title": task.title, "board_id": str(board.id)},
+    )
     return ResponseBase(data=response)
 
 
@@ -164,6 +168,10 @@ async def update_task(
         if w.user and str(w.user.id) not in notified:
             notified.add(str(w.user.id))
             await manager.broadcast_to_user(str(w.user.id), {"type": "notification.new"})
+    await NotificationService.fire_webhooks(
+        db, board.project_id, "task.updated",
+        {"task_id": str(task_id), "title": updated.title, "board_id": str(board.id)},
+    )
     return ResponseBase(data=response)
 
 
@@ -178,14 +186,10 @@ async def delete_task(
     task = await crud_task.get_with_relations(db, task_id)
     if not task or task.board_id != board.id:
         raise NotFoundError("Task not found")
-    task_title = task.title
-    assignee_user_ids = [a.user_id for a in task.assignees if a.user_id]
-    watcher_user_ids = [w.user_id for w in task.watchers if w.user_id]
 
-    # Check if task has children — return 409 if no mode explicitly chosen
     children_count = len(task.children) if hasattr(task, "children") else 0
 
-    await TaskService.delete_task_with_strategy(db, task, current_user.id, mode)
+    result = await TaskService.delete_task_with_strategy(db, task, current_user.id, mode)
 
     await manager.broadcast_to_board(str(board.project_id), str(board.id), {
         "type": "task.deleted",
@@ -193,38 +197,12 @@ async def delete_task(
         "board_id": str(board.id),
         "data": {"task_id": str(task_id), "mode": mode, "children_count": children_count},
     })
-    deleter_name = current_user.full_name or current_user.username
-    notified: set[str] = set()
-    for uid in assignee_user_ids:
-        notif = await NotificationService.create_notification(
-            db,
-            user_id=uid,
-            actor_id=current_user.id,
-            project_id=board.project_id,
-            type="task_deleted",
-            title="Task Deleted",
-            message=f'{deleter_name} deleted "{task_title}"',
-            data={"task_id": str(task_id)},
-        )
-        if notif:
-            notified.add(str(uid))
-            await manager.broadcast_to_user(str(uid), {"type": "notification.new"})
-    for wuid in watcher_user_ids:
-        if str(wuid) in notified:
-            continue
-        notif = await NotificationService.create_notification(
-            db,
-            user_id=wuid,
-            actor_id=current_user.id,
-            project_id=board.project_id,
-            type="task_deleted",
-            title="Watching: Task Deleted",
-            message=f'{deleter_name} deleted "{task_title}"',
-            data={"task_id": str(task_id)},
-        )
-        if notif:
-            notified.add(str(wuid))
-            await manager.broadcast_to_user(str(wuid), {"type": "notification.new"})
+    for uid_str in result.get("notified_uids", []):
+        await manager.broadcast_to_user(uid_str, {"type": "notification.new"})
+    await NotificationService.fire_webhooks(
+        db, board.project_id, "task.deleted",
+        {"task_id": str(task_id), "mode": mode},
+    )
 
 
 @router.post("/{task_id}/move", response_model=ResponseBase[TaskResponse])
@@ -260,6 +238,10 @@ async def move_task(
         if w.user and str(w.user.id) not in notified:
             notified.add(str(w.user.id))
             await manager.broadcast_to_user(str(w.user.id), {"type": "notification.new"})
+    await NotificationService.fire_webhooks(
+        db, board.project_id, "task.moved",
+        {"task_id": str(task_id), "title": moved.title, "status_id": str(body.status_id)},
+    )
     return ResponseBase(data=response)
 
 
@@ -285,7 +267,7 @@ async def bulk_update_tasks(
         })
         updater_name = current_user.full_name or current_user.username
         for a in r.assignees:
-            if a.user:
+            if a.user and a.user.id != current_user.id:
                 uid = str(a.user.id)
                 notif = await NotificationService.create_notification(
                     db,
@@ -294,6 +276,22 @@ async def bulk_update_tasks(
                     project_id=board.project_id,
                     type="task_updated",
                     title="Task Updated",
+                    message=f'{updater_name} updated "{r.title}"',
+                    data={"task_id": str(r.id), "board_id": str(board.id)},
+                )
+                if notif and uid not in notified_users:
+                    notified_users.add(uid)
+                    await manager.broadcast_to_user(uid, {"type": "notification.new"})
+        for w in r.watchers:
+            if w.user and str(w.user.id) not in notified_users and w.user.id != current_user.id:
+                uid = str(w.user.id)
+                notif = await NotificationService.create_notification(
+                    db,
+                    user_id=w.user.id,
+                    actor_id=current_user.id,
+                    project_id=board.project_id,
+                    type="task_updated",
+                    title="Watching: Task Updated",
                     message=f'{updater_name} updated "{r.title}"',
                     data={"task_id": str(r.id), "board_id": str(board.id)},
                 )
@@ -325,7 +323,7 @@ async def bulk_move_tasks(
         })
         mover_name = current_user.full_name or current_user.username
         for a in r.assignees:
-            if a.user:
+            if a.user and a.user.id != current_user.id:
                 uid = str(a.user.id)
                 notif = await NotificationService.create_notification(
                     db,
@@ -334,6 +332,22 @@ async def bulk_move_tasks(
                     project_id=board.project_id,
                     type="task_moved",
                     title="Task Moved",
+                    message=f'{mover_name} moved "{r.title}"',
+                    data={"task_id": str(r.id), "board_id": str(board.id)},
+                )
+                if notif and uid not in notified_users:
+                    notified_users.add(uid)
+                    await manager.broadcast_to_user(uid, {"type": "notification.new"})
+        for w in r.watchers:
+            if w.user and str(w.user.id) not in notified_users and w.user.id != current_user.id:
+                uid = str(w.user.id)
+                notif = await NotificationService.create_notification(
+                    db,
+                    user_id=w.user.id,
+                    actor_id=current_user.id,
+                    project_id=board.project_id,
+                    type="task_moved",
+                    title="Watching: Task Moved",
                     message=f'{mover_name} moved "{r.title}"',
                     data={"task_id": str(r.id), "board_id": str(board.id)},
                 )
@@ -356,6 +370,7 @@ async def bulk_delete_tasks(
         if task and task.board_id == board.id:
             task_title = task.title
             assignee_user_ids = [a.user_id for a in task.assignees if a.user_id]
+            watcher_user_ids = [w.user_id for w in task.watchers if w.user_id]
             await crud_activity_log.log(
                 db,
                 project_id=board.project_id,
@@ -374,6 +389,8 @@ async def bulk_delete_tasks(
             })
             deleter_name = current_user.full_name or current_user.username
             for uid in assignee_user_ids:
+                if uid == current_user.id:
+                    continue
                 uid_str = str(uid)
                 notif = await NotificationService.create_notification(
                     db,
@@ -388,6 +405,25 @@ async def bulk_delete_tasks(
                 if notif and uid_str not in notified_users:
                     notified_users.add(uid_str)
                     await manager.broadcast_to_user(uid_str, {"type": "notification.new"})
+            for wuid in watcher_user_ids:
+                if wuid == current_user.id:
+                    continue
+                wuid_str = str(wuid)
+                if wuid_str in notified_users:
+                    continue
+                notif = await NotificationService.create_notification(
+                    db,
+                    user_id=wuid,
+                    actor_id=current_user.id,
+                    project_id=board.project_id,
+                    type="task_deleted",
+                    title="Watching: Task Deleted",
+                    message=f'{deleter_name} deleted "{task_title}"',
+                    data={"task_id": str(task_id)},
+                )
+                if notif and wuid_str not in notified_users:
+                    notified_users.add(wuid_str)
+                    await manager.broadcast_to_user(wuid_str, {"type": "notification.new"})
 
 
 # ── Subtask endpoints ──────────────────────────────────────────────
@@ -446,6 +482,17 @@ async def create_subtask(
         "data": {**response.model_dump(mode="json"), "parent_id": str(task_id)},
         "user": ws_user,
     })
+    # WS broadcast for parent task stakeholders (notifications created in service)
+    parent_rels = await crud_task.get_with_relations(db, task_id)
+    if parent_rels:
+        notified: set[str] = set()
+        for a in parent_rels.assignees:
+            if a.user_id and a.user_id != actor.user.id:
+                notified.add(str(a.user_id))
+                await manager.broadcast_to_user(str(a.user_id), {"type": "notification.new"})
+        for w in parent_rels.watchers:
+            if w.user_id and str(w.user_id) not in notified and w.user_id != actor.user.id:
+                await manager.broadcast_to_user(str(w.user_id), {"type": "notification.new"})
     return ResponseBase(data=response)
 
 

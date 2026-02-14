@@ -58,8 +58,7 @@ async def mark_read(
     if body.mark_all:
         await crud_notification.mark_all_read(db, current_user.id)
     elif body.notification_ids:
-        for nid in body.notification_ids:
-            await crud_notification.mark_read(db, nid)
+        await crud_notification.mark_read_batch(db, body.notification_ids)
     await db.commit()
     return {"success": True}
 

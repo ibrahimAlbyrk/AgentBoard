@@ -121,8 +121,9 @@ async def create_comment(
     )
 
     commenter_name = actor.display_name
+    notified_uids: set[str] = set()
     for assignee in task.assignees:
-        if not assignee.user_id:
+        if not assignee.user_id or assignee.user_id == actor.user.id:
             continue
         notif = await NotificationService.create_notification(
             db,
@@ -135,7 +136,29 @@ async def create_comment(
             data={"task_id": str(task_id), "board_id": str(board.id)},
         )
         if notif:
+            notified_uids.add(str(assignee.user_id))
             await manager.broadcast_to_user(str(assignee.user_id), {
+                "type": "notification.new",
+            })
+    # Notify watchers (skip already notified assignees and self)
+    for watcher in task.watchers:
+        if not watcher.user_id or watcher.user_id == actor.user.id:
+            continue
+        if str(watcher.user_id) in notified_uids:
+            continue
+        notif = await NotificationService.create_notification(
+            db,
+            user_id=watcher.user_id,
+            actor_id=actor.user.id,
+            project_id=board.project_id,
+            type="task_comment",
+            title="Watching: New Comment",
+            message=f'{commenter_name} commented on "{task.title}": {preview}',
+            data={"task_id": str(task_id), "board_id": str(board.id)},
+        )
+        if notif:
+            notified_uids.add(str(watcher.user_id))
+            await manager.broadcast_to_user(str(watcher.user_id), {
                 "type": "notification.new",
             })
 
@@ -161,6 +184,10 @@ async def create_comment(
             if notif:
                 await manager.broadcast_to_user(uid_str, {"type": "notification.new"})
 
+    await NotificationService.fire_webhooks(
+        db, board.project_id, "comment.created",
+        {"task_id": str(task_id), "comment_id": str(comment.id), "board_id": str(board.id)},
+    )
     return ResponseBase(data=CommentResponse.model_validate(comment))
 
 
@@ -244,5 +271,44 @@ async def delete_comment(
         task_id=task_id,
         changes={},
     )
+
+    # Notify task assignees/watchers about comment deletion
+    task = await crud_task.get_with_relations(db, task_id)
+    if task:
+        deleter_name = current_user.full_name or current_user.username
+        notified_uids: set[str] = set()
+        for a in task.assignees:
+            if not a.user_id or a.user_id == current_user.id:
+                continue
+            notif = await NotificationService.create_notification(
+                db,
+                user_id=a.user_id,
+                actor_id=current_user.id,
+                project_id=board.project_id,
+                type="comment_deleted",
+                title="Comment Deleted",
+                message=f'{deleter_name} deleted a comment on "{task.title}"',
+                data={"task_id": str(task_id), "board_id": str(board.id)},
+            )
+            if notif:
+                notified_uids.add(str(a.user_id))
+                await manager.broadcast_to_user(str(a.user_id), {"type": "notification.new"})
+        for w in task.watchers:
+            if not w.user_id or w.user_id == current_user.id or str(w.user_id) in notified_uids:
+                continue
+            notif = await NotificationService.create_notification(
+                db,
+                user_id=w.user_id,
+                actor_id=current_user.id,
+                project_id=board.project_id,
+                type="comment_deleted",
+                title="Watching: Comment Deleted",
+                message=f'{deleter_name} deleted a comment on "{task.title}"',
+                data={"task_id": str(task_id), "board_id": str(board.id)},
+            )
+            if notif:
+                notified_uids.add(str(w.user_id))
+                await manager.broadcast_to_user(str(w.user_id), {"type": "notification.new"})
+
     await ReactionService.delete_reactions_for_entity(db, "comment", comment_id)
     await crud_comment.remove(db, id=comment_id)

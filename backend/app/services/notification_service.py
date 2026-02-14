@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud import crud_user, crud_webhook
 from app.models.notification import Notification
-from app.schemas.notification import NotificationPreferences
+from app.schemas.notification import NotificationPreferences, NotificationType
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +32,13 @@ class NotificationService:
         prefs = await NotificationService.get_user_prefs(db, user_id)
         if not prefs.self_notifications and user_id == actor_id:
             return False
-        if not getattr(prefs, notification_type, True):
-            return False
+        if notification_type in NotificationType.ALL:
+            if not getattr(prefs, notification_type, True):
+                return False
+        else:
+            logger.warning("Unknown notification type: %s — defaulting to notify", notification_type)
+            if not getattr(prefs, notification_type, True):
+                return False
         if project_id and str(project_id) in prefs.muted_projects:
             return False
         return True
@@ -124,3 +129,13 @@ class NotificationService:
             await NotificationService.send_webhook(
                 wh.url, wh.secret, {"event": event_type, "data": data}
             )
+
+    @staticmethod
+    async def fire_webhooks(
+        db: AsyncSession, project_id: UUID, event_type: str, data: dict
+    ) -> None:
+        """Fire-and-forget wrapper — logs errors, never raises."""
+        try:
+            await NotificationService.notify_project_event(db, project_id, event_type, data)
+        except Exception:
+            logger.exception("Webhook dispatch failed for %s", event_type)
