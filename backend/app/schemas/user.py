@@ -16,6 +16,11 @@ class UserUpdate(BaseModel):
     avatar_url: str | None = None
 
 
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

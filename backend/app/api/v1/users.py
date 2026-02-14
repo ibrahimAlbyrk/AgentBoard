@@ -8,7 +8,8 @@ from app.core.database import get_db
 from app.crud import crud_user
 from app.models.user import User
 from app.schemas.base import ResponseBase
-from app.schemas.user import UserResponse, UserUpdate
+from app.core.security import hash_password, verify_password
+from app.schemas.user import PasswordChange, UserResponse, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -26,6 +27,23 @@ async def update_me(
 ):
     user = await crud_user.update(db, db_obj=current_user, obj_in=user_in)
     return ResponseBase(data=UserResponse.model_validate(user))
+
+
+@router.put("/me/password")
+async def change_password(
+    body: PasswordChange,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(body.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+    current_user.password_hash = hash_password(body.new_password)
+    db.add(current_user)
+    await db.flush()
+    return ResponseBase(data={"message": "Password changed"})
 
 
 @router.get("/{user_id}", response_model=ResponseBase[UserResponse])

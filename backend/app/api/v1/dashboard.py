@@ -64,10 +64,18 @@ async def get_dashboard_stats(
         )
     )
 
+    # Total tasks across all user projects
+    total_tasks = await db.execute(
+        select(func.count())
+        .select_from(Task)
+        .where(Task.project_id.in_(user_projects))
+    )
+
     return ResponseBase(
         data={
             "in_progress": in_progress.scalar_one(),
             "overdue": overdue.scalar_one(),
+            "total_tasks": total_tasks.scalar_one(),
         }
     )
 
