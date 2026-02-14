@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -22,12 +22,12 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useProjectStore } from '@/stores/projectStore'
 import { useCreateTask } from '@/hooks/useTasks'
 import { api } from '@/lib/api-client'
-import type { Priority } from '@/types'
+import type { Priority, TiptapDoc } from '@/types'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -39,7 +39,6 @@ function formatFileSize(bytes: number): string {
 
 const schema = z.object({
   title: z.string().min(1, 'Title is required'),
-  description: z.string().optional(),
   due_date: z.string().optional(),
 })
 
@@ -71,6 +70,7 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
 
   const [statusId, setStatusId] = useState(firstStatusId)
   const [priority, setPriority] = useState<Priority>('none')
+  const [description, setDescription] = useState<TiptapDoc | null>(null)
   const [assigneeUserIds, setAssigneeUserIds] = useState<string[]>([])
   const [assigneeAgentIds, setAssigneeAgentIds] = useState<string[]>([])
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
@@ -86,6 +86,20 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
+
+  // Reset all form state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      reset()
+      setStatusId(firstStatusId)
+      setPriority('none')
+      setDescription(null)
+      setAssigneeUserIds([])
+      setAssigneeAgentIds([])
+      setSelectedLabelIds([])
+      setPendingFiles([])
+    }
+  }, [open, firstStatusId, reset])
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const valid: File[] = []
@@ -127,7 +141,7 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
     try {
       const res = await createTask.mutateAsync({
         title: data.title,
-        description: data.description,
+        description: description || undefined,
         status_id: statusId || firstStatusId,
         priority,
         due_date: data.due_date || undefined,
@@ -149,13 +163,6 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
       }
 
       toast.success('Task created')
-      reset()
-      setStatusId(firstStatusId)
-      setPriority('none')
-      setAssigneeUserIds([])
-      setAssigneeAgentIds([])
-      setSelectedLabelIds([])
-      setPendingFiles([])
       onClose()
     } catch (err) {
       setUploading(false)
@@ -191,11 +198,13 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
 
           <div className="space-y-1.5">
             <span className="text-xs text-[var(--text-tertiary)] font-medium">Description</span>
-            <Textarea
-              id="task-desc"
+            <RichTextEditor
+              projectId={projectId}
+              value={description}
+              onChange={setDescription}
+              variant="compact"
               placeholder="Describe the task..."
-              {...register('description')}
-              className="min-h-[80px] bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--ring)] transition-colors rounded-lg"
+              className="min-h-[80px] [&_.tiptap]:min-h-[60px] [&_.tiptap]:max-h-[160px] [&_.tiptap]:overflow-y-auto"
             />
           </div>
 

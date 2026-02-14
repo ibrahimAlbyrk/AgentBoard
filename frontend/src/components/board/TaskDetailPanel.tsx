@@ -24,6 +24,7 @@ import {
   ListTree,
   ArrowUpFromLine,
   ArrowDownToLine,
+  Pencil,
 } from 'lucide-react'
 import {
   Select,
@@ -32,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -463,15 +465,18 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                           className="text-[22px] font-bold bg-transparent border-0 border-b-2 border-[var(--accent-solid)] rounded-none px-0 py-1 focus-visible:ring-0 focus-visible:shadow-none tracking-tight"
                         />
                       ) : (
-                        <h2
-                          className="text-[22px] font-bold tracking-tight cursor-pointer hover:text-[var(--accent-solid)] transition-colors duration-200 leading-snug"
+                        <div
+                          className="group cursor-pointer"
                           onClick={() => {
                             setTitle(displayTask.title)
                             setEditingTitle(true)
                           }}
                         >
-                          {displayTask.title}
-                        </h2>
+                          <h2 className="text-[22px] font-bold tracking-tight hover:text-[var(--accent-solid)] transition-colors duration-200 leading-snug">
+                            {displayTask.title}
+                            <Pencil className="size-3 ml-1.5 opacity-0 group-hover:opacity-40 inline-block transition-opacity" />
+                          </h2>
+                        </div>
                       )}
                     </motion.div>
 
@@ -493,55 +498,60 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                       variants={fadeUp}
                       className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] divide-y divide-[var(--border-subtle)] mb-6"
                     >
-                      {/* Status */}
-                      <PropertyRow icon={CircleDot} label="Status">
-                        <Select
-                          value={displayTask.status.id}
-                          onValueChange={(v) => handleFieldUpdate({ status_id: v })}
-                        >
-                          <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0 [&_[data-slot=select-value]]:overflow-visible">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statuses.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="size-2.5 rounded-full shrink-0"
-                                    style={{ backgroundColor: s.color || 'var(--priority-none)', boxShadow: `0 0 0 2px var(--popover), 0 0 0 3.5px ${s.color || 'var(--priority-none)'}` }}
-                                  />
-                                  {s.name}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </PropertyRow>
+                      {/* Status + Priority group */}
+                      <div className="bg-[var(--accent-solid)]/[0.03]">
+                        {/* Status */}
+                        <PropertyRow icon={CircleDot} label="Status">
+                          <Select
+                            value={displayTask.status.id}
+                            onValueChange={(v) => handleFieldUpdate({ status_id: v })}
+                          >
+                            <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0 [&_[data-slot=select-value]]:overflow-visible">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {statuses.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="size-2.5 rounded-full shrink-0"
+                                      style={{ backgroundColor: s.color || 'var(--priority-none)', boxShadow: `0 0 0 2px var(--popover), 0 0 0 3.5px ${s.color || 'var(--priority-none)'}` }}
+                                    />
+                                    {s.name}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </PropertyRow>
 
-                      {/* Priority */}
-                      <PropertyRow icon={Flag} label="Priority" iconColor={currentPriority.color}>
-                        <Select
-                          value={displayTask.priority}
-                          onValueChange={(v) => handleFieldUpdate({ priority: v })}
-                        >
-                          <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {priorities.map((p) => (
-                              <SelectItem key={p.value} value={p.value}>
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="size-2.5 rounded-full"
-                                    style={{ backgroundColor: p.color }}
-                                  />
-                                  {p.label}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </PropertyRow>
+                        <div className="mx-4 border-t border-[var(--border-subtle)]" />
+
+                        {/* Priority */}
+                        <PropertyRow icon={Flag} label="Priority" iconColor={currentPriority.color}>
+                          <Select
+                            value={displayTask.priority}
+                            onValueChange={(v) => handleFieldUpdate({ priority: v })}
+                          >
+                            <SelectTrigger className="w-full border-0 bg-transparent h-8 px-2 text-sm font-medium shadow-none hover:bg-[var(--elevated)] rounded-lg transition-colors focus:ring-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {priorities.map((p) => (
+                                <SelectItem key={p.value} value={p.value}>
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="size-2.5 rounded-full"
+                                      style={{ backgroundColor: p.color }}
+                                    />
+                                    {p.label}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </PropertyRow>
+                      </div>
 
                       {/* Assignees */}
                       <PropertyRow icon={Users} label="Assignees">
@@ -692,7 +702,7 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                         </span>
                       </div>
                       {editingDesc ? (
-                        <div onBlur={handleDescSave}>
+                        <div>
                           <RichTextEditor
                             projectId={projectId}
                             value={typeof displayTask.description === 'string' ? displayTask.description : (displayTask.description as TiptapDoc | null)}
@@ -701,6 +711,28 @@ export function TaskDetailPanel({ task, projectId, boardId, open, onClose }: Tas
                             placeholder="Describe this task..."
                             autoFocus
                           />
+                          <div className="flex items-center justify-end gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setDescDoc(null)
+                                setEditingDesc(false)
+                              }}
+                              className="h-7 text-xs"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                handleDescSave()
+                              }}
+                              className="h-7 text-xs"
+                            >
+                              Save
+                            </Button>
+                          </div>
                         </div>
                       ) : (
                         <div

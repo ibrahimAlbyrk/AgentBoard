@@ -91,7 +91,7 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
 
       {/* Title */}
       <span className={cn(
-        'text-[13px] font-medium text-foreground leading-snug block',
+        'text-sm font-medium text-foreground leading-snug block',
         compact ? 'line-clamp-1' : 'line-clamp-2',
       )}>
         {task.title}
@@ -141,7 +141,7 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
         /* Detailed: full existing layout */
         <>
           {(task.description_text || task.description) && (
-            <p className="text-xs text-[var(--text-tertiary)] line-clamp-2 mt-1.5 leading-relaxed">
+            <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mt-1.5 leading-relaxed">
               {task.description_text || (typeof task.description === 'string' ? task.description : '')}
             </p>
           )}
@@ -151,7 +151,7 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
               {visibleLabels.map((label) => (
                 <span
                   key={label.id}
-                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full border inline-flex items-center"
+                  className="text-[11px] font-semibold px-2 py-0.5 rounded-full border inline-flex items-center"
                   style={{
                     backgroundColor: `${label.color}15`,
                     color: label.color,
@@ -162,7 +162,7 @@ export function TaskCard({ task, onClick, isDragOverlay, compact, isExpanded, on
                 </span>
               ))}
               {extraCount > 0 && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--overlay)] text-[var(--text-tertiary)] inline-flex items-center">
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[var(--overlay)] text-[var(--text-tertiary)] inline-flex items-center">
                   +{extraCount}
                 </span>
               )}

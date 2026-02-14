@@ -172,7 +172,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
   const prevDelta = useRef({ x: 0, y: 0 })
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
   )
 
   // Measure droppables once before drag starts — MeasuringStrategy.Always causes

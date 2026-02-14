@@ -17,13 +17,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { useAgents, useCreateAgent, useUpdateAgent, useDeleteAgent, useMyAgents, useLinkAgent } from '@/hooks/useAgents'
+import { ColorPicker } from '@/components/shared/ColorPicker'
 import { EmptyState } from '@/components/shared/EmptyState'
-import type { Agent, AgentWithProjects } from '@/types'
-
-const PRESET_COLORS = [
-  '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B',
-  '#22C55E', '#EF4444', '#06B6D4', '#6366F1',
-]
+import type { Agent } from '@/types'
 
 interface AgentManagerProps {
   projectId: string
@@ -50,7 +46,7 @@ export function AgentManager({ projectId, open, onClose }: AgentManagerProps) {
   const [showAdd, setShowAdd] = useState(false)
   const [showLink, setShowLink] = useState(false)
   const [name, setName] = useState('')
-  const [color, setColor] = useState(PRESET_COLORS[0])
+  const [color, setColor] = useState('#3B82F6')
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null)
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState('')
@@ -58,7 +54,7 @@ export function AgentManager({ projectId, open, onClose }: AgentManagerProps) {
   const resetAdd = () => {
     setShowAdd(false)
     setName('')
-    setColor(PRESET_COLORS[0])
+    setColor('#3B82F6')
   }
 
   const handleCreate = async () => {
@@ -205,20 +201,7 @@ export function AgentManager({ projectId, open, onClose }: AgentManagerProps) {
                   />
                   <div className="space-y-1.5">
                     <span className="text-xs text-[var(--text-tertiary)] font-medium">Color</span>
-                    <div className="flex gap-2">
-                      {PRESET_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          className="size-7 rounded-full transition-transform hover:scale-110"
-                          style={{
-                            backgroundColor: c,
-                            outline: color === c ? '2px solid var(--foreground)' : 'none',
-                            outlineOffset: '2px',
-                          }}
-                          onClick={() => setColor(c)}
-                        />
-                      ))}
-                    </div>
+                    <ColorPicker value={color} onChange={setColor} />
                   </div>
                   {/* Preview */}
                   <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[var(--elevated)]">
@@ -350,20 +333,7 @@ export function AgentManager({ projectId, open, onClose }: AgentManagerProps) {
                 </div>
                 <div className="space-y-1.5">
                   <span className="text-xs text-[var(--text-tertiary)] font-medium">Color</span>
-                  <div className="flex gap-2">
-                    {PRESET_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        className="size-7 rounded-full transition-transform hover:scale-110"
-                        style={{
-                          backgroundColor: c,
-                          outline: editColor === c ? '2px solid var(--foreground)' : 'none',
-                          outlineOffset: '2px',
-                        }}
-                        onClick={() => setEditColor(c)}
-                      />
-                    ))}
-                  </div>
+                  <ColorPicker value={editColor} onChange={setEditColor} />
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">

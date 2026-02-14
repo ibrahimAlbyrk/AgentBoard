@@ -1,7 +1,7 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Plus, Filter } from 'lucide-react'
+import { Plus, Filter, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { SortableTaskCard } from './SortableTaskCard'
 import { useBoardStore } from '@/stores/boardStore'
 import type { Status, Task } from '@/types'
@@ -23,7 +23,7 @@ interface BoardColumnProps {
 function DropPlaceholder({ height }: { height: number }) {
   return (
     <div
-      className="rounded-xl border-2 border-dashed border-[var(--accent-solid)]/40 bg-[var(--accent-muted-bg)]/30 relative overflow-hidden transition-all duration-200"
+      className="rounded-xl border-2 border-dashed border-[var(--accent-solid)]/70 bg-[var(--accent-muted-bg)]/50 relative overflow-hidden transition-all duration-200"
       style={{ height }}
     >
       {/* Animated shimmer */}
@@ -52,9 +52,27 @@ function DropPlaceholder({ height }: { height: number }) {
 export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, placeholderHeight = 72, hideDragSourceId, compact, isTaskExpanded, onToggleExpand, renderExpandedContent }: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status.id}` })
   const filtersActive = useBoardStore((s) => s.hasActiveFilters())
+  const [isCollapsed, setIsCollapsed] = useState(false)
+
+  if (isCollapsed) {
+    return (
+      <div
+        onClick={() => setIsCollapsed(false)}
+        className="w-10 flex-shrink-0 bg-[var(--surface)]/60 rounded-xl border border-[var(--border-subtle)] flex flex-col items-center py-3 cursor-pointer hover:bg-[var(--surface)] transition-all duration-300"
+      >
+        <ChevronsRight className="size-3.5 text-[var(--text-tertiary)] mb-2 flex-shrink-0" />
+        <span className="text-xs font-medium text-[var(--text-secondary)] [writing-mode:vertical-lr] rotate-180">
+          {status.name}
+        </span>
+        <span className="mt-2 text-xs text-[var(--text-tertiary)] bg-[var(--overlay)] rounded-full size-5 flex items-center justify-center">
+          {tasks.length}
+        </span>
+      </div>
+    )
+  }
 
   return (
-    <div className="w-[300px] flex-shrink-0 flex flex-col">
+    <div className="min-w-[280px] w-[300px] max-w-[360px] flex-shrink-0 flex flex-col transition-all duration-300">
       <div className="flex items-center justify-between px-1 py-2 mb-2">
         <div className="flex items-center gap-2">
           <span
@@ -66,12 +84,21 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
             {tasks.length}
           </span>
         </div>
-        <button
-          onClick={onAddTask}
-          className="size-6 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] hover:bg-[var(--accent-muted-bg)] transition-all duration-150"
-        >
-          <Plus className="size-3.5" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="size-6 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--overlay)] transition-all duration-150"
+            title="Collapse column"
+          >
+            <ChevronsLeft className="size-3.5" />
+          </button>
+          <button
+            onClick={onAddTask}
+            className="size-6 inline-flex items-center justify-center rounded-md text-[var(--text-tertiary)] hover:text-[var(--accent-solid)] hover:bg-[var(--accent-muted-bg)] transition-all duration-150"
+          >
+            <Plus className="size-3.5" />
+          </button>
+        </div>
       </div>
 
       <div
@@ -79,7 +106,7 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
         className={`rounded-xl p-2 space-y-2 min-h-[120px] transition-all duration-200 ${
           isOver
             ? 'border border-[var(--accent-solid)]/40 bg-[var(--accent-muted-bg)] shadow-[inset_0_0_20px_-8px_var(--glow)]'
-            : 'bg-[var(--surface)]/40 border border-dashed border-[var(--border-subtle)]'
+            : 'bg-[var(--surface)]/60 border border-dashed border-[var(--border-subtle)]'
         }`}
       >
         <SortableContext

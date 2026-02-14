@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Plus, Tag, LayoutList, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -93,6 +93,26 @@ export function BoardPage() {
     }
   }, [pendingTaskId, tasksRes])
 
+  // "N" keyboard shortcut to open task creation form
+  const handleAddTaskRef = useRef<((statusId?: string) => void) | null>(null)
+  handleAddTaskRef.current = (statusId?: string) => {
+    setDefaultStatusId(statusId)
+    setShowTaskForm(true)
+  }
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+      if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault()
+        handleAddTaskRef.current?.()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   if (projectLoading || boardLoading || tasksLoading) {
     return <LoadingSpinner text="Loading board..." />
   }
@@ -119,7 +139,8 @@ export function BoardPage() {
             <span className="text-xl">{project.icon || '📋'}</span>
             <div>
               <h1 className="text-lg font-bold text-foreground tracking-tight">
-                {project.name} <span className="text-[var(--text-secondary)] font-normal">/ {board.name}</span>
+                <Link to={`/projects/${projectId}`} className="hover:text-[var(--accent-solid)] transition-colors">{project.name}</Link>
+                <span className="text-[var(--text-secondary)] font-normal"> / {board.name}</span>
               </h1>
               {board.description && (
                 <p className="text-[13px] text-[var(--text-secondary)]">{board.description}</p>
@@ -170,10 +191,12 @@ export function BoardPage() {
             </Button>
             <Button
               onClick={() => handleAddTask()}
+              title="New Task (N)"
               className="bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)] shadow-[0_0_16px_-4px_var(--glow)] transition-all"
             >
               <Plus className="size-4" />
               New Task
+              <kbd className="ml-1.5 px-1.5 py-0.5 text-[10px] font-mono rounded bg-white/20 leading-none">N</kbd>
             </Button>
           </div>
         </div>
