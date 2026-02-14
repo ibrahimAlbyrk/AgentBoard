@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FolderKanban, CheckSquare, Clock, AlertTriangle, ArrowRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { toast } from '@/lib/toast'
 import { useAuthStore } from '@/stores/authStore'
 import { useProjects, useDeleteProject } from '@/hooks/useProjects'
@@ -9,7 +10,6 @@ import { api } from '@/lib/api-client'
 import { ProjectCard } from '@/components/projects/ProjectCard'
 import { ProjectForm } from '@/components/projects/ProjectForm'
 import { MyTasksSection } from '@/components/dashboard/MyTasksSection'
-import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { Project } from '@/types'
 
@@ -25,8 +25,6 @@ export function DashboardPage() {
   const deleteProject = useDeleteProject()
   const [editProject, setEditProject] = useState<Project | null>(null)
   const projects = projectsRes?.data ?? []
-
-  if (isLoading) return <LoadingSpinner text="Loading dashboard..." />
 
   const totalTasks = projects.reduce((sum, p) => sum + p.task_count, 0)
 
@@ -91,10 +89,10 @@ export function DashboardPage() {
   ]
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {/* Greeting */}
       <div>
-        <h1 className="text-[26px] font-bold tracking-tight">
+        <h1 className="text-3xl font-bold tracking-tight">
           Welcome back, {user?.full_name || user?.username}
         </h1>
         <p className="text-[var(--text-secondary)] text-sm mt-1">
@@ -103,23 +101,49 @@ export function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s, i) => (
-          <div
-            key={s.label}
-            className="bg-card border border-[var(--border-subtle)] rounded-xl p-5 card-hover"
-            style={{ animationDelay: `${i * 60}ms` }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[13px] font-medium text-[var(--text-secondary)]">{s.label}</p>
-              <div className={`size-8 rounded-lg flex items-center justify-center ${s.bg} ring-1 ${s.ring}`}>
-                <s.icon className={`size-4 ${s.color}`} />
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-card border border-[var(--border-subtle)] rounded-xl p-5 animate-pulse">
+              <div className="flex items-center justify-between mb-2">
+                <div className="h-3 w-20 bg-[var(--overlay)] rounded" />
+                <div className="size-9 bg-[var(--overlay)] rounded-lg" />
               </div>
+              <div className="h-8 w-16 bg-[var(--overlay)] rounded mt-1" />
             </div>
-            <p className="text-[28px] font-bold text-foreground leading-none tracking-tight">{s.value}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((s, i) => {
+            const isOverdue = s.label === 'Overdue' && s.value > 0
+            return (
+              <div
+                key={s.label}
+                className={cn(
+                  'bg-card border rounded-xl p-5 card-hover',
+                  isOverdue
+                    ? 'border-red-500/30 bg-red-500/[0.04]'
+                    : 'border-[var(--border-subtle)]',
+                )}
+                style={{ animationDelay: `${i * 60}ms` }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[13px] font-medium text-[var(--text-secondary)]">{s.label}</p>
+                  <div className={cn(
+                    'size-8 rounded-lg flex items-center justify-center ring-1',
+                    s.bg, s.ring,
+                    isOverdue && 'animate-pulse',
+                  )}>
+                    <s.icon className={`size-4 ${s.color}`} />
+                  </div>
+                </div>
+                <p className="text-[28px] font-bold text-foreground leading-none tracking-tight">{s.value}</p>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* My Tasks */}
       <MyTasksSection />

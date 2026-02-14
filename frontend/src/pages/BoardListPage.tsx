@@ -5,6 +5,16 @@ import { toast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -18,9 +28,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { hexToRgb } from '@/lib/utils'
 import { useProject } from '@/hooks/useProjects'
 import { useCreateBoard, useUpdateBoard, useDeleteBoard } from '@/hooks/useBoards'
 import { AgentManager } from '@/components/agents/AgentManager'
+import { ColorPicker } from '@/components/shared/ColorPicker'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { EmptyState } from '@/components/shared/EmptyState'
 import type { Board } from '@/types'
@@ -40,6 +52,7 @@ export function BoardListPage() {
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState('#3B82F6')
   const [showAgents, setShowAgents] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Board | null>(null)
 
   if (isLoading) return <LoadingSpinner text="Loading project..." />
 
@@ -79,17 +92,21 @@ export function BoardListPage() {
     }
   }
 
-  const handleDelete = async (board: Board) => {
-    if (!confirm(`Delete "${board.name}"? All tasks in this board will be lost.`)) return
+  const handleDelete = (board: Board) => {
+    setDeleteTarget(board)
+  }
+
+  const handleConfirmedDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await deleteBoard.mutateAsync(board.id)
+      await deleteBoard.mutateAsync(deleteTarget.id)
       toast.success('Board deleted')
     } catch (err) {
       toast.error(err)
+    } finally {
+      setDeleteTarget(null)
     }
   }
-
-  const colors = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#22C55E', '#EF4444', '#06B6D4', '#6366F1']
 
   return (
     <div className="space-y-6">
@@ -285,20 +302,7 @@ export function BoardListPage() {
             </div>
             <div className="space-y-1.5">
               <span className="text-xs text-[var(--text-tertiary)] font-medium">Color</span>
-              <div className="flex gap-2">
-                {colors.map((c) => (
-                  <button
-                    key={c}
-                    className="size-7 rounded-full transition-transform hover:scale-110"
-                    style={{
-                      backgroundColor: c,
-                      outline: editColor === c ? '2px solid var(--foreground)' : 'none',
-                      outlineOffset: '2px',
-                    }}
-                    onClick={() => setEditColor(c)}
-                  />
-                ))}
-              </div>
+              <ColorPicker value={editColor} onChange={setEditColor} />
             </div>
           </div>
           <DialogFooter>
@@ -334,20 +338,7 @@ export function BoardListPage() {
             </div>
             <div className="space-y-1.5">
               <span className="text-xs text-[var(--text-tertiary)] font-medium">Color</span>
-              <div className="flex gap-2">
-                {colors.map((c) => (
-                  <button
-                    key={c}
-                    className="size-7 rounded-full transition-transform hover:scale-110"
-                    style={{
-                      backgroundColor: c,
-                      outline: boardColor === c ? '2px solid var(--foreground)' : 'none',
-                      outlineOffset: '2px',
-                    }}
-                    onClick={() => setBoardColor(c)}
-                  />
-                ))}
-              </div>
+              <ColorPicker value={boardColor} onChange={setBoardColor} />
             </div>
           </div>
           <DialogFooter>
@@ -358,14 +349,23 @@ export function BoardListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete "{deleteTarget?.name}"? All tasks in this board will be lost. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmedDelete} className="bg-red-500 hover:bg-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
-}
-
-function hexToRgb(hex: string): string {
-  const h = hex.replace('#', '')
-  const r = parseInt(h.substring(0, 2), 16)
-  const g = parseInt(h.substring(2, 4), 16)
-  const b = parseInt(h.substring(4, 6), 16)
-  return `${r} ${g} ${b}`
 }

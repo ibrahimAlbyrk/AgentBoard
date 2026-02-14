@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { toast } from '@/lib/toast'
+import { AppLogo } from '@/components/shared/AppLogo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,9 +22,11 @@ export function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore((s) => s.login)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setError, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    mode: 'onBlur',
   })
 
   const onSubmit = async (data: FormData) => {
@@ -32,7 +35,9 @@ export function LoginPage() {
       await login({ email: data.email, password: data.password })
       navigate('/dashboard')
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Login failed'
       toast.error(err)
+      setError('root', { message })
     } finally {
       setLoading(false)
     }
@@ -50,14 +55,7 @@ export function LoginPage() {
       <div className="relative z-10 w-full max-w-[420px] animate-fade-in">
         <div className="bg-[var(--elevated)]/80 backdrop-blur-2xl border border-[var(--border-subtle)] rounded-2xl p-8 shadow-[0_0_80px_-20px_var(--glow)]">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center size-12 rounded-xl bg-gradient-to-br from-[var(--accent-solid)] to-[var(--accent-solid-hover)] mb-4 shadow-[0_0_24px_-4px_var(--accent-solid)]">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" />
-                <rect x="14" y="14" width="7" height="7" rx="1" />
-              </svg>
-            </div>
+            <AppLogo size="lg" className="mb-4 shadow-[0_0_24px_-4px_var(--accent-solid)]" />
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Welcome back</h1>
             <p className="text-sm text-[var(--text-secondary)] mt-1.5">Sign in to continue to AgentBoard</p>
           </div>
@@ -80,18 +78,34 @@ export function LoginPage() {
 
             <div className="space-y-2">
               <Label htmlFor="password" className="text-[var(--text-secondary)] text-xs font-medium uppercase tracking-wider">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                className="bg-[var(--background)] border-[var(--border-subtle)] h-11 text-foreground placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-solid)] transition-colors"
-                {...register('password')}
-                aria-invalid={!!errors.password}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  className="bg-[var(--background)] border-[var(--border-subtle)] h-11 text-foreground placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent-solid)] transition-colors pr-10"
+                  {...register('password')}
+                  aria-invalid={!!errors.password}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
             </div>
+
+            {errors.root && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-lg flex items-center gap-2">
+                <AlertCircle className="size-4 shrink-0" />
+                {errors.root.message}
+              </div>
+            )}
 
             <Button
               type="submit"

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { toast } from '@/lib/toast'
-import { Copy, Plus, Trash2, Key, Bell, BellOff, Monitor, Mail, VolumeX, Bot, Pencil, Check, X, Eye, EyeOff } from 'lucide-react'
+import { Copy, Plus, Trash2, Key, Bell, BellOff, Monitor, Mail, VolumeX, Bot, Pencil, Check, X, Eye, EyeOff, User } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api-client'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -117,7 +127,7 @@ export function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile">
-        <TabsList className="bg-[var(--surface)] border border-[var(--border-subtle)]">
+        <TabsList className="bg-[var(--surface)] border border-[var(--border-subtle)] sticky top-0 z-10">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="api-keys" onClick={loadKeys}>API Keys</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -143,21 +153,40 @@ export function SettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="avatar_url" className="text-[13px]">Avatar URL</Label>
-                <Input
-                  id="avatar_url"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors"
-                />
+                <div className="flex items-center gap-4">
+                  <div className="size-16 rounded-full bg-[var(--surface)] border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center shrink-0">
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt="Avatar preview"
+                        className="size-full object-cover"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                        onLoad={(e) => { e.currentTarget.style.display = 'block' }}
+                      />
+                    ) : (
+                      <User className="size-6 text-[var(--text-tertiary)]" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Input
+                      id="avatar_url"
+                      value={avatarUrl}
+                      onChange={(e) => setAvatarUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="bg-[var(--surface)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] focus:border-[var(--accent-solid)] transition-colors"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-[13px]">Email</Label>
                 <Input value={user?.email ?? ''} disabled className="opacity-60" />
+                <p className="text-xs text-[var(--text-tertiary)] mt-1">This field cannot be changed</p>
               </div>
               <div className="space-y-2">
                 <Label className="text-[13px]">Username</Label>
                 <Input value={user?.username ?? ''} disabled className="opacity-60" />
+                <p className="text-xs text-[var(--text-tertiary)] mt-1">This field cannot be changed</p>
               </div>
               <Button
                 onClick={handleProfileSave}
@@ -364,6 +393,7 @@ const PRESET_COLORS = [
 ]
 
 function AgentsSettings() {
+  const [deleteTarget, setDeleteTarget] = useState<AgentWithProjects | null>(null)
   const [showDeleted, setShowDeleted] = useState(false)
   // Always fetch with include_deleted=true so we can show the toggle count
   const { data: agentsRes, isLoading } = useMyAgents(true)
@@ -430,13 +460,15 @@ function AgentsSettings() {
     }
   }
 
-  const handleDelete = async (agent: AgentWithProjects) => {
-    if (!confirm(`Delete "${agent.name}"? This will remove it from all projects.`)) return
+  const handleConfirmedDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await deleteAgent.mutateAsync(agent.id)
+      await deleteAgent.mutateAsync(deleteTarget.id)
       toast.success('Agent deleted')
     } catch (err) {
       toast.error(err)
+    } finally {
+      setDeleteTarget(null)
     }
   }
 
@@ -587,7 +619,7 @@ function AgentsSettings() {
                   <Pencil className="size-3.5" />
                 </button>
                 <button
-                  onClick={() => handleDelete(agent)}
+                  onClick={() => setDeleteTarget(agent)}
                   className="size-7 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100"
                 >
                   <Trash2 className="size-3.5" />
@@ -679,6 +711,24 @@ function AgentsSettings() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete "{deleteTarget?.name}"? This will remove it from all projects. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmedDelete} className="bg-red-500 hover:bg-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

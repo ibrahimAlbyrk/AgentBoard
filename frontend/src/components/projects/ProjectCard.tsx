@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { hexToRgb } from '@/lib/utils'
 import type { Project } from '@/types'
 
 interface ProjectCardProps {
@@ -36,14 +37,6 @@ function getInitials(name: string | null | undefined): string {
     .join('')
     .slice(0, 2)
     .toUpperCase()
-}
-
-function hexToRgb(hex: string): string {
-  const h = hex.replace('#', '')
-  const r = parseInt(h.substring(0, 2), 16)
-  const g = parseInt(h.substring(2, 4), 16)
-  const b = parseInt(h.substring(4, 6), 16)
-  return `${r} ${g} ${b}`
 }
 
 export function ProjectCard({ project, onEdit, onArchive, onDelete }: ProjectCardProps) {
@@ -92,7 +85,7 @@ export function ProjectCard({ project, onEdit, onArchive, onDelete }: ProjectCar
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-[16px] text-foreground truncate leading-tight">
+            <h3 title={project.name} className="font-semibold text-[16px] text-foreground truncate leading-tight">
               {project.name}
             </h3>
             {project.description && (

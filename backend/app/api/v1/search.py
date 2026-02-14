@@ -65,6 +65,7 @@ async def global_search(
                 "id": str(t.id),
                 "title": t.title,
                 "project_id": str(t.project_id),
+                "board_id": str(t.board_id),
             })
 
     return PaginatedResponse(

@@ -102,15 +102,15 @@ function UrgencyBanner({ summary }: { summary: MyTasksSummary }) {
         </span>
       </div>
 
-      {/* Segmented progress bar */}
-      {barTotal > 0 && (
+      {/* Segmented progress bar — width relative to total_assigned */}
+      {barTotal > 0 && total_assigned > 0 && (
         <div className="mt-3 h-1.5 rounded-full bg-[var(--overlay)] overflow-hidden flex">
           {segments.map((seg, i) => (
             <div
               key={seg.label}
               className="h-full transition-all duration-700 ease-out"
               style={{
-                width: `${(seg.count / barTotal) * 100}%`,
+                width: `${(seg.count / total_assigned) * 100}%`,
                 backgroundColor: seg.color,
                 opacity: 0.8,
                 borderRadius:
@@ -146,10 +146,19 @@ function DashboardTaskRow({ task }: { task: DashboardTask }) {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          handleClick()
+        }
+      }}
       className={cn(
         'group flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-200',
         'hover:bg-[var(--overlay)] hover:translate-x-1',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-solid)]/50 focus-visible:bg-[var(--overlay)]',
         isOverdue && 'bg-[var(--destructive)]/[0.03]',
       )}
     >

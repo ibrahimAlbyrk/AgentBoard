@@ -4,6 +4,16 @@ import { toast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -29,6 +39,7 @@ const SORT_LABELS: Record<SortKey, string> = {
 export function ProjectsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [editProject, setEditProject] = useState<Project | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('recent')
@@ -82,13 +93,19 @@ export function ProjectsPage() {
     }
   }
 
-  const handleDelete = async (project: Project) => {
-    if (!window.confirm(`Delete "${project.name}"? This cannot be undone.`)) return
+  const handleDelete = (project: Project) => {
+    setDeleteTarget(project)
+  }
+
+  const handleConfirmedDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await deleteProject.mutateAsync(project.id)
-      toast.success(`"${project.name}" deleted`)
+      await deleteProject.mutateAsync(deleteTarget.id)
+      toast.success(`"${deleteTarget.name}" deleted`)
     } catch (err) {
       toast.error(err)
+    } finally {
+      setDeleteTarget(null)
     }
   }
 
@@ -195,6 +212,23 @@ export function ProjectsPage() {
         }}
         project={editProject}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete "{deleteTarget?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmedDelete} className="bg-red-500 hover:bg-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
