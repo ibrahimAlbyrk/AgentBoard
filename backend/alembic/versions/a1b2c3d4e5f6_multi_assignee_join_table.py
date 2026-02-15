@@ -46,16 +46,20 @@ def upgrade() -> None:
 
     if has_old_columns:
         # Migrate existing single-assignee data into the join table
-        op.execute("""
+        dialect = bind.dialect.name
+        if dialect == 'postgresql':
+            uuid_expr = 'gen_random_uuid()'
+        else:
+            uuid_expr = "lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))"
+
+        op.execute(f"""
             INSERT INTO task_assignees (id, task_id, user_id, created_at)
-            SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))),
-                   id, assignee_id, created_at
+            SELECT {uuid_expr}, id, assignee_id, created_at
             FROM tasks WHERE assignee_id IS NOT NULL
         """)
-        op.execute("""
+        op.execute(f"""
             INSERT INTO task_assignees (id, task_id, agent_id, created_at)
-            SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6))),
-                   id, agent_assignee_id, created_at
+            SELECT {uuid_expr}, id, agent_assignee_id, created_at
             FROM tasks WHERE agent_assignee_id IS NOT NULL
         """)
 
