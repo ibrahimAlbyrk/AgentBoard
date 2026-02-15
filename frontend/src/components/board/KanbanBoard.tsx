@@ -448,7 +448,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
 
       <DragOverlay dropAnimation={null}>
         {freshOverlayTask && (
-          <div style={{
+          <div aria-hidden="true" style={{
             perspective: 600,
           }}>
             <div style={{

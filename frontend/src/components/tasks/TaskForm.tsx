@@ -210,13 +210,15 @@ export function TaskForm({ projectId, boardId, open, onClose, defaultStatusId }:
           </div>
 
           <div className="space-y-1.5">
-            <span className="text-xs text-[var(--text-tertiary)] font-medium">Description</span>
+            <label htmlFor="task-description" className="text-xs text-[var(--text-tertiary)] font-medium">Description</label>
             <RichTextEditor
+              id="task-description"
               projectId={projectId}
               value={description}
               onChange={setDescription}
               variant="compact"
               placeholder="Describe the task..."
+              aria-label="Task description"
               className="min-h-[80px] [&_.tiptap]:min-h-[60px] [&_.tiptap]:max-h-[160px] [&_.tiptap]:overflow-y-auto"
             />
           </div>

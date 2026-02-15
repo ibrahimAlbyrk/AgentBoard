@@ -462,9 +462,12 @@ export function Header({ onMenuClick }: HeaderProps) {
 
                         if (isClickable) {
                           return (
-                            <button
+                            <div
                               key={n.id}
+                              role="button"
+                              tabIndex={0}
                               onClick={() => handleNotifClick(n)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNotifClick(n) } }}
                               className={cn(
                                 'group w-full flex gap-3 px-4 py-2.5 transition-colors cursor-pointer hover:bg-foreground/[0.04] focus-visible:outline-2 focus-visible:outline-[var(--accent-solid)] focus-visible:outline-offset-[-2px]',
                                 !n.is_read && 'bg-[var(--accent-solid)]/[0.03]',
@@ -473,7 +476,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                               aria-label={`${meta.label}: ${n.title}`}
                             >
                               {notifContent}
-                            </button>
+                            </div>
                           )
                         }
 

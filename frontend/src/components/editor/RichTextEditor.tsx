@@ -59,6 +59,7 @@ const ReferenceExtension = Mention.extend({
 })
 
 interface RichTextEditorProps {
+  id?: string
   projectId: string
   value?: TiptapDoc | string | null
   onChange?: (doc: TiptapDoc) => void
@@ -67,6 +68,7 @@ interface RichTextEditorProps {
   placeholder?: string
   className?: string
   autoFocus?: boolean
+  'aria-label'?: string
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -116,6 +118,7 @@ function createSuggestionRenderer(SuggestionComponent: any) {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export function RichTextEditor({
+  id,
   projectId,
   value,
   onChange,
@@ -124,6 +127,7 @@ export function RichTextEditor({
   placeholder = 'Start writing...',
   className,
   autoFocus = false,
+  'aria-label': ariaLabel,
 }: RichTextEditorProps) {
   const navigate = useNavigate()
   const [focused, setFocused] = useState(false)
@@ -262,6 +266,7 @@ export function RichTextEditor({
 
   return (
     <div
+      id={id}
       className={cn(
         'tiptap-editor rounded-xl border bg-[var(--surface)] transition-colors',
         focused
@@ -270,6 +275,9 @@ export function RichTextEditor({
         variant === 'compact' && 'compact',
         className,
       )}
+      role="textbox"
+      aria-label={ariaLabel}
+      aria-multiline="true"
     >
       {(variant === 'full' || focused) && (
         <EditorToolbar editor={editor} variant={variant} />
