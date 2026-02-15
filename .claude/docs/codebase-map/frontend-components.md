@@ -539,3 +539,98 @@
 - **Purpose**: Centered empty state placeholder with icon, title, description, and optional action button.
 - `EmptyState` (named export) — Empty state display
 - Props: `icon` (LucideIcon), `title` (string), `description` (string), `action` ({ label, onClick })
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/shared/AppLogo.tsx`
+- **Purpose**: Branded logo icon with gradient background and SVG grid icon in three size variants.
+- `AppLogo` (named export) — Renders the app logo icon
+- Props: `size` ('sm' | 'md' | 'lg'), `className` (string)
+- Key state/hooks used: (none, presentational)
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/shared/ColorPicker.tsx`
+- **Purpose**: Row of clickable color swatches with active-state outline for color selection.
+- `ColorPicker` (named export) — Color swatch picker
+- Props: `value` (string) — selected color, `onChange` ((color: string) => void), `colors` (string[]) — defaults to 8 presets, `className` (string)
+- Key state/hooks used: (none, presentational)
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/shared/CommandPalette.tsx`
+- **Purpose**: Global command palette dialog with navigation shortcuts, cached project list, and API-powered task/project search.
+- `CommandPalette` (named export) — Cmd+K command palette overlay
+- Props: `open` (boolean), `onOpenChange` ((open: boolean) => void)
+- Navigation items: Dashboard, Projects, Settings; search requires 2+ chars
+- Shows cached projects, API search results grouped by tasks and projects
+- Key state/hooks used: useState, useCallback, useEffect, useMemo, useNavigate, useProjects, useSearch
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/shared/DeleteTaskDialog.tsx`
+- **Purpose**: Confirmation dialog for deleting a task, with cascade/orphan options when subtasks exist.
+- `DeleteTaskDialog` (named export) — Delete task confirmation dialog
+- Props: `open` (boolean), `onOpenChange` ((open: boolean) => void), `taskTitle` (string), `childrenCount` (number), `onDelete` ((mode: TaskDeleteMode) => void)
+- Key state/hooks used: usePanelLayer
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/shared/ErrorBoundary.tsx`
+- **Purpose**: React error boundary that catches rendering errors and displays a fallback UI with error message and retry button.
+- `ErrorBoundary` (named export, class component) — Catches child component errors
+- Props: `children` (ReactNode)
+- Key state/hooks used: getDerivedStateFromError (lifecycle)
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/shared/ImageLightbox.tsx`
+- **Purpose**: Full-screen image preview overlay with backdrop blur, close button, and Escape key handling.
+- `ImageLightbox` (named export) — Modal image viewer
+- Props: `src` (string | null) — image URL (null = hidden), `onClose` (() => void)
+- Key state/hooks used: useEffect
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/shared/PageHeader.tsx`
+- **Purpose**: Reusable page header with title, optional description, and action slot.
+- `PageHeader` (named export) — Page title bar
+- Props: `title` (string), `description` (string), `children` (ReactNode) — action slot
+- Key state/hooks used: (none, presentational)
+
+---
+
+## Task Components (continued)
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/tasks/SubtasksSection.tsx`
+- **Purpose**: Subtask list with progress bar, inline creation input, drag-and-drop reorder, and per-subtask status/assignee display.
+- `SubtasksSection` (named export) — Subtasks area within task detail panel
+- Props: `projectId` (string), `boardId` (string), `taskId` (string), `onOpenSubtask` ((subtask: Task) => void)
+- Sub-component: `SubtaskList` — DnD-enabled sorted subtask list with position-based reorder
+- Sub-component: `SubtaskRow` — Sortable row with status dot, clickable title, assignee avatars, nested subtask count, confirm-to-delete
+- Sub-component: `SubtaskRowContent` — Static row content used in drag overlay
+- Key state/hooks used: useState, useRef, useSubtasks, useCreateSubtask, useReorderSubtask, useDeleteTask, useSortable (dnd-kit), AnimatePresence/motion (framer-motion)
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/tasks/TaskPickerDialog.tsx`
+- **Purpose**: Dialog for searching and selecting a task from the current board, used for parent task assignment.
+- `TaskPickerDialog` (named export) — Task search and select dialog
+- Props: `open` (boolean), `onOpenChange` ((open: boolean) => void), `onSelect` ((task: Task) => void), `excludeTaskIds` (string[]), `title` (string)
+- Key state/hooks used: useState, useMemo, usePanelLayer, useBoardStore
+
+---
+
+## Agent Components (continued)
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/components/agents/AgentCluster.tsx`
+- **Purpose**: Overlapping avatar cluster for active agents with expandable hover dropdown showing agent list and manage button.
+- `AgentCluster` (named export) — Agent avatar cluster with dropdown
+- Props: `agents` (Agent[]), `onManageClick` (() => void)
+- Shows up to 4 avatars with +N overflow badge; hover expands to full agent list
+- Key state/hooks used: useState, AnimatePresence/motion (framer-motion)
+
+---
+
+## Pages (continued)
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/pages/NotFoundPage.tsx`
+- **Purpose**: 404 error page with "Back to Dashboard" link.
+- `NotFoundPage` (named export) — Route: `*` (catch-all)
+- Key state/hooks used: (none, presentational)
+
+---
+
+## Contexts
+
+### `/Users/ibrahimalbyrk/Projects/CC/AgentBoard/frontend/src/contexts/PanelStackContext.tsx`
+- **Purpose**: Context provider and hooks for managing a stack of open panels/dialogs so only the topmost handles Escape key.
+- `PanelStackProvider` (named export) — Context provider wrapping panel-aware subtree
+- `usePanelLayer` (named export) — Registers a panel in the stack, returns `isTop` boolean
+- `usePanelEsc` (named export) — Handles Escape key only when panel is topmost and no Radix overlay is open
+- Internal: `createPanelStack` factory builds stack API with push/pop/isTop/isEscSuppressed/subscribe
+- Key state/hooks used: createContext, useContext, useEffect, useRef, useState, useSyncExternalStore-like subscribe pattern
