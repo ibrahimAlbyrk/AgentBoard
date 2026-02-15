@@ -518,7 +518,7 @@ class APIClient {
 
   async listAttachments(projectId: string, boardId: string, taskId: string) {
     return this.request<PaginatedResponse<Attachment>>(
-      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/attachments`,
+      `/projects/${projectId}/boards/${boardId}/tasks/${taskId}/attachments/`,
     )
   }
 
