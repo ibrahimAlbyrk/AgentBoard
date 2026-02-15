@@ -6,12 +6,24 @@ cd /opt/agentboard
 echo "==> Pulling latest changes..."
 git pull origin main
 
-echo "==> Building and restarting containers..."
-docker compose -f docker-compose.prod.yml up -d --build
+echo "==> Installing backend deps..."
+cd backend
+source venv/bin/activate
+pip install -r requirements.txt -q
 
-echo "==> Cleaning unused images..."
-docker image prune -f
+echo "==> Running migrations..."
+alembic upgrade head
 
-echo "==> Status:"
-docker compose -f docker-compose.prod.yml ps
+echo "==> Restarting backend..."
+systemctl restart agentboard-backend
+
+echo "==> Building frontend..."
+cd ../frontend
+npm ci --silent
+npm run build
+
+echo "==> Reloading nginx..."
+systemctl reload nginx
+
 echo "==> Deploy complete!"
+curl -s http://localhost/health
