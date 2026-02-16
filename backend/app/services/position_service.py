@@ -9,7 +9,7 @@ from app.models.task import Task
 
 class PositionService:
     POSITION_GAP = 1024.0
-    REBALANCE_THRESHOLD = 1.0
+    REBALANCE_THRESHOLD = 10.0
 
     @staticmethod
     def calculate_position(
@@ -73,8 +73,9 @@ class PositionService:
     ) -> float:
         """Proactive rebalance: if positions are too tight, rebalance first,
         then (re)calculate the end position. Returns final position to use."""
-        # Frontend already calculated position — skip expensive rebalance check
         if position is not None:
+            # Still check rebalance even with frontend-provided position
+            await PositionService.maybe_rebalance(db, status_id)
             return position
 
         if await PositionService._needs_rebalance(db, status_id):
@@ -86,6 +87,22 @@ class PositionService:
     async def get_end_position_in_parent(db: AsyncSession, parent_id: UUID) -> float:
         max_pos = await crud_task.get_max_position_in_parent(db, parent_id)
         return (max_pos or 0) + PositionService.POSITION_GAP
+
+    @staticmethod
+    async def maybe_rebalance_children(db: AsyncSession, parent_id: UUID) -> bool:
+        result = await db.execute(
+            select(Task.position)
+            .where(Task.parent_id == parent_id)
+            .order_by(Task.position)
+        )
+        positions = [row[0] for row in result.all()]
+        if len(positions) < 2:
+            return False
+        for i in range(len(positions) - 1):
+            if positions[i + 1] - positions[i] < PositionService.REBALANCE_THRESHOLD:
+                await PositionService.rebalance_children(db, parent_id)
+                return True
+        return False
 
     @staticmethod
     async def rebalance_children(db: AsyncSession, parent_id: UUID) -> None:

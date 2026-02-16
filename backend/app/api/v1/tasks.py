@@ -22,6 +22,7 @@ from app.schemas.task import (
     TaskUpdate,
 )
 from app.services.notification_service import NotificationService
+from app.services.position_service import PositionService
 from app.services.reaction_service import ReactionService
 from app.services.task_service import TaskService
 from app.services.websocket_manager import manager
@@ -465,6 +466,7 @@ async def reorder_subtask(
     if not subtask or subtask.parent_id != task_id:
         raise NotFoundError("Subtask not found under this parent")
 
+    await PositionService.maybe_rebalance_children(db, task_id)
     subtask.position = body.position
     db.add(subtask)
     await db.flush()
