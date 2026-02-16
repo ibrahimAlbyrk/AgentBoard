@@ -79,13 +79,16 @@ export function useMoveTask(projectId: string, boardId: string) {
       toast.error('Task taşınamadı, lütfen tekrar deneyin')
     },
 
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
       const task = response?.data as Task | undefined
       if (task) {
         useBoardStore.getState().relocateTask(task.id, task)
+        // Only invalidate if backend rebalanced (position differs from what we sent)
+        const sentPosition = variables.data.position
+        if (sentPosition != null && Math.abs(task.position - sentPosition) > 0.01) {
+          qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
+        }
       }
-      // Invalidate tasks to sync positions after potential backend rebalance
-      qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
     },
 
     onSettled: (_data, _error, variables) => {

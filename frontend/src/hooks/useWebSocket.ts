@@ -12,10 +12,20 @@ const localMoves = new Set<string>()
 export function markLocalMove(taskId: string) {
   localMoves.add(taskId)
   // Fallback cleanup — normally cleared by useMoveTask.onSettled
-  setTimeout(() => localMoves.delete(taskId), 10000)
+  setTimeout(() => localMoves.delete(taskId), 3000)
 }
 export function clearLocalMove(taskId: string) {
   localMoves.delete(taskId)
+}
+
+// Queue for WS updates received during drag — flushed on drag end
+const pendingWSUpdates: Task[] = []
+export function flushPendingWSUpdates() {
+  const { relocateTask } = useBoardStore.getState()
+  while (pendingWSUpdates.length > 0) {
+    const task = pendingWSUpdates.shift()!
+    relocateTask(task.id, task)
+  }
 }
 
 export function useWebSocket(projectId: string, boardId: string) {
@@ -71,6 +81,11 @@ export function useWebSocket(projectId: string, boardId: string) {
       const data = e.data as Task
       if (localMoves.has(data.id)) {
         // Local drag — skip store update to avoid overriding optimistic state
+        return
+      }
+      // Queue WS updates during active drag to prevent dnd-kit state corruption
+      if (useBoardStore.getState().isDragging) {
+        pendingWSUpdates.push(data)
         return
       }
       animatedRelocate(data)

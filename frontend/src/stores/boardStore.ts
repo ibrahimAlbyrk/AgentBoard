@@ -17,7 +17,9 @@ export interface FilterState {
 interface BoardState {
   tasksByStatus: Record<string, Task[]>
   filters: FilterState
+  isDragging: boolean
 
+  setIsDragging: (v: boolean) => void
   setTasksForStatus: (statusId: string, tasks: Task[]) => void
   addTask: (task: Task) => void
   updateTask: (taskId: string, data: Partial<Task>) => void
@@ -49,6 +51,9 @@ const defaultFilters: FilterState = {
 export const useBoardStore = create<BoardState>((set, get) => ({
   tasksByStatus: {},
   filters: { ...defaultFilters },
+  isDragging: false,
+
+  setIsDragging: (v) => set({ isDragging: v }),
 
   setTasksForStatus: (statusId, tasks) =>
     set((state) => ({
@@ -119,11 +124,22 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       const targetStatusId = newTask.status.id
       const updated: Record<string, Task[]> = {}
       for (const [statusId, tasks] of Object.entries(state.tasksByStatus)) {
-        updated[statusId] = tasks.filter((t) => t.id !== taskId)
+        const filtered = tasks.filter((t) => t.id !== taskId)
+        if (filtered.length !== tasks.length || statusId === targetStatusId) {
+          updated[statusId] = filtered
+        }
       }
-      updated[targetStatusId] = [...(updated[targetStatusId] ?? []), newTask]
-        .sort((a, b) => a.position - b.position)
-      return { tasksByStatus: updated }
+      // Binary insert into target to maintain sort order
+      const target = [...(updated[targetStatusId] ?? state.tasksByStatus[targetStatusId] ?? [])]
+      let lo = 0, hi = target.length
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1
+        if (target[mid].position < newTask.position) lo = mid + 1
+        else hi = mid
+      }
+      target.splice(lo, 0, newTask)
+      updated[targetStatusId] = target
+      return { tasksByStatus: { ...state.tasksByStatus, ...updated } }
     }),
 
   removeTask: (taskId) =>

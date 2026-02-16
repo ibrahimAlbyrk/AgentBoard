@@ -22,7 +22,7 @@ import { useBoardStore } from '@/stores/boardStore'
 import { useMoveTask } from '@/hooks/useTasks'
 import { useExpandedTasks } from '@/hooks/useExpandedTasks'
 import { useSubtasks } from '@/hooks/useSubtasks'
-import { markLocalMove } from '@/hooks/useWebSocket'
+import { markLocalMove, flushPendingWSUpdates } from '@/hooks/useWebSocket'
 import { calculateInsertPosition } from '@/lib/position'
 import { BoardColumn } from './BoardColumn'
 import { TaskCard } from './TaskCard'
@@ -169,6 +169,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
     }
 
     // Freeze filtered tasks during drag so WS updates don't break dnd-kit
+    useBoardStore.getState().setIsDragging(true)
     dragSnapshotRef.current = latestFilteredMap
 
     const fresh = useBoardStore.getState().tasksByStatus
@@ -226,6 +227,8 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
 
   const handleDragCancel = useCallback(() => {
     dragSnapshotRef.current = null
+    useBoardStore.getState().setIsDragging(false)
+    flushPendingWSUpdates()
     setActiveTask(null)
     setDragOverColumnId(null)
     setDragOverItemId(null)
@@ -235,6 +238,8 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       dragSnapshotRef.current = null
+      useBoardStore.getState().setIsDragging(false)
+      flushPendingWSUpdates()
       setDragOverColumnId(null)
       setDragOverItemId(null)
       const { active, over } = event
@@ -270,15 +275,16 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
       const columnTasks = freshTasksByStatus[targetStatusId] ?? []
       const filtered = columnTasks.filter((t) => t.id !== taskId)
 
+      const sortedPositions = filtered.map((t) => t.position).sort((a, b) => a - b)
+
       let position: number
       if (overId.startsWith('column-')) {
         // Dropped on empty column area → append to end
-        position = calculateInsertPosition(filtered.map((t) => t.position), filtered.length)
+        position = calculateInsertPosition(sortedPositions, filtered.length)
       } else if (fromStatusId === targetStatusId) {
-        // Same column reorder — use drag direction to determine insert position
-        const oldIndex = columnTasks.findIndex((t) => t.id === taskId)
-        const overIndex = columnTasks.findIndex((t) => t.id === overId)
-        if (oldIndex === -1 || overIndex === -1 || oldIndex === overIndex) {
+        // Same column reorder — compare positions to determine direction
+        const overIdxInFiltered = filtered.findIndex((t) => t.id === overId)
+        if (overIdxInFiltered === -1) {
           // No-op — animate back
           const translated = active.rect.current.translated
           if (translated) {
@@ -287,16 +293,16 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
           setActiveTask(null)
           return
         }
-        // Remove dragged task, then calculate insert position relative to over task
-        const overIdxInFiltered = filtered.findIndex((t) => t.id === overId)
-        const draggingDown = oldIndex < overIndex
+        // Use position values (not array indices) to determine drag direction
+        const overPosition = filtered[overIdxInFiltered]?.position ?? 0
+        const draggingDown = activeTask.position < overPosition
         const insertIdx = draggingDown ? overIdxInFiltered + 1 : overIdxInFiltered
-        position = calculateInsertPosition(filtered.map((t) => t.position), insertIdx)
+        position = calculateInsertPosition(sortedPositions, insertIdx)
       } else {
         // Cross column: insert at the over task's position
         const overIdx = filtered.findIndex((t) => t.id === overId)
         const insertIdx = overIdx === -1 ? filtered.length : overIdx
-        position = calculateInsertPosition(filtered.map((t) => t.position), insertIdx)
+        position = calculateInsertPosition(sortedPositions, insertIdx)
       }
 
       // Animate back to position
@@ -337,14 +343,21 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
     [activeTask, moveTask]
   )
 
-  // Cross-column placeholder: index where a gap should appear in the target column.
-  // Collision returns the task AFTER the gap, so placeholder goes at that index (before it).
+  // Placeholder: index where a gap should appear in the target column during drag.
   const getPlaceholderIdx = (statusId: string): number => {
-    if (!activeTask || dragOverColumnId !== statusId || activeTask.status.id === statusId) return -1
+    if (!activeTask || dragOverColumnId !== statusId) return -1
 
     const tasks = filteredTasksMap[statusId] ?? []
-    if (!dragOverItemId) return tasks.length
 
+    if (activeTask.status.id === statusId) {
+      // Same-column: show placeholder at hover position (skip if no over item)
+      if (!dragOverItemId || dragOverItemId === activeTask.id) return -1
+      const idx = tasks.findIndex(t => t.id === dragOverItemId)
+      return idx === -1 ? -1 : idx
+    }
+
+    // Cross-column
+    if (!dragOverItemId) return tasks.length
     const idx = tasks.findIndex(t => t.id === dragOverItemId)
     if (idx === -1) return tasks.length
     return idx
@@ -370,6 +383,15 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
     },
   }), [])
 
+  // Stable callback refs per status to prevent BoardColumn re-renders
+  const addTaskCallbacks = useMemo(() => {
+    const map: Record<string, () => void> = {}
+    for (const status of statuses) {
+      map[status.id] = () => onAddTask(status.id)
+    }
+    return map
+  }, [statuses, onAddTask])
+
   return (
     <DndContext
       sensors={sensors}
@@ -389,7 +411,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
             status={status}
             tasks={filteredTasksMap[status.id] ?? []}
             onTaskClick={onTaskClick}
-            onAddTask={() => onAddTask(status.id)}
+            onAddTask={addTaskCallbacks[status.id]}
             placeholderIdx={getPlaceholderIdx(status.id)}
             placeholderHeight={draggedCardHeight}
             hideDragSourceId={

@@ -16,10 +16,12 @@ interface SortableTaskCardProps {
   expandedContent?: React.ReactNode
 }
 
-// Allow layout animation during sorting so other tasks shift out of the way.
+// Animate layout during sorting so other tasks shift to make room.
 // Skip only for the item that was just dropped (flight animation handles it).
 const animateLayoutChanges: AnimateLayoutChanges = (args) => {
   if (args.wasDragging) return false
+  // Force animation during active sorting for smooth reorder feedback
+  if (args.isSorting) return true
   return defaultAnimateLayoutChanges(args)
 }
 
