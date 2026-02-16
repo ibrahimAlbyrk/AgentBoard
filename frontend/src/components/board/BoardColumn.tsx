@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo, memo, Fragment } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Plus, Filter, ChevronsLeft, ChevronsRight } from 'lucide-react'
@@ -50,11 +50,12 @@ function DropPlaceholder({ height }: { height: number }) {
   )
 }
 
-export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, placeholderHeight = 72, hideDragSourceId, compact, isTaskExpanded, onToggleExpand, renderExpandedContent }: BoardColumnProps) {
+export const BoardColumn = memo(function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, placeholderHeight = 72, hideDragSourceId, compact, isTaskExpanded, onToggleExpand, renderExpandedContent }: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status.id}` })
   const filtersActive = useBoardStore((s) => s.hasActiveFilters())
   const [isCollapsed, setIsCollapsed] = useState(false)
   const columnRef = useRef<HTMLDivElement>(null)
+  const itemIds = useMemo(() => tasks.map((t) => t.id), [tasks])
 
   const handleColumnKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
@@ -143,24 +144,30 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
         }`}
       >
         <SortableContext
-          items={tasks.map((t) => t.id)}
+          items={itemIds}
           strategy={verticalListSortingStrategy}
         >
-          {tasks.map((task) => (
-            <SortableTaskCard
-              key={task.id}
-              task={task}
-              onClick={() => onTaskClick(task)}
-              hideWhileDragging={task.id === hideDragSourceId}
-              placeholderHeight={placeholderHeight}
-              compact={compact}
-              isExpanded={isTaskExpanded?.(task.id)}
-              onToggleExpand={task.children_count > 0 ? () => onToggleExpand?.(task.id) : undefined}
-              expandedContent={isTaskExpanded?.(task.id) ? renderExpandedContent?.(task) : undefined}
-            />
+          {tasks.map((task, index) => (
+            <Fragment key={task.id}>
+              {placeholderIdx === index && (
+                <DropPlaceholder height={placeholderHeight} />
+              )}
+              <SortableTaskCard
+                task={task}
+                onClick={() => onTaskClick(task)}
+                hideWhileDragging={task.id === hideDragSourceId}
+                placeholderHeight={placeholderHeight}
+                compact={compact}
+                isExpanded={isTaskExpanded?.(task.id)}
+                onToggleExpand={task.children_count > 0 ? () => onToggleExpand?.(task.id) : undefined}
+                expandedContent={isTaskExpanded?.(task.id) ? renderExpandedContent?.(task) : undefined}
+              />
+            </Fragment>
           ))}
+          {placeholderIdx >= 0 && placeholderIdx >= tasks.length && (
+            <DropPlaceholder height={placeholderHeight} />
+          )}
         </SortableContext>
-        {placeholderIdx >= 0 && <DropPlaceholder height={placeholderHeight} />}
 
         {tasks.length === 0 && placeholderIdx < 0 && (
           <div className="flex flex-col items-center justify-center h-20 border border-dashed border-[var(--border-subtle)] rounded-lg text-[13px] text-[var(--text-tertiary)] gap-1.5">
@@ -186,4 +193,4 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
       </div>
     </div>
   )
-}
+})

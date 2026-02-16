@@ -290,11 +290,10 @@
   100% { background-position: 0% 50%; }
 }
 
-/* unused — kept for potential future use */
-/* @keyframes glow-pulse {
+@keyframes glow-pulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
-} */
+}
 
 /* unused — kept for potential future use */
 /* @keyframes slide-in-right {

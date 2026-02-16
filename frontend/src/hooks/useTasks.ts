@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
 import { useBoardStore } from '@/stores/boardStore'
 import { clearLocalMove } from '@/hooks/useWebSocket'
+import { toast } from '@/lib/toast'
 import type { Task, TaskCreate, TaskUpdate, TaskMove, TaskFilters } from '@/types'
 
 export function useTasks(projectId: string, boardId: string, filters?: TaskFilters) {
@@ -75,11 +76,20 @@ export function useMoveTask(projectId: string, boardId: string) {
           store.setTasksForStatus(statusId, tasks)
         }
       }
+      toast.error('Task taşınamadı, lütfen tekrar deneyin')
+    },
+
+    onSuccess: (response) => {
+      const task = response?.data as Task | undefined
+      if (task) {
+        useBoardStore.getState().relocateTask(task.id, task)
+      }
+      // Invalidate tasks to sync positions after potential backend rebalance
+      qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
     },
 
     onSettled: (_data, _error, variables) => {
       clearLocalMove(variables.taskId)
-      qc.invalidateQueries({ queryKey: ['tasks', projectId, boardId] })
       qc.invalidateQueries({ queryKey: ['activity', projectId] })
     },
   })

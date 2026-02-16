@@ -70,12 +70,12 @@ export function useWebSocket(projectId: string, boardId: string) {
     const handleMoved = (e: Record<string, unknown>) => {
       const data = e.data as Task
       if (localMoves.has(data.id)) {
-        relocateTask(data.id, data)
-      } else {
-        animatedRelocate(data)
-        const user = e.user as { username: string; agent?: { name: string } } | undefined
-        if (user) toast.info(`${wsActorName(user)} moved a task`)
+        // Local drag — skip store update to avoid overriding optimistic state
+        return
       }
+      animatedRelocate(data)
+      const user = e.user as { username: string; agent?: { name: string } } | undefined
+      if (user) toast.info(`${wsActorName(user)} moved a task`)
       invalidateActivity()
     }
 

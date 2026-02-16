@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, memo } from 'react'
 import { useSortable, defaultAnimateLayoutChanges, type AnimateLayoutChanges } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { TaskCard } from './TaskCard'
@@ -16,14 +16,14 @@ interface SortableTaskCardProps {
   expandedContent?: React.ReactNode
 }
 
-// Allow layout animation on drop with shorter duration to avoid jump glitch.
-// With live-rect collision detection the overlap issue is resolved, so we can
-// keep smooth transitions when items settle into their final positions.
+// Allow layout animation during sorting so other tasks shift out of the way.
+// Skip only for the item that was just dropped (flight animation handles it).
 const animateLayoutChanges: AnimateLayoutChanges = (args) => {
+  if (args.wasDragging) return false
   return defaultAnimateLayoutChanges(args)
 }
 
-export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholderHeight = 72, compact, isExpanded, onToggleExpand, expandedContent }: SortableTaskCardProps) {
+export const SortableTaskCard = memo(function SortableTaskCard({ task, onClick, hideWhileDragging, placeholderHeight = 72, compact, isExpanded, onToggleExpand, expandedContent }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -49,7 +49,8 @@ export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholder
     // Use Translate (not Transform) to avoid dnd-kit injecting scaleX/scaleY
     // that can cause visual glitches during reorder
     transform: CSS.Translate.toString(transform),
-    transition,
+    // Disable CSS transition while actively dragging to avoid sluggish feel
+    transition: isDragging ? 'none' : transition,
     ...(flying && { opacity: 0 }),
     ...(hidden && { height: 0, overflow: 'hidden', margin: 0, padding: 0 }),
   }
@@ -80,4 +81,4 @@ export function SortableTaskCard({ task, onClick, hideWhileDragging, placeholder
       )}
     </div>
   )
-}
+})

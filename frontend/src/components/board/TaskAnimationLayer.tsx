@@ -80,14 +80,12 @@ function FlyingCard({ taskId, info }: { taskId: string; info: FlyingTaskInfo }) 
 
   useLayoutEffect(() => {
     let cancelled = false
-    // Double-RAF: wait for one full paint cycle so the card settles in new column
+    // Single RAF: wait for one paint cycle so the card settles in new position
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (cancelled) return
-        const rect = getCardRect(taskId)
-        if (rect) setToRect(rect)
-        else endFlight(taskId)
-      })
+      if (cancelled) return
+      const rect = getCardRect(taskId)
+      if (rect) setToRect(rect)
+      else endFlight(taskId)
     })
     return () => { cancelled = true }
   }, [taskId])
