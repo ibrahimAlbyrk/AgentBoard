@@ -1,4 +1,4 @@
-import { Fragment, useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Plus, Filter, ChevronsLeft, ChevronsRight } from 'lucide-react'
@@ -136,7 +136,7 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
         onKeyDown={handleColumnKeyDown}
         role="listbox"
         aria-label={`${status.name} tasks`}
-        className={`rounded-xl p-2 space-y-2 min-h-[120px] transition-all duration-200 ${
+        className={`rounded-xl p-2 flex flex-col gap-2 min-h-[120px] transition-all duration-200 ${
           isOver
             ? 'border border-[var(--accent-solid)]/40 bg-[var(--accent-muted-bg)] shadow-[inset_0_0_20px_-8px_var(--glow)]'
             : 'bg-[var(--surface)]/60 border border-dashed border-[var(--border-subtle)]'
@@ -146,23 +146,21 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholder
           items={tasks.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
         >
-          {tasks.map((task, idx) => (
-            <Fragment key={task.id}>
-              {idx === placeholderIdx && <DropPlaceholder height={placeholderHeight} />}
-              <SortableTaskCard
-                task={task}
-                onClick={() => onTaskClick(task)}
-                hideWhileDragging={task.id === hideDragSourceId}
-                placeholderHeight={placeholderHeight}
-                compact={compact}
-                isExpanded={isTaskExpanded?.(task.id)}
-                onToggleExpand={task.children_count > 0 ? () => onToggleExpand?.(task.id) : undefined}
-                expandedContent={isTaskExpanded?.(task.id) ? renderExpandedContent?.(task) : undefined}
-              />
-            </Fragment>
+          {tasks.map((task) => (
+            <SortableTaskCard
+              key={task.id}
+              task={task}
+              onClick={() => onTaskClick(task)}
+              hideWhileDragging={task.id === hideDragSourceId}
+              placeholderHeight={placeholderHeight}
+              compact={compact}
+              isExpanded={isTaskExpanded?.(task.id)}
+              onToggleExpand={task.children_count > 0 ? () => onToggleExpand?.(task.id) : undefined}
+              expandedContent={isTaskExpanded?.(task.id) ? renderExpandedContent?.(task) : undefined}
+            />
           ))}
-          {placeholderIdx >= 0 && placeholderIdx >= tasks.length && <DropPlaceholder height={placeholderHeight} />}
         </SortableContext>
+        {placeholderIdx >= 0 && <DropPlaceholder height={placeholderHeight} />}
 
         {tasks.length === 0 && placeholderIdx < 0 && (
           <div className="flex flex-col items-center justify-center h-20 border border-dashed border-[var(--border-subtle)] rounded-lg text-[13px] text-[var(--text-tertiary)] gap-1.5">

@@ -29,63 +29,64 @@ import { TaskCard } from './TaskCard'
 import { TaskAnimationLayer, startFlight, getCardRect } from './TaskAnimationLayer'
 import type { Task } from '@/types'
 
-/** Helper: is a droppable rect horizontally inside a column rect? */
-const isInColumn = (
-  id: string | number,
-  r: { left: number; width: number },
-  colRect: { left: number; right: number },
-) => {
-  if (String(id).startsWith('column-')) return false
-  const cx = r.left + r.width / 2
-  return cx >= colRect.left && cx <= colRect.right
-}
+/** Find a droppable container by id from the array */
+const findContainer = (containers: Parameters<CollisionDetection>[0]['droppableContainers'], id: string | number) =>
+  containers.find((c) => c.id === id)
 
 /** Find the column droppable whose horizontal band contains the pointer. */
 const findColumnAtPointer = (args: Parameters<CollisionDetection>[0]) => {
   const px = args.pointerCoordinates?.x ?? 0
-  for (const [id, rect] of args.droppableRects.entries()) {
-    if (String(id).startsWith('column-') && px >= rect.left && px <= rect.right) {
-      return { id, rect }
+  for (const entry of args.droppableContainers) {
+    const id = String(entry.id)
+    if (!id.startsWith('column-') || entry.disabled) continue
+    const node = entry.node.current
+    if (!node) continue
+    const rect = node.getBoundingClientRect()
+    if (px >= rect.left && px <= rect.right) {
+      return { id: entry.id, rect }
     }
   }
   return null
 }
 
 /**
- * Custom collision detection using "between-midpoints" approach.
+ * Custom collision detection using "between-midpoints" with LIVE DOM rects.
  *
- * Determines which pair of task midpoints the pointer sits between and
- * returns the task AFTER the gap. This gives stable, predictable targeting:
- *
- *   pointer above A's midpoint  → return A  (insert before A)
- *   pointer between A and B mid → return B  (insert before B = between A and B)
- *   pointer past last midpoint  → return column (append to end)
- *
- * Active item is filtered from the task list so collision never targets
- * the dragged card itself.
+ * Uses getBoundingClientRect() instead of cached droppableRects so that
+ * CSS transforms applied by verticalListSortingStrategy are accounted for.
+ * This eliminates the stale-rect problem that caused tasks not to shift
+ * correctly during drag.
  */
 const kanbanCollision: CollisionDetection = (args) => {
   const withinCollisions = pointerWithin(args)
 
-  // Find column via pointerWithin or horizontal band fallback.
-  // We intentionally skip the "directTask" shortcut (returning the first
-  // pointerWithin task hit) because it bypasses the stable between-midpoints
-  // logic below and causes oscillation with MeasuringStrategy changes.
+  // Find column via pointerWithin or horizontal band fallback
   const withinColumn = withinCollisions.find((c) =>
     String(c.id).startsWith('column-'),
   )
-  const col = withinColumn
-    ? { id: withinColumn.id, rect: args.droppableRects.get(withinColumn.id)! }
-    : findColumnAtPointer(args)
 
-  if (!col?.rect) return closestCenter(args)
+  let col: { id: string | number; rect: DOMRect } | null = null
+  if (withinColumn) {
+    const entry = findContainer(args.droppableContainers, withinColumn.id)
+    const node = entry?.node.current
+    if (node) col = { id: withinColumn.id, rect: node.getBoundingClientRect() }
+  }
+  if (!col) col = findColumnAtPointer(args)
+  if (!col) return closestCenter(args)
+
   const columnRect = col.rect
   const pointerY = args.pointerCoordinates?.y ?? 0
 
-  // Collect tasks in this column (excluding active), sorted top-to-bottom
-  const tasksInColumn: { id: string | number; rect: { top: number; height: number } }[] = []
-  for (const [id, rect] of args.droppableRects.entries()) {
-    if (id !== args.active.id && isInColumn(id, rect, columnRect)) {
+  // Collect tasks in this column (excluding active) using live DOM rects
+  const tasksInColumn: { id: string | number; rect: DOMRect }[] = []
+  for (const entry of args.droppableContainers) {
+    const id = entry.id
+    if (id === args.active.id || entry.disabled || String(id).startsWith('column-')) continue
+    const node = entry.node.current
+    if (!node) continue
+    const rect = node.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    if (cx >= columnRect.left && cx <= columnRect.right) {
       tasksInColumn.push({ id, rect })
     }
   }
@@ -102,8 +103,7 @@ const kanbanCollision: CollisionDetection = (args) => {
     return [{ id: tasksInColumn[0].id, data: { droppableContainer: undefined } }]
   }
 
-  // Fix 4: "between-midpoints" — find which gap the pointer is in.
-  // Return the task AFTER the gap for stable targeting (no flickering).
+  // "between-midpoints" — find which gap the pointer sits in
   for (let i = 0; i < tasksInColumn.length - 1; i++) {
     const nextMid = tasksInColumn[i + 1].rect.top + tasksInColumn[i + 1].rect.height / 2
     if (pointerY <= nextMid) {
@@ -112,11 +112,16 @@ const kanbanCollision: CollisionDetection = (args) => {
   }
 
   // Pointer past last task's midpoint
-  // Same-column: return last task so verticalListSortingStrategy can shift properly
+  // Same-column: return last task so verticalListSortingStrategy can shift
   // Cross-column: return column ID to signal "append to end"
-  const activeRect = args.droppableRects.get(args.active.id)
-  if (activeRect && isInColumn(args.active.id, activeRect, columnRect)) {
-    return [{ id: tasksInColumn[tasksInColumn.length - 1].id, data: { droppableContainer: undefined } }]
+  const activeEntry = findContainer(args.droppableContainers, args.active.id)
+  const activeNode = activeEntry?.node.current
+  if (activeNode) {
+    const activeRect = activeNode.getBoundingClientRect()
+    const cx = activeRect.left + activeRect.width / 2
+    if (cx >= columnRect.left && cx <= columnRect.right) {
+      return [{ id: tasksInColumn[tasksInColumn.length - 1].id, data: { droppableContainer: undefined } }]
+    }
   }
   return [{ id: col.id, data: { droppableContainer: undefined } }]
 }

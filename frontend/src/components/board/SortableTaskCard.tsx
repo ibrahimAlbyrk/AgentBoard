@@ -16,11 +16,10 @@ interface SortableTaskCardProps {
   expandedContent?: React.ReactNode
 }
 
-// Skip layout animation when an item is being dropped (wasDragging = true).
-// This prevents the overlap/jump glitch during same-column reorder because
-// the default layout animation conflicts with dnd-kit's transform removal.
+// Allow layout animation on drop with shorter duration to avoid jump glitch.
+// With live-rect collision detection the overlap issue is resolved, so we can
+// keep smooth transitions when items settle into their final positions.
 const animateLayoutChanges: AnimateLayoutChanges = (args) => {
-  if (args.wasDragging) return false
   return defaultAnimateLayoutChanges(args)
 }
 
