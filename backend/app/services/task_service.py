@@ -759,10 +759,9 @@ class TaskService:
                     f'{mover_name} moved subtask "{task.title}" to {new_status_name}',
                 )
 
-        task_id = task.id
         await db.commit()
-        db.expunge(task)
-        return await crud_task.get_with_relations(db, task_id)
+        # refreshed already has relations loaded — no need for second fetch
+        return refreshed or task
 
     @staticmethod
     async def bulk_update(

@@ -73,15 +73,14 @@ class PositionService:
     ) -> float:
         """Proactive rebalance: if positions are too tight, rebalance first,
         then (re)calculate the end position. Returns final position to use."""
+        # Frontend already calculated position — skip expensive rebalance check
+        if position is not None:
+            return position
+
         if await PositionService._needs_rebalance(db, status_id):
             await PositionService.rebalance(db, status_id)
-            # After rebalance, recalculate if no explicit position given
-            if position is None:
-                return await PositionService.get_end_position(db, status_id)
 
-        if position is None:
-            return await PositionService.get_end_position(db, status_id)
-        return position
+        return await PositionService.get_end_position(db, status_id)
 
     @staticmethod
     async def get_end_position_in_parent(db: AsyncSession, parent_id: UUID) -> float:
