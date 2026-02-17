@@ -37,6 +37,11 @@ export function endFlight(taskId: string) {
   notify()
 }
 
+export function clearAllFlights() {
+  flyingMap.clear()
+  notify()
+}
+
 export function isFlying(taskId: string) {
   return flyingMap.has(taskId)
 }
@@ -80,12 +85,14 @@ function FlyingCard({ taskId, info }: { taskId: string; info: FlyingTaskInfo }) 
 
   useLayoutEffect(() => {
     let cancelled = false
-    // Single RAF: wait for one paint cycle so the card settles in new position
+    // Double-RAF: wait two paint cycles so layout settles before measuring toRect
     requestAnimationFrame(() => {
-      if (cancelled) return
-      const rect = getCardRect(taskId)
-      if (rect) setToRect(rect)
-      else endFlight(taskId)
+      requestAnimationFrame(() => {
+        if (cancelled) return
+        const rect = getCardRect(taskId)
+        if (rect) setToRect(rect)
+        else endFlight(taskId)
+      })
     })
     return () => { cancelled = true }
   }, [taskId])

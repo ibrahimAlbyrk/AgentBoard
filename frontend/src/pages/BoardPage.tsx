@@ -11,6 +11,7 @@ import { useCardDisplayMode } from '@/hooks/useCardDisplayMode'
 import { useProjectStore } from '@/stores/projectStore'
 import { useBoardStore } from '@/stores/boardStore'
 import { KanbanBoard } from '@/components/board/KanbanBoard'
+import { clearAllFlights } from '@/components/board/TaskAnimationLayer'
 import { TaskForm } from '@/components/tasks/TaskForm'
 import { TaskDetailPanel } from '@/components/board/TaskDetailPanel'
 import { TaskFilters } from '@/components/tasks/TaskFilters'
@@ -52,6 +53,7 @@ export function BoardPage() {
     return () => {
       clearProject()
       clearBoard()
+      clearAllFlights()
     }
   }, [projectRes, setCurrentProject, setLabels, setMembers, setAgents, clearProject, clearBoard])
 

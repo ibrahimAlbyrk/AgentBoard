@@ -9,7 +9,6 @@ interface SortableTaskCardProps {
   task: Task
   onClick: () => void
   hideWhileDragging?: boolean
-  placeholderHeight?: number
   compact?: boolean
   isExpanded?: boolean
   onToggleExpand?: () => void
@@ -25,7 +24,7 @@ const animateLayoutChanges: AnimateLayoutChanges = (args) => {
   return defaultAnimateLayoutChanges(args)
 }
 
-export const SortableTaskCard = memo(function SortableTaskCard({ task, onClick, hideWhileDragging, placeholderHeight = 72, compact, isExpanded, onToggleExpand, expandedContent }: SortableTaskCardProps) {
+export const SortableTaskCard = memo(function SortableTaskCard({ task, onClick, hideWhileDragging, compact, isExpanded, onToggleExpand, expandedContent }: SortableTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -45,16 +44,23 @@ export const SortableTaskCard = memo(function SortableTaskCard({ task, onClick, 
     [setNodeRef, task.id],
   )
 
-  const hidden = isDragging && hideWhileDragging
+  // Cross-column: collapse height so source column closes gap
+  const collapsed = isDragging && hideWhileDragging
+  // Same-column: keep height (dnd-kit needs it for displacement) but hide visually
+  const invisible = isDragging && !hideWhileDragging
 
   const style: React.CSSProperties = {
-    // Use Translate (not Transform) to avoid dnd-kit injecting scaleX/scaleY
-    // that can cause visual glitches during reorder
-    transform: CSS.Translate.toString(transform),
-    // Disable CSS transition while actively dragging to avoid sluggish feel
-    transition: isDragging ? 'none' : transition,
+    // Invisible (same-column active): DON'T apply transform — keep DOM at original position
+    // so dnd-kit's WhileDragging re-measurement sees a stable rect (prevents oscillation).
+    // Collapsed (cross-column): transform doesn't matter since height is 0.
+    // Normal siblings: apply transform for smooth displacement animation.
+    transform: invisible ? undefined : CSS.Translate.toString(transform),
+    transition: collapsed
+      ? 'height 200ms ease, margin 200ms ease, padding 200ms ease'
+      : (isDragging ? 'none' : transition),
     ...(flying && { opacity: 0 }),
-    ...(hidden && { height: 0, overflow: 'hidden', margin: 0, padding: 0 }),
+    ...(collapsed && { height: 0, overflow: 'hidden', marginTop: 0, marginBottom: 0 }),
+    ...(invisible && { opacity: 0 }),
   }
 
   return (
@@ -64,21 +70,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({ task, onClick, 
       {...attributes}
       {...listeners}
     >
-      {isDragging && !hidden ? (
-        <div
-          className="rounded-xl border-2 border-dashed border-[var(--accent-solid)]/40 bg-[var(--accent-muted-bg)]/30 relative overflow-hidden"
-          style={{ height: placeholderHeight }}
-        >
-          <div
-            className="absolute inset-0 rounded-lg"
-            style={{
-              boxShadow: 'inset 0 0 16px -4px var(--accent-solid)',
-              animation: 'glow-pulse 2s ease-in-out infinite',
-              opacity: 0.3,
-            }}
-          />
-        </div>
-      ) : hidden ? null : (
+      {collapsed ? null : (
         <TaskCard task={task} onClick={onClick} compact={compact} isExpanded={isExpanded} onToggleExpand={onToggleExpand} expandedContent={expandedContent} />
       )}
     </div>

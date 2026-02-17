@@ -52,7 +52,20 @@ function DropPlaceholder({ height }: { height: number }) {
 
 export const BoardColumn = memo(function BoardColumn({ status, tasks, onTaskClick, onAddTask, placeholderIdx = -1, placeholderHeight = 72, hideDragSourceId, compact, isTaskExpanded, onToggleExpand, renderExpandedContent }: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${status.id}` })
-  const filtersActive = useBoardStore((s) => s.hasActiveFilters())
+  const filtersActive = useBoardStore(
+    useCallback(
+      (s) => !!(
+        s.filters.search ||
+        s.filters.priorities.length ||
+        s.filters.assigneeUserIds.length ||
+        s.filters.assigneeAgentIds.length ||
+        s.filters.unassigned ||
+        s.filters.labelIds.length ||
+        s.filters.dueDatePresets.length
+      ),
+      [],
+    ),
+  )
   const [isCollapsed, setIsCollapsed] = useState(false)
   const columnRef = useRef<HTMLDivElement>(null)
   const itemIds = useMemo(() => tasks.map((t) => t.id), [tasks])
@@ -156,7 +169,6 @@ export const BoardColumn = memo(function BoardColumn({ status, tasks, onTaskClic
                 task={task}
                 onClick={() => onTaskClick(task)}
                 hideWhileDragging={task.id === hideDragSourceId}
-                placeholderHeight={placeholderHeight}
                 compact={compact}
                 isExpanded={isTaskExpanded?.(task.id)}
                 onToggleExpand={task.children_count > 0 ? () => onToggleExpand?.(task.id) : undefined}

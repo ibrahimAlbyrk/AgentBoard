@@ -12,7 +12,7 @@ const localMoves = new Set<string>()
 export function markLocalMove(taskId: string) {
   localMoves.add(taskId)
   // Fallback cleanup — normally cleared by useMoveTask.onSettled
-  setTimeout(() => localMoves.delete(taskId), 3000)
+  setTimeout(() => localMoves.delete(taskId), 30000)
 }
 export function clearLocalMove(taskId: string) {
   localMoves.delete(taskId)
@@ -22,8 +22,13 @@ export function clearLocalMove(taskId: string) {
 const pendingWSUpdates: Task[] = []
 export function flushPendingWSUpdates() {
   const { relocateTask } = useBoardStore.getState()
-  while (pendingWSUpdates.length > 0) {
-    const task = pendingWSUpdates.shift()!
+  // Deduplicate: keep only the last update per task (last-write-wins)
+  const lastByTask = new Map<string, Task>()
+  for (const task of pendingWSUpdates) {
+    lastByTask.set(task.id, task)
+  }
+  pendingWSUpdates.length = 0
+  for (const task of lastByTask.values()) {
     relocateTask(task.id, task)
   }
 }

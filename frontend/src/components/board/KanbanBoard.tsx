@@ -50,9 +50,11 @@ const kanbanCollision: CollisionDetection = (args) => {
   const columnRect = args.droppableRects.get(columnHit.id)
   if (!columnRect) return closestCenter(args)
 
-  // 2. Filter to only tasks inside the hit column (using cached rects)
+  // 2. Filter to only tasks inside the hit column (using cached rects).
+  // Include the active item so closestCenter can return it when the pointer
+  // is at its original slot — this prevents oscillation between neighbors.
   const tasksInColumn = args.droppableContainers.filter((entry) => {
-    if (entry.id === args.active.id || entry.disabled) return false
+    if (entry.disabled) return false
     if (String(entry.id).startsWith('column-')) return false
     const rect = args.droppableRects.get(entry.id)
     if (!rect) return false
@@ -116,18 +118,38 @@ function ExpandedSubtasks({ projectId, boardId, taskId, onTaskClick }: { project
   )
 }
 
+interface DragState {
+  activeTask: Task | null
+  cardHeight: number
+  overColumnId: string | null
+  overItemId: string | null
+  tilt: { x: number; y: number }
+}
+
 export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProps) {
   const { statuses, currentProject, currentBoard } = useProjectStore()
   const { tasksByStatus, filters } = useBoardStore()
   const getFilteredTasks = useBoardStore((s) => s.getFilteredTasks)
   const moveTask = useMoveTask(currentProject?.id ?? '', currentBoard?.id ?? '')
   const { isExpanded, toggle } = useExpandedTasks(currentBoard?.id ?? '')
-  const [activeTask, setActiveTask] = useState<Task | null>(null)
-  const [draggedCardHeight, setDraggedCardHeight] = useState(72)
-  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
-  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
-  const [tilt, setTilt] = useState({ x: 0, y: 0 })
-  const prevDelta = useRef({ x: 0, y: 0 })
+
+  // Single ref for all drag state — eliminates multi-setState render bursts
+  const dragStateRef = useRef<DragState>({
+    activeTask: null,
+    cardHeight: 72,
+    overColumnId: null,
+    overItemId: null,
+    tilt: { x: 0, y: 0 },
+  })
+
+  // Single render trigger for overlay — only bumped when visual state changes
+  const [overlayVersion, setOverlayVersion] = useState(0)
+  const redrawOverlay = useCallback(() => setOverlayVersion((v) => v + 1), [])
+
+  // O(1) overlay task ref — set in handleDragStart, cleared on end/cancel
+  const overlayTaskRef = useRef<Task | null>(null)
+
+  const prevDeltaRef = useRef({ x: 0, y: 0 })
   const dragSnapshotRef = useRef<Record<string, Task[]> | null>(null)
 
   // Memoize filtered tasks per column — prevents new array refs on every render
@@ -159,94 +181,109 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const taskId = String(event.active.id)
-    prevDelta.current = { x: 0, y: 0 }
-    setTilt({ x: 0, y: 0 })
+    prevDeltaRef.current = { x: 0, y: 0 }
 
-    // Measure the card's actual height for placeholder sizing
     const cardRect = getCardRect(taskId)
-    if (cardRect) {
-      setDraggedCardHeight(cardRect.height)
-    }
-
-    // Freeze filtered tasks during drag so WS updates don't break dnd-kit
-    useBoardStore.getState().setIsDragging(true)
-    dragSnapshotRef.current = latestFilteredMap
-
     const fresh = useBoardStore.getState().tasksByStatus
+
     for (const tasks of Object.values(fresh)) {
       const task = tasks.find((t) => t.id === taskId)
       if (task) {
-        setActiveTask(task)
-        setDragOverColumnId(task.status.id)
-        setDragOverItemId(null)
+        dragStateRef.current = {
+          activeTask: task,
+          cardHeight: cardRect?.height ?? 72,
+          overColumnId: task.status.id,
+          overItemId: null,
+          tilt: { x: 0, y: 0 },
+        }
+        overlayTaskRef.current = task
         break
       }
     }
-  }, [latestFilteredMap])
+
+    useBoardStore.getState().setIsDragging(true)
+    dragSnapshotRef.current = latestFilteredMap
+    redrawOverlay()
+  }, [latestFilteredMap, redrawOverlay])
 
   const handleDragMove = useCallback((event: DragMoveEvent) => {
     const { delta } = event
-    const velocityX = delta.x - prevDelta.current.x
-    const velocityY = delta.y - prevDelta.current.y
-    prevDelta.current = { x: delta.x, y: delta.y }
+    const velocityX = delta.x - prevDeltaRef.current.x
+    const velocityY = delta.y - prevDeltaRef.current.y
+    prevDeltaRef.current = { x: delta.x, y: delta.y }
 
-    // Clamp tilt: max ±12 degrees, velocity drives the angle
     const maxTilt = 12
     const sensitivity = 0.6
     const tiltY = Math.max(-maxTilt, Math.min(maxTilt, velocityX * sensitivity))
     const tiltX = Math.max(-maxTilt, Math.min(maxTilt, -velocityY * sensitivity))
-    setTilt({ x: tiltX, y: tiltY })
-  }, [])
+    dragStateRef.current.tilt = { x: tiltX, y: tiltY }
+    redrawOverlay()
+  }, [redrawOverlay])
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     const { over } = event
-    if (!over || !activeTask) return
+    if (!over || !dragStateRef.current.activeTask) return
 
     const overId = String(over.id)
-    let targetColumnId: string | undefined
+    let overColumnId: string | null = null
     let overItemId: string | null = null
 
     if (overId.startsWith('column-')) {
-      targetColumnId = overId.replace('column-', '')
+      overColumnId = overId.replace('column-', '')
     } else {
       overItemId = overId
       const fresh = useBoardStore.getState().tasksByStatus
       for (const [statusId, tasks] of Object.entries(fresh)) {
         if (tasks.some((t) => t.id === overId)) {
-          targetColumnId = statusId
+          overColumnId = statusId
           break
         }
       }
     }
 
-    if (targetColumnId) {
-      setDragOverColumnId(targetColumnId)
-      setDragOverItemId(overItemId)
+    if (overColumnId) {
+      dragStateRef.current.overColumnId = overColumnId
+      dragStateRef.current.overItemId = overItemId
+      redrawOverlay()
     }
-  }, [activeTask])
+  }, [redrawOverlay])
 
   const handleDragCancel = useCallback(() => {
     dragSnapshotRef.current = null
     useBoardStore.getState().setIsDragging(false)
     flushPendingWSUpdates()
-    setActiveTask(null)
-    setDragOverColumnId(null)
-    setDragOverItemId(null)
-    setTilt({ x: 0, y: 0 })
-  }, [])
+    dragStateRef.current = {
+      activeTask: null,
+      cardHeight: 72,
+      overColumnId: null,
+      overItemId: null,
+      tilt: { x: 0, y: 0 },
+    }
+    overlayTaskRef.current = null
+    redrawOverlay()
+  }, [redrawOverlay])
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       dragSnapshotRef.current = null
       useBoardStore.getState().setIsDragging(false)
       flushPendingWSUpdates()
-      setDragOverColumnId(null)
-      setDragOverItemId(null)
+
       const { active, over } = event
-      if (!over || !activeTask) {
-        setActiveTask(null)
-        return
+      const { activeTask } = dragStateRef.current
+
+      // Clear drag state immediately
+      dragStateRef.current = {
+        activeTask: null,
+        cardHeight: 72,
+        overColumnId: null,
+        overItemId: null,
+        tilt: { x: 0, y: 0 },
       }
+      overlayTaskRef.current = null
+      redrawOverlay()
+
+      if (!over || !activeTask) return
 
       const taskId = String(active.id)
       const overId = String(over.id)
@@ -267,22 +304,27 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
           }
         }
       }
-      if (!targetStatusId) {
-        setActiveTask(null)
-        return
-      }
+      if (!targetStatusId) return
 
       const columnTasks = freshTasksByStatus[targetStatusId] ?? []
-      const filtered = columnTasks.filter((t) => t.id !== taskId)
 
-      const sortedPositions = filtered.map((t) => t.position).sort((a, b) => a - b)
+      // Ensure position order — guards against partially-rebalanced arrays
+      const filtered = columnTasks
+        .filter((t) => t.id !== taskId)
+        .sort((a, b) => a.position - b.position)
+
+      const sortedPositions = filtered.map((t) => t.position)
+
+      // Use fresh store position (not stale activeTask.position) for direction detection
+      const currentTask = (freshTasksByStatus[fromStatusId] ?? []).find((t) => t.id === taskId)
+      const currentPosition = currentTask?.position ?? activeTask.position
 
       let position: number
       if (overId.startsWith('column-')) {
         // Dropped on empty column area → append to end
         position = calculateInsertPosition(sortedPositions, filtered.length)
       } else if (fromStatusId === targetStatusId) {
-        // Same column reorder — compare positions to determine direction
+        // Same column reorder
         const overIdxInFiltered = filtered.findIndex((t) => t.id === overId)
         if (overIdxInFiltered === -1) {
           // No-op — animate back
@@ -290,12 +332,10 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
           if (translated) {
             startFlight(taskId, activeTask, new DOMRect(translated.left, translated.top, translated.width, translated.height), true)
           }
-          setActiveTask(null)
           return
         }
-        // Use position values (not array indices) to determine drag direction
-        const overPosition = filtered[overIdxInFiltered]?.position ?? 0
-        const draggingDown = activeTask.position < overPosition
+        const overPosition = filtered[overIdxInFiltered].position
+        const draggingDown = currentPosition < overPosition
         const insertIdx = draggingDown ? overIdxInFiltered + 1 : overIdxInFiltered
         position = calculateInsertPosition(sortedPositions, insertIdx)
       } else {
@@ -305,7 +345,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
         position = calculateInsertPosition(sortedPositions, insertIdx)
       }
 
-      // Animate back to position
+      // Animate card from drag position to final slot
       const translated = active.rect.current.translated
       if (translated) {
         const fromRect = new DOMRect(translated.left, translated.top, translated.width, translated.height)
@@ -313,25 +353,16 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
       }
 
       // No-op if nothing changed
-      if (fromStatusId === targetStatusId && activeTask.position === position) {
-        setActiveTask(null)
-        return
-      }
+      if (fromStatusId === targetStatusId && currentPosition === position) return
 
-      // Capture store snapshot before optimistic update (for error rollback)
+      // Capture snapshot for rollback on error
       const prevSnapshot: Record<string, Task[]> = {}
       for (const [sid, tasks] of Object.entries(freshTasksByStatus)) {
         prevSnapshot[sid] = [...tasks]
       }
 
-      // Mark as local drag so WS echo won't re-animate
       markLocalMove(taskId)
-
-      // Optimistic update first — ensures task is visible in new position
       useBoardStore.getState().moveTask(taskId, fromStatusId, targetStatusId, position)
-
-      // Clear overlay AFTER optimistic update so there's no visual gap
-      setActiveTask(null)
 
       moveTask.mutate({
         taskId,
@@ -340,33 +371,40 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
         _prevSnapshot: prevSnapshot,
       })
     },
-    [activeTask, moveTask]
+    [moveTask, redrawOverlay]
   )
 
-  // Placeholder: index where a gap should appear in the target column during drag.
-  const getPlaceholderIdx = (statusId: string): number => {
-    if (!activeTask || dragOverColumnId !== statusId) return -1
+  // Memoized placeholder index per status — only recomputes when drag state or tasks change
+  const placeholderIndices = useMemo(() => {
+    const result: Record<string, number> = {}
+    const { activeTask, overColumnId, overItemId } = dragStateRef.current
+    if (!activeTask) return result
 
-    const tasks = filteredTasksMap[statusId] ?? []
-
-    if (activeTask.status.id === statusId) {
-      // Same-column: show placeholder at hover position (skip if no over item)
-      if (!dragOverItemId || dragOverItemId === activeTask.id) return -1
-      const idx = tasks.findIndex(t => t.id === dragOverItemId)
-      return idx === -1 ? -1 : idx
+    for (const status of statuses) {
+      // Same-column: dnd-kit displacement handles it — no extra placeholder needed
+      if (overColumnId !== status.id || activeTask.status.id === status.id) {
+        result[status.id] = -1
+        continue
+      }
+      // Cross-column: show placeholder at the over-item's position
+      const tasks = filteredTasksMap[status.id] ?? []
+      if (!overItemId) {
+        result[status.id] = tasks.length
+      } else {
+        const idx = tasks.findIndex((t) => t.id === overItemId)
+        result[status.id] = idx === -1 ? tasks.length : idx
+      }
     }
+    return result
+    // overlayVersion triggers recompute when drag state changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statuses, filteredTasksMap, overlayVersion])
 
-    // Cross-column
-    if (!dragOverItemId) return tasks.length
-    const idx = tasks.findIndex(t => t.id === dragOverItemId)
-    if (idx === -1) return tasks.length
-    return idx
-  }
-
-  // Use fresh task data from store for overlay (handles WS updates during drag)
-  const freshOverlayTask = activeTask
-    ? (Object.values(tasksByStatus).flat().find(t => t.id === activeTask.id) ?? activeTask)
-    : null
+  const { tilt, cardHeight, overColumnId } = dragStateRef.current
+  const overlayTask = overlayTaskRef.current
+  // Only collapse the source card when dragging to a DIFFERENT column.
+  // Same-column: SortableTaskCard uses opacity:0 (keeps height for dnd-kit displacement).
+  const isCrossColumn = overlayTask && overColumnId && overColumnId !== overlayTask.status.id
 
   const announcements = useMemo(() => ({
     onDragStart({ active }: { active: { id: string | number } }) {
@@ -412,11 +450,11 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
             tasks={filteredTasksMap[status.id] ?? []}
             onTaskClick={onTaskClick}
             onAddTask={addTaskCallbacks[status.id]}
-            placeholderIdx={getPlaceholderIdx(status.id)}
-            placeholderHeight={draggedCardHeight}
+            placeholderIdx={placeholderIndices[status.id] ?? -1}
+            placeholderHeight={cardHeight}
             hideDragSourceId={
-              activeTask && dragOverColumnId && dragOverColumnId !== activeTask.status.id && activeTask.status.id === status.id
-                ? activeTask.id
+              isCrossColumn && overlayTask.status.id === status.id
+                ? overlayTask.id
                 : undefined
             }
             compact={compact}
@@ -437,7 +475,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
       <TaskAnimationLayer />
 
       <DragOverlay dropAnimation={null}>
-        {freshOverlayTask && (
+        {overlayTask && (
           <div aria-hidden="true" style={{
             perspective: 600,
           }}>
@@ -448,7 +486,7 @@ export function KanbanBoard({ onTaskClick, onAddTask, compact }: KanbanBoardProp
               boxShadow: `${-tilt.y * 0.5}px ${tilt.x * 0.5 + 12}px 40px -8px rgba(0,0,0,0.35)`,
               borderRadius: 12,
             }}>
-              <TaskCard task={freshOverlayTask} onClick={() => {}} isDragOverlay compact={compact} />
+              <TaskCard task={overlayTask} onClick={() => {}} isDragOverlay compact={compact} />
             </div>
           </div>
         )}
